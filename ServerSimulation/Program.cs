@@ -1,0 +1,34 @@
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+
+builder.Services.AddControllers();
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (true)
+{
+    app.UseSwagger();
+    //app.UseSwaggerUI(); //for windows
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+        c.RoutePrefix = string.Empty; // Access Swagger at the root URL
+    }); // for mac
+}
+
+app.UseHttpsRedirection();
+
+app.UseStaticFiles(); // added for mac
+
+app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();

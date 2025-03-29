@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shelter Assignment Simulation</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <!-- Leaflet Routing Machine CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/styles.css" />
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Routing Machine JavaScript -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/js/simulation.js" defer></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Shelter Assignment Simulation</h1>
+
+      <div class="simulation-container">
+        <div id="map"></div>
+      </div>
+
+     
+    <script>
+      // Initialize the visualizer when the page loads
+      let visualizer;
+
+      document.addEventListener("DOMContentLoaded", function () {
+        visualizer = new ShelterSimulationVisualizer("map");
+
+        // For demo/testing purposes, load a simple dataset on page load
+        loadDemoData();
+      });
+
+      function loadDemoData() {
+        // This is a simple demo dataset for initial display
+        const demoData = {
+          people: generateDemoPeople(50),
+          shelters: generateDemoShelters(5),
+          assignments: {},
+        };
+
+        // Generate some sample assignments
+        demoData.people.forEach((person) => {
+          // Assign 80% of people to random shelters
+          if (Math.random() < 0.8) {
+            const randomShelter =
+              demoData.shelters[
+                Math.floor(Math.random() * demoData.shelters.length)
+              ];
+
+            // Calculate distance
+            const distance = calculateDistance(
+              person.latitude,
+              person.longitude,
+              randomShelter.latitude,
+              randomShelter.longitude
+            );
+
+            demoData.assignments[person.id] = {
+              personId: person.id,
+              shelterId: randomShelter.id,
+              distance: distance,
+            };
+          }
+        });
+
+        // Visualize demo data
+        visualizer.visualizeSimulation(
+          demoData.people,
+          demoData.shelters,
+          demoData.assignments
+        );
+      }
+
+      function generateDemoPeople(count) {
+        const people = [];
+        const centerLat = 31.2518; // Beer Sheva latitude
+        const centerLon = 34.7913; // Beer Sheva longitude
+        const radius = 0.05; // roughly 5km
+
+        for (let i = 0; i < count; i++) {
+          const age = Math.floor(Math.random() * 90) + 1; // Age 1-90
+
+          // Generate random point within radius
+          const angle = Math.random() * 2 * Math.PI;
+          const distance = Math.random() * radius;
+          const lat = centerLat + distance * Math.cos(angle);
+          const lon = centerLon + distance * Math.sin(angle);
+
+          people.push({
+            id: i + 1,
+            age: age,
+            latitude: lat,
+            longitude: lon,
+          });
+        }
+
+        return people;
+      }
+
+      function generateDemoShelters(count) {
+        const shelters = [];
+        const centerLat = 31.2518; // Beer Sheva latitude
+        const centerLon = 34.7913; // Beer Sheva longitude
+        const radius = 0.05; // roughly 5km
+
+        for (let i = 0; i < count; i++) {
+          // Generate random point within radius, but more central
+          const angle = Math.random() * 2 * Math.PI;
+          const distance = Math.random() * radius * 0.7;
+          const lat = centerLat + distance * Math.cos(angle);
+          const lon = centerLon + distance * Math.sin(angle);
+
+          shelters.push({
+            id: i + 1,
+            name: `Shelter ${i + 1}`,
+            latitude: lat,
+            longitude: lon,
+            capacity: Math.floor(Math.random() * 30) + 10, // Capacity 10-40
+          });
+        }
+
+        return shelters;
+      }
+
+      function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius of earth in km
+        const dLat = toRadians(lat2 - lat1);
+        const dLon = toRadians(lon2 - lon1);
+
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(toRadians(lat1)) *
+            Math.cos(toRadians(lat2)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function toRadians(degrees) {
+        return (degrees * Math.PI) / 180;
+      }
+
+      function runScenario(scenarioType) {
+        // In a real implementation, this would call your backend API
+        // Here we'll just generate different demo data based on the scenario
+
+        let peopleCount, shelterCount, radius, priorityEnabled;
+
+        switch (scenarioType) {
+          case "standard":
+            peopleCount = 100;
+            shelterCount = 8;
+            radius = 0.05;
+            priorityEnabled = true;
+            break;
+          case "limited-capacity":
+            peopleCount = 200;
+            shelterCount = 5;
+            radius = 0.05;
+            priorityEnabled = true;
+            break;
+          case "dense-urban":
+            peopleCount = 300;
+            shelterCount = 12;
+            radius = 0.03;
+            priorityEnabled = true;
+            break;
+          case "rural":
+            peopleCount = 50;
+            shelterCount = 3;
+            radius = 0.1;
+            priorityEnabled = true;
+            break;
+          case "no-priority":
+            peopleCount = 100;
+            shelterCount = 8;
+            radius = 0.05;
+            priorityEnabled = false;
+            break;
+          default:
+            peopleCount = 100;
+            shelterCount = 8;
+            radius = 0.05;
+            priorityEnabled = true;
+        }
+
+        // Show loading indicator
+        document.body.classList.add("loading");
+
+        // Simulate a server delay
+        setTimeout(() => {
+          runDemoSimulation(peopleCount, shelterCount, radius, priorityEnabled);
+          document.body.classList.remove("loading");
+        }, 1000);
+      }
+
+      function runDemoSimulation(
+        peopleCount,
+        shelterCount,
+        radius,
+        priorityEnabled
+      ) {
+        // This is where you would normally call the backend
+        // For the demo, we'll implement a simplified version of the algorithm in JavaScript
+
+        const centerLat = 31.2518; // Beer Sheva latitude
+        const centerLon = 34.7913; // Beer Sheva longitude
+
+        // Generate people and shelters
+        const people = generateDemoPeople(peopleCount);
+        const shelters = generateDemoShelters(shelterCount);
+
+        // Create working copies of the data
+        const remainingShelters = shelters.map((s) => ({
+          ...s,
+          remainingCapacity: s.capacity,
+          assignedPeople: [],
+        }));
+
+        // Sort people by priority if needed
+        if (priorityEnabled) {
+          people.sort((a, b) => {
+            // Children and elderly first
+            const aPriority = a.age <= 12 || a.age >= 70 ? 0 : 1;
+            const bPriority = b.age <= 12 || b.age >= 70 ? 0 : 1;
+            return aPriority - bPriority;
+          });
+        }
+
+        const assignments = {};
+
+        // Assign each person to the nearest shelter with available capacity
+        people.forEach((person) => {
+          const availableShelters = remainingShelters.filter(
+            (s) => s.remainingCapacity > 0
+          );
+          if (availableShelters.length === 0) {
+            // All shelters at capacity - this person remains unassigned
+            return;
+          }
+
+          // Find nearest shelter
+          availableShelters.sort((a, b) => {
+            const distanceA = calculateDistance(
+              person.latitude,
+              person.longitude,
+              a.latitude,
+              a.longitude
+            );
+            const distanceB = calculateDistance(
+              person.latitude,
+              person.longitude,
+              b.latitude,
+              b.longitude
+            );
+            return distanceA - distanceB;
+          });
+
+          const nearestShelter = availableShelters[0];
+
+          // Calculate distance
+          const distance = calculateDistance(
+            person.latitude,
+            person.longitude,
+            nearestShelter.latitude,
+            nearestShelter.longitude
+          );
+
+          // Create assignment
+          assignments[person.id] = {
+            personId: person.id,
+            shelterId: nearestShelter.id,
+            distance: distance,
+          };
+
+          // Update shelter capacity
+          nearestShelter.remainingCapacity--;
+          nearestShelter.assignedPeople.push(person);
+        });
+
+        // Visualize the results
+        visualizer.visualizeSimulation(people, shelters, assignments);
+      }
+    </script>
+  </body>
+</html>
