@@ -1,0 +1,157 @@
+html {
+  font-family: "Assistant";
+}
+body {
+  font-family: "Arial", sans-serif;
+  background-color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  padding: 25px;
+  margin-bottom: 20px;
+  margin-top: -50px;
+}
+
+.header {
+  margin-top: 50px;
+  margin-bottom: -25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo {
+  width: 75%;
+}
+.header img {
+  width: 22%;
+  height: 22%;
+  height: auto;
+  margin-bottom: -25px; /* ביטול רווחים פנימיים */
+  display: block;
+}
+
+h1 {
+  font-size: 36px;
+  color: #1d2e59;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 75px;
+}
+
+label {
+  text-align: right;
+  font-size: 24px;
+  color: #1d2e59;
+  margin-bottom: -10px;
+}
+
+input {
+  width: 360px;
+  height: 50px;
+  padding: 25px;
+  font-size: 16px;
+  border: 1px solid #aac0d8;
+  background-color: #aac0d8;
+  border-radius: 15px;
+  box-sizing: border-box;
+}
+
+input:focus {
+  outline: none;
+  border-color: #1d2e59;
+}
+
+.submit-button {
+  width: 100%;
+  padding: 15px;
+  font-size: 24px;
+  color: white;
+  background-color: #1d2e59;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  margin-top: 15px;
+  height: 76px;
+}
+
+.submit-button:hover {
+  background-color: #14203f;
+}
+
+.custom-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #b0c4de; /* צבע רקע */
+  padding: 15px 20px; /* ריווח פנימי */
+  border-radius: 40px 40px 0 0; /* פינות מעוגלות בחלק העליון */
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000; /* מבטיח שהתחתית תהיה מעל אלמנטים אחרים */
+}
+
+.footer-button-i {
+  background-color: #b0c4de;
+  border: white 4px solid; /* גבול לבן */
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s ease; /* אפקט מעבר */
+  margin-right: 40px;
+}
+.footer-button2 {
+  background-color: #b0c4de;
+  border: white 4px solid; /* גבול לבן */
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s ease; /* אפקט מעבר */
+  margin-left: 40px;
+}
+.footer-button:hover {
+  transform: scale(1.1); /* הגדלה קלה בעת ריחוף */
+}
+
+.footer-center {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: -60px; /* מעלה את הכפתור המרכזי */
+}
+
+.footer-center .footer-button {
+  width: 100px;
+  height: 100px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  background-color: #b0c4de;
+  border: 5px solid white;
+  border-radius: 50%;
+}
