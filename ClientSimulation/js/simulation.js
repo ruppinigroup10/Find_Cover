@@ -1,71 +1,92 @@
+/**
+ * ShelterSimulationVisualizer - Main class that handles the simulation and visualization of shelter assignments
+ * This class creates and manages an interactive map for visualizing emergency shelter assignments
+ * It allows generating random populations and shelter locations, then assigns people to shelters
+ * based on distance and priority rules, and visualizes the results on the map
+ */
 class ShelterSimulationVisualizer {
+  /**
+   * Constructor - initializes the map, layers, statistics, and UI controls
+   * @param {string} mapElementId - The HTML element ID where the map will be rendered
+   */
   constructor(mapElementId) {
-    // Initialize the map
+    // Initialize the map centered on Beer Sheva
     this.map = L.map(mapElementId).setView([31.2518, 34.7913], 13); // Beer Sheva coordinates
 
-    // Base map layer - OpenStreetMap
+    // Add OpenStreetMap as the base tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.map);
 
-    // Initialize marker groups
-    this.shelterMarkers = L.layerGroup().addTo(this.map);
-    this.peopleMarkers = L.layerGroup().addTo(this.map);
-    this.pathLines = L.layerGroup().addTo(this.map);
+    // Create layer groups to organize map elements
+    this.shelterMarkers = L.layerGroup().addTo(this.map); // Group for shelter markers
+    this.peopleMarkers = L.layerGroup().addTo(this.map); // Group for people markers
+    this.pathLines = L.layerGroup().addTo(this.map); // Group for path lines connecting people to shelters
 
-    // Initialize counters and statistics
+    // Initialize statistics object to track simulation results
     this.stats = {
       totalPeople: 0,
       assignedPeople: 0,
       unassignedPeople: 0,
       averageDistance: 0,
       maxDistance: 0,
-      shelterUsage: [],
+      shelterUsage: [], // Will store usage statistics for each shelter
       ageGroups: {
+        // Tracks age demographics of assigned/unassigned people
         assigned: { elderly: 0, children: 0, adults: 0 },
         unassigned: { elderly: 0, children: 0, adults: 0 },
       },
     };
 
-    // Initialize custom icons
+    // Create custom map icons for different entities
     this.icons = this.createIcons();
 
-    // Add UI controls
+    // Set up UI control panels
     this.addControlPanel();
   }
 
-  // Function to calculate street distance using Leaflet Routing Machine
+  /**
+   * Calculates the real-world street distance between two points using Leaflet Routing Machine
+   * This is more accurate than air distance as it accounts for actual road networks
+   *
+   * @param {number} lat1 - Latitude of the first point
+   * @param {number} lon1 - Longitude of the first point
+   * @param {number} lat2 - Latitude of the second point
+   * @param {number} lon2 - Longitude of the second point
+   * @returns {Promise} - Resolves to an object with distance in km and route coordinates
+   */
   calculateStreetDistance(lat1, lon1, lat2, lon2) {
     return new Promise((resolve, reject) => {
-      // Debug log
+      // Log debugging information
       console.log(
         `Calculating street distance from [${lat1},${lon1}] to [${lat2},${lon2}]`
       );
 
       try {
-        // Create a routing control with default router
+        // Create a Leaflet routing control configured to calculate the route
         const control = L.Routing.control({
-          waypoints: [L.latLng(lat1, lon1), L.latLng(lat2, lon2)],
+          waypoints: [L.latLng(lat1, lon1), L.latLng(lat2, lon2)], // Start and end points
           routeWhileDragging: false,
           lineOptions: {
-            styles: [{ color: "#0000FF", opacity: 0, weight: 0 }], // Hidden path
+            styles: [{ color: "#0000FF", opacity: 0, weight: 0 }], // Hidden path - we only need the data
           },
-          fitSelectedRoutes: false,
-          show: false,
-          showAlternatives: false,
-          addWaypoints: false,
-          useZoomParameter: false,
-          draggableWaypoints: false,
+          fitSelectedRoutes: false, // Don't auto-focus map on the route
+          show: false, // Don't show the routing control UI
+          showAlternatives: false, // We only need one route
+          addWaypoints: false, // Prevent adding additional waypoints
+          useZoomParameter: false, // Don't modify the zoom level
+          draggableWaypoints: false, // Waypoints shouldn't be draggable
         });
 
         // Add control to map temporarily to calculate route
         control.addTo(this.map);
 
-        // Listen for route calculation
+        // Event handler for successful route calculation
         control.on("routesfound", (e) => {
           const routes = e.routes;
           if (routes && routes.length > 0) {
+            // Extract distance from the first route
             const route = routes[0];
             const distanceInMeters = route.summary.totalDistance;
             const distanceInKm = distanceInMeters / 1000;
@@ -74,13 +95,13 @@ class ShelterSimulationVisualizer {
               `Street distance calculated: ${distanceInKm.toFixed(2)} km`
             );
 
-            // Update our route data with the actual path coordinates for visualization
+            // Extract the route path coordinates for visualization
             const routeCoords = routes[0].coordinates.map((coord) => [
               coord.lat,
               coord.lng,
             ]);
 
-            // Safe removal - check if the control is still on the map
+            // Remove the routing control from the map to free resources
             try {
               if (this.map) {
                 this.map.removeControl(control);
@@ -89,12 +110,13 @@ class ShelterSimulationVisualizer {
               console.warn("Could not remove routing control:", err);
             }
 
-            // Return both distance and route coordinates
+            // Return both the distance and the route coordinates
             resolve({
               distance: distanceInKm,
               coordinates: routeCoords,
             });
           } else {
+            // Fall back to air distance if no routes were found
             console.warn("No routes found");
             const airDistance = this.calculateAirDistance(
               lat1,
@@ -103,7 +125,7 @@ class ShelterSimulationVisualizer {
               lon2
             );
 
-            // Safe removal
+            // Clean up by removing the control
             try {
               if (this.map) {
                 this.map.removeControl(control);
@@ -112,6 +134,7 @@ class ShelterSimulationVisualizer {
               console.warn("Could not remove routing control:", err);
             }
 
+            // Return air distance and a straight line path
             resolve({
               distance: airDistance,
               coordinates: [
@@ -122,13 +145,12 @@ class ShelterSimulationVisualizer {
           }
         });
 
-        // Handle errors
+        // Handle routing errors by falling back to air distance
         control.on("routingerror", (e) => {
           console.warn("Routing error:", e.error);
-          // Fall back to air distance
           const airDistance = this.calculateAirDistance(lat1, lon1, lat2, lon2);
 
-          // Safe removal
+          // Clean up
           try {
             if (this.map) {
               this.map.removeControl(control);
@@ -137,6 +159,7 @@ class ShelterSimulationVisualizer {
             console.warn("Could not remove routing control:", err);
           }
 
+          // Return fallback distance and path
           resolve({
             distance: airDistance,
             coordinates: [
@@ -146,12 +169,12 @@ class ShelterSimulationVisualizer {
           });
         });
 
-        // Timeout if routing takes too long
+        // Set a timeout to prevent hanging if routing takes too long
         setTimeout(() => {
           console.warn("Routing timeout");
           const airDistance = this.calculateAirDistance(lat1, lon1, lat2, lon2);
 
-          // Safe removal
+          // Clean up
           try {
             if (this.map) {
               this.map.removeControl(control);
@@ -160,6 +183,7 @@ class ShelterSimulationVisualizer {
             console.warn("Could not remove routing control:", err);
           }
 
+          // Return fallback after timeout
           resolve({
             distance: airDistance,
             coordinates: [
@@ -167,8 +191,9 @@ class ShelterSimulationVisualizer {
               [lat2, lon2],
             ],
           });
-        }, 5000);
+        }, 5000); // 5 second timeout
       } catch (error) {
+        // Handle any exceptions in routing setup
         console.error("Error in street distance calculation:", error);
         const airDistance = this.calculateAirDistance(lat1, lon1, lat2, lon2);
         resolve({
@@ -181,11 +206,21 @@ class ShelterSimulationVisualizer {
       }
     });
   }
-  // Implementation of a method to calculate street distances for all assignments
+
+  /**
+   * Calculates street distances for all person-shelter assignments
+   * Processes each assignment sequentially to avoid overwhelming routing services
+   *
+   * @param {Array} people - Array of person objects
+   * @param {Array} shelters - Array of shelter objects
+   * @param {Object} assignments - Object mapping person IDs to their shelter assignments
+   * @returns {Object} - Updated assignments with street distances and routes
+   */
   async calculateAllStreetDistances(people, shelters, assignments) {
     console.log("Calculating street distances for all assignments...");
     const assignmentKeys = Object.keys(assignments);
 
+    // Process each assignment sequentially
     for (let i = 0; i < assignmentKeys.length; i++) {
       const personId = assignmentKeys[i];
       const assignment = assignments[personId];
@@ -194,14 +229,14 @@ class ShelterSimulationVisualizer {
 
       if (person && shelter) {
         try {
-          // Log progress
+          // Log progress to console
           console.log(
             `Calculating route for person ${personId} (${i + 1}/${
               assignmentKeys.length
             })`
           );
 
-          // Calculate street distance
+          // Calculate the street distance for this person-shelter pair
           const result = await this.calculateStreetDistance(
             person.latitude,
             person.longitude,
@@ -209,13 +244,13 @@ class ShelterSimulationVisualizer {
             shelter.longitude
           );
 
-          // Update assignment with street distance and route
+          // Update the assignment with the calculated distance and route
           assignment.distance = result.distance;
           assignment.route = {
             coordinates: result.coordinates,
           };
 
-          // Add a small delay to avoid overwhelming the routing service
+          // Small delay to prevent overwhelming the routing service
           await new Promise((resolve) => setTimeout(resolve, 200));
         } catch (error) {
           console.error(
@@ -230,11 +265,22 @@ class ShelterSimulationVisualizer {
     return assignments;
   }
 
+  /**
+   * Calculates the "as the crow flies" distance between two points using the Haversine formula
+   * This is much faster than street distance but less accurate for actual travel
+   *
+   * @param {number} lat1 - Latitude of the first point
+   * @param {number} lon1 - Longitude of the first point
+   * @param {number} lat2 - Latitude of the second point
+   * @param {number} lon2 - Longitude of the second point
+   * @returns {number} - Distance in kilometers
+   */
   calculateAirDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Earth radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180; // Convert degree difference to radians
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
+    // Haversine formula for distance on a sphere
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
@@ -243,35 +289,46 @@ class ShelterSimulationVisualizer {
         Math.sin(dLon / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance in kilometers
   }
 
+  /**
+   * Creates custom map icons for different entity types
+   * Uses div icons with color-coded dots to distinguish between different types
+   *
+   * @returns {Object} - Object containing Leaflet icon objects for each entity type
+   */
   createIcons() {
     return {
+      // Shelter icon - orange dot
       shelter: L.divIcon({
         className: "marker-shelter",
         html: '<div style="background-color: #ff4500; border-radius: 50%; width: 14px; height: 14px;"></div>',
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       }),
+      // Regular person icon - blue dot
       person: L.divIcon({
         className: "marker-person",
         html: '<div style="background-color: #4169e1; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
+      // Child icon - green dot
       child: L.divIcon({
         className: "marker-child",
         html: '<div style="background-color: #32cd32; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
+      // Elderly icon - pink dot
       elderly: L.divIcon({
         className: "marker-elderly",
         html: '<div style="background-color: #ff69b4; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
+      // Unassigned person icon - gray dot
       unassigned: L.divIcon({
         className: "marker-unassigned",
         html: '<div style="background-color: #808080; border-radius: 50%; width: 10px; height: 10px;"></div>',
@@ -281,12 +338,17 @@ class ShelterSimulationVisualizer {
     };
   }
 
+  /**
+   * Clears all layers and resets statistics
+   * Called before visualizing a new simulation
+   */
   clearMap() {
+    // Clear all markers and lines from the map
     this.shelterMarkers.clearLayers();
     this.peopleMarkers.clearLayers();
     this.pathLines.clearLayers();
 
-    // Reset statistics
+    // Reset statistics to initial state
     this.stats = {
       totalPeople: 0,
       assignedPeople: 0,
@@ -301,10 +363,18 @@ class ShelterSimulationVisualizer {
     };
   }
 
+  /**
+   * Main visualization method - displays simulation results on the map
+   *
+   * @param {Array} people - Array of person objects
+   * @param {Array} shelters - Array of shelter objects
+   * @param {Object} assignments - Object mapping person IDs to their shelter assignments
+   */
   visualizeSimulation(people, shelters, assignments) {
     // Clear previous visualization
     this.clearMap();
 
+    // Update basic statistics
     this.stats.totalPeople = people.length;
     this.stats.assignedPeople = Object.keys(assignments).length;
     this.stats.unassignedPeople =
@@ -316,74 +386,102 @@ class ShelterSimulationVisualizer {
       unassigned: { elderly: 0, children: 0, adults: 0 },
     };
 
-    // Calculate appropriate bounds for the map
+    // Calculate map bounds to ensure all entities are visible
     const bounds = this.calculateBounds(people, shelters);
     this.map.fitBounds(bounds);
 
-    // Display shelters
+    // Display shelters on the map
     this.displayShelters(shelters);
 
-    // Display people and their assignments
+    // Display people and their shelter assignments
     this.displayPeopleAndAssignments(people, shelters, assignments);
 
-    // Update statistics display
+    // Update the statistics display in the UI
     this.updateStatisticsDisplay();
   }
 
+  /**
+   * Calculates the geographical bounds that contain all people and shelters
+   * Used to set the map view to show all entities
+   *
+   * @param {Array} people - Array of person objects with coordinates
+   * @param {Array} shelters - Array of shelter objects with coordinates
+   * @returns {L.LatLngBounds} - Leaflet bounds object
+   */
   calculateBounds(people, shelters) {
+    // Combine all coordinates into a single array
     const allPoints = [
       ...people.map((p) => [p.latitude, p.longitude]),
       ...shelters.map((s) => [s.latitude, s.longitude]),
     ];
 
-    // If we have data, calculate bounds
+    // If we have data, calculate bounds from all points
     if (allPoints.length > 0) {
       return L.latLngBounds(allPoints);
     }
 
-    // Default bounds if no data
+    // Default bounds centered on Tel Aviv if no data
     return L.latLngBounds([
       [32.0853 - 0.1, 34.7818 - 0.1],
       [32.0853 + 0.1, 34.7818 + 0.1],
     ]);
   }
 
+  /**
+   * Displays shelter markers on the map and initializes shelter usage statistics
+   *
+   * @param {Array} shelters - Array of shelter objects
+   */
   displayShelters(shelters) {
-    // Initialize shelter usage statistics
+    // Initialize shelter usage statistics for each shelter
     this.stats.shelterUsage = shelters.map((s) => ({
       id: s.id,
       name: s.name,
       capacity: s.capacity,
-      assigned: 0,
-      percentUsed: 0,
+      assigned: 0, // Number of people assigned
+      percentUsed: 0, // Percentage of capacity used
     }));
 
+    // Add each shelter as a marker on the map
     shelters.forEach((shelter) => {
       const marker = L.marker([shelter.latitude, shelter.longitude], {
         icon: this.icons.shelter,
       });
 
-      // Add popup with shelter info
+      // Add popup with shelter information
       marker.bindPopup(`
                 <h3>${shelter.name}</h3>
                 <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
                 <p>Status: <span id="shelter-${shelter.id}-status">Empty</span></p>
             `);
 
+      // Add the marker to the shelter layer group
       this.shelterMarkers.addLayer(marker);
     });
   }
 
+  /**
+   * Displays people and their shelter assignments on the map
+   * Draws paths between people and their assigned shelters
+   * Updates statistics based on assignments
+   *
+   * @param {Array} people - Array of person objects
+   * @param {Array} shelters - Array of shelter objects
+   * @param {Object} assignments - Mapping of person IDs to shelter assignments
+   */
   displayPeopleAndAssignments(people, shelters, assignments) {
     // Track total distance for average calculation
     let totalDistance = 0;
     this.stats.maxDistance = 0;
 
+    // Process each person
     people.forEach((person) => {
       // Determine which icon to use based on age and assignment status
-      let icon = this.icons.person;
+      let icon = this.icons.person; // Default icon
+
+      // Handle unassigned people
       if (!assignments[person.id]) {
-        icon = this.icons.unassigned;
+        icon = this.icons.unassigned; // Gray icon for unassigned
 
         // Update age group statistics for unassigned
         if (person.age >= 70) {
@@ -394,7 +492,7 @@ class ShelterSimulationVisualizer {
           this.stats.ageGroups.unassigned.adults++;
         }
       } else {
-        // Update age group statistics for assigned
+        // Handle assigned people - use age-specific icons
         if (person.age >= 70) {
           icon = this.icons.elderly;
           this.stats.ageGroups.assigned.elderly++;
@@ -406,6 +504,7 @@ class ShelterSimulationVisualizer {
         }
       }
 
+      // Create a marker for this person
       const marker = L.marker([person.latitude, person.longitude], { icon });
 
       // Check if the person has been assigned to a shelter
@@ -424,7 +523,7 @@ class ShelterSimulationVisualizer {
               (shelterStat.assigned / shelter.capacity) * 100;
           }
 
-          // Update document elements for this shelter
+          // Update DOM elements for this shelter's popup
           const countElement = document.getElementById(
             `shelter-${shelter.id}-count`
           );
@@ -437,6 +536,7 @@ class ShelterSimulationVisualizer {
           }
 
           if (statusElement) {
+            // Update status text and class based on usage
             if (shelterStat.assigned >= shelter.capacity) {
               statusElement.textContent = "Full";
               statusElement.className = "status-full";
@@ -449,7 +549,8 @@ class ShelterSimulationVisualizer {
             }
           }
 
-          // Show the actual route if you have it
+          // Draw the path from person to shelter
+          // Use the calculated route if available
           if (assignment.route && assignment.route.coordinates) {
             const routeLine = L.polyline(assignment.route.coordinates, {
               color: this.getLineColor(person.age),
@@ -458,7 +559,7 @@ class ShelterSimulationVisualizer {
             });
             this.pathLines.addLayer(routeLine);
           } else {
-            // Fallback to straight line
+            // Fallback to a straight line if no route is available
             const line = L.polyline(
               [
                 [person.latitude, person.longitude],
@@ -475,7 +576,7 @@ class ShelterSimulationVisualizer {
             this.stats.maxDistance = assignment.distance;
           }
 
-          // Add popup with assignment info
+          // Add popup with assignment information
           marker.bindPopup(`
           <p>Person #${person.id}</p>
           <p>Age: ${person.age}</p>
@@ -484,7 +585,7 @@ class ShelterSimulationVisualizer {
         `);
         }
       } else {
-        // Unassigned person popup
+        // Popup for unassigned person
         marker.bindPopup(`
         <p>Person #${person.id}</p>
         <p>Age: ${person.age}</p>
@@ -492,23 +593,32 @@ class ShelterSimulationVisualizer {
       `);
       }
 
+      // Add the marker to the people layer group
       this.peopleMarkers.addLayer(marker);
     });
 
-    // Calculate average distance
+    // Calculate average distance for assigned people
     if (this.stats.assignedPeople > 0) {
       this.stats.averageDistance = totalDistance / this.stats.assignedPeople;
     }
   }
 
+  /**
+   * Adds control panels to the map
+   * Sets up UI elements for statistics and simulation controls
+   */
   addControlPanel() {
-    // Create control panels
-    this.addStatisticsPanel();
-    this.addSimulationControlPanel();
+    // Create both control panels
+    this.addStatisticsPanel(); // Panel showing simulation results
+    this.addSimulationControlPanel(); // Panel with input controls
   }
 
+  /**
+   * Adds a statistics panel to the top-right corner of the map
+   * Displays summary statistics about the simulation
+   */
   addStatisticsPanel() {
-    // Create statistics panel in the top right
+    // Create statistics panel HTML element
     const statsDiv = L.DomUtil.create(
       "div",
       "simulation-statistics leaflet-bar"
@@ -534,10 +644,10 @@ class ShelterSimulationVisualizer {
       </div>
     `;
 
-    // Create a custom control
+    // Create a custom Leaflet control for the statistics panel
     const StatsControl = L.Control.extend({
       options: {
-        position: "topright",
+        position: "topright", // Position in the top-right corner
       },
       onAdd: () => {
         return statsDiv;
@@ -548,8 +658,12 @@ class ShelterSimulationVisualizer {
     new StatsControl().addTo(this.map);
   }
 
+  /**
+   * Adds a simulation control panel to the top-left corner of the map
+   * Provides UI controls for configuring and running simulations
+   */
   addSimulationControlPanel() {
-    // Create simulation control panel in the top left
+    // Create control panel HTML element
     const controlDiv = L.DomUtil.create(
       "div",
       "simulation-controls leaflet-bar"
@@ -597,10 +711,10 @@ class ShelterSimulationVisualizer {
     </div>
   `;
 
-    // Create a custom control
+    // Create a custom Leaflet control for the control panel
     const ControlPanelControl = L.Control.extend({
       options: {
-        position: "topleft",
+        position: "topleft", // Position in the top-left corner
       },
       onAdd: () => {
         return controlDiv;
@@ -610,13 +724,13 @@ class ShelterSimulationVisualizer {
     // Add the control to the map
     new ControlPanelControl().addTo(this.map);
 
-    // Add event listeners
+    // Add event listeners after a short delay to ensure DOM is ready
     setTimeout(() => {
       const runButton = document.getElementById("run-simulation");
       const simTypeSelect = document.getElementById("simulation-type");
       const clientOnlyElements = document.querySelectorAll(".client-only");
 
-      // Toggle visibility of client-only options
+      // Toggle visibility of client-only options based on simulation type
       if (simTypeSelect) {
         simTypeSelect.addEventListener("change", () => {
           const isClientSide = simTypeSelect.value === "client";
@@ -626,21 +740,26 @@ class ShelterSimulationVisualizer {
         });
       }
 
+      // Set up the run button to trigger the appropriate simulation type
       if (runButton) {
         runButton.addEventListener("click", () => {
           const simulationType =
             document.getElementById("simulation-type").value;
           if (simulationType === "server") {
-            runServerSimulation();
+            runServerSimulation(); // Call external server simulation function
           } else {
-            this.runSimulationFromUI(); // Local simulation
+            this.runSimulationFromUI(); // Run local simulation
           }
         });
       }
-    }, 500);
+    }, 500); // Short delay to ensure DOM is ready
   }
 
-  // Method to run simulation with parameters from the UI
+  /**
+   * Runs a client-side simulation with parameters from the UI controls
+   * Generates random people and shelters, assigns people to shelters,
+   * and visualizes the results
+   */
   async runSimulationFromUI() {
     const statusElement = document.getElementById("simulation-status");
     if (statusElement) {
@@ -649,7 +768,7 @@ class ShelterSimulationVisualizer {
     }
 
     try {
-      // Get parameters from UI
+      // Get parameters from UI controls
       const peopleCount =
         parseInt(document.getElementById("people-count").value) || 100;
       const shelterCount =
@@ -660,21 +779,21 @@ class ShelterSimulationVisualizer {
       const useStreetDistance =
         document.getElementById("route-type").value === "street";
 
-      // Convert radius from km to degrees (approximate)
-      const radiusDegrees = radius / 111; // 1 degree ≈ 111 km
+      // Convert radius from km to approximate degrees (1 degree ≈ 111 km)
+      const radiusDegrees = radius / 111;
 
-      // Generate data
+      // Generate random data for the simulation
       const people = this.generatePeople(peopleCount, radiusDegrees);
       const shelters = this.generateShelters(shelterCount, radiusDegrees);
 
-      // Run assignment algorithm
+      // Run the assignment algorithm
       let assignments = this.assignPeopleToShelters(
         people,
         shelters,
         priorityEnabled
       );
 
-      // If street distance is selected, calculate actual street distances
+      // Calculate street distances if selected (more accurate but slower)
       if (useStreetDistance) {
         if (statusElement) {
           statusElement.textContent = "Calculating street distances...";
@@ -686,9 +805,10 @@ class ShelterSimulationVisualizer {
         );
       }
 
-      // Visualize the results
+      // Visualize the simulation results
       this.visualizeSimulation(people, shelters, assignments);
 
+      // Update status message
       if (statusElement) {
         statusElement.textContent = "Simulation complete";
         statusElement.className = "status-message success";
@@ -708,7 +828,13 @@ class ShelterSimulationVisualizer {
     }
   }
 
-  // Generate people with random locations around the center
+  /**
+   * Generates random people with realistic age distribution around a center point
+   *
+   * @param {number} count - Number of people to generate
+   * @param {number} radiusDegrees - Radius in degrees to distribute people
+   * @returns {Array} - Array of generated person objects
+   */
   generatePeople(count, radiusDegrees) {
     const people = [];
     const centerLat = 31.2518; // Beer Sheva latitude
@@ -716,7 +842,8 @@ class ShelterSimulationVisualizer {
 
     for (let i = 0; i < count; i++) {
       let age;
-      // Generate age with a better distribution
+      // Generate age with a realistic distribution:
+      // 15% children, 70% adults, 15% elderly
       const ageRand = Math.random();
       if (ageRand < 0.15) {
         // 15% children
@@ -729,12 +856,13 @@ class ShelterSimulationVisualizer {
         age = Math.floor(Math.random() * 25) + 70; // Ages 70-94
       }
 
-      // Generate random point within radius
-      const angle = Math.random() * 2 * Math.PI;
-      const distance = Math.random() * radiusDegrees;
-      const lat = centerLat + distance * Math.cos(angle);
-      const lon = centerLon + distance * Math.sin(angle);
+      // Generate random point within radius using polar coordinates
+      const angle = Math.random() * 2 * Math.PI; // Random angle in radians
+      const distance = Math.random() * radiusDegrees; // Random distance within max radius
+      const lat = centerLat + distance * Math.cos(angle); // Convert to latitude
+      const lon = centerLon + distance * Math.sin(angle); // Convert to longitude
 
+      // Add person to the array
       people.push({
         id: i + 1,
         age: age,
@@ -746,13 +874,19 @@ class ShelterSimulationVisualizer {
     return people;
   }
 
-  // Generate shelters with random locations around the center
+  /**
+   * Generates random shelters, including some known landmarks in Beer Sheva
+   *
+   * @param {number} count - Number of shelters to generate
+   * @param {number} radiusDegrees - Radius in degrees for random shelters
+   * @returns {Array} - Array of generated shelter objects
+   */
   generateShelters(count, radiusDegrees) {
     const shelters = [];
     const centerLat = 31.2518; // Beer Sheva latitude
     const centerLon = 34.7913; // Beer Sheva longitude
 
-    // Add some known Beer Sheva locations first
+    // Include some real-world locations as shelters for realism
     const knownLocations = [
       { name: "Ben Gurion University", lat: 31.2634, lon: 34.8044 },
       { name: "Beer Sheva Central Station", lat: 31.2434, lon: 34.798 },
@@ -760,7 +894,7 @@ class ShelterSimulationVisualizer {
       { name: "Soroka Medical Center", lat: 31.2534, lon: 34.8018 },
     ];
 
-    // Add known locations first if they fit within the count
+    // Add known locations first if they fit within the requested count
     for (let i = 0; i < Math.min(count, knownLocations.length); i++) {
       const location = knownLocations[i];
       shelters.push({
@@ -774,12 +908,14 @@ class ShelterSimulationVisualizer {
 
     // Add remaining random shelters if needed
     for (let i = knownLocations.length; i < count; i++) {
-      // Generate random point within radius, but more central
+      // Generate random point within radius, but more central (0.7 factor)
+      // Shelters are more centrally located for realism
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.random() * radiusDegrees * 0.7; // Shelters are more central
       const lat = centerLat + distance * Math.cos(angle);
       const lon = centerLon + distance * Math.sin(angle);
 
+      // Add shelter to the array
       shelters.push({
         id: i + 1,
         name: `Shelter ${i + 1}`,
@@ -791,11 +927,20 @@ class ShelterSimulationVisualizer {
 
     return shelters;
   }
-  // Assignment algorithm with time constraints and priority logic
+
+  /**
+   * Core algorithm to assign people to shelters based on distance and priority
+   * Implements time constraints and optional prioritization for vulnerable groups
+   *
+   * @param {Array} people - Array of person objects
+   * @param {Array} shelters - Array of shelter objects
+   * @param {boolean} priorityEnabled - Whether to prioritize children and elderly
+   * @returns {Object} - Mapping of person IDs to their shelter assignments
+   */
   assignPeopleToShelters(people, shelters, priorityEnabled) {
-    // Constants
+    // Constants defining time and distance constraints
     const MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
-    const WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
+    const WALKING_SPEED_KM_PER_MINUTE = 0.6; // 36 km/h = 0.6 km/min (fast movement)
     const MAX_DISTANCE_KM =
       MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // ~600m in 1 minute
 
@@ -803,11 +948,11 @@ class ShelterSimulationVisualizer {
       `Time constraint: Maximum distance = ${MAX_DISTANCE_KM.toFixed(4)} km`
     );
 
-    // Create working copies of the data
+    // Create working copies of the shelter data with tracking for capacity
     const remainingShelters = shelters.map((s) => ({
       ...s,
-      remainingCapacity: s.capacity,
-      assignedPeople: [],
+      remainingCapacity: s.capacity, // Track remaining capacity for each shelter
+      assignedPeople: [], // Track which people are assigned to this shelter
     }));
 
     // Calculate total capacity and check if there are enough shelters for everyone
@@ -826,6 +971,7 @@ class ShelterSimulationVisualizer {
     // Find all valid person-shelter pairs within time constraint
     const allValidPairs = [];
     people.forEach((person) => {
+      // Find all shelters accessible to this person within the time constraint
       const accessibleShelters = remainingShelters
         .map((shelter) => {
           const distance = this.calculateAirDistance(
@@ -836,9 +982,10 @@ class ShelterSimulationVisualizer {
           );
           return { shelter, distance };
         })
-        .filter((pair) => pair.distance <= MAX_DISTANCE_KM)
-        .sort((a, b) => a.distance - b.distance);
+        .filter((pair) => pair.distance <= MAX_DISTANCE_KM) // Filter by max distance
+        .sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
 
+      // Add all valid person-shelter pairs to the collection
       accessibleShelters.forEach(({ shelter, distance }) => {
         allValidPairs.push({ person, shelter, distance });
       });
@@ -860,7 +1007,7 @@ class ShelterSimulationVisualizer {
     if (enoughSheltersForAll && priorityEnabled) {
       console.log("Using priority assignment - enough shelters for everyone");
 
-      // First, assign elderly to nearest shelters
+      // First, assign elderly to nearest shelters (highest priority)
       const elderlyPeople = people.filter((p) => p.age >= 70);
       this.assignPeopleToNearestShelters(
         elderlyPeople,
@@ -869,10 +1016,10 @@ class ShelterSimulationVisualizer {
         MAX_DISTANCE_KM
       );
 
-      // Then, assign children to nearest shelters
+      // Then, assign children to nearest shelters (second priority)
       const childrenPeople = people
         .filter((p) => p.age <= 12)
-        .filter((p) => !assignments[p.id]);
+        .filter((p) => !assignments[p.id]); // Skip if already assigned
       this.assignPeopleToNearestShelters(
         childrenPeople,
         remainingShelters,
@@ -880,10 +1027,10 @@ class ShelterSimulationVisualizer {
         MAX_DISTANCE_KM
       );
 
-      // Finally, assign remaining adults to nearest shelters
+      // Finally, assign remaining adults to nearest shelters (lowest priority)
       const adultPeople = people
         .filter((p) => p.age > 12 && p.age < 70)
-        .filter((p) => !assignments[p.id]);
+        .filter((p) => !assignments[p.id]); // Skip if already assigned
       this.assignPeopleToNearestShelters(
         adultPeople,
         remainingShelters,
@@ -895,25 +1042,25 @@ class ShelterSimulationVisualizer {
         "Using random selection - limited shelter capacity or no priority"
       );
 
-      // Randomly shuffle the eligible people
+      // Randomly shuffle the eligible people for fair selection
       const shuffledEligiblePeople = [...eligiblePeople].sort(
         () => Math.random() - 0.5
       );
 
-      // Get available total capacity
+      // Calculate available total capacity across all shelters
       const availableCapacity = remainingShelters.reduce(
         (sum, s) => sum + s.remainingCapacity,
         0
       );
 
-      // Limit to available capacity
+      // Limit selection to available capacity
       const selectedPeople = shuffledEligiblePeople.slice(0, availableCapacity);
 
       console.log(
         `Randomly selected ${selectedPeople.length} people for assignment`
       );
 
-      // Prioritize elderly among the randomly selected people
+      // Even with random selection, still prioritize elderly within the selected group
       const selectedElderly = selectedPeople.filter((p) => p.age >= 70);
       const selectedNonElderly = selectedPeople.filter((p) => p.age < 70);
 
@@ -945,7 +1092,15 @@ class ShelterSimulationVisualizer {
     return assignments;
   }
 
-  // Helper method to assign people to their nearest shelters
+  /**
+   * Helper method to assign people to their nearest shelters with capacity
+   * Called by the main assignment algorithm with different priority groups
+   *
+   * @param {Array} peopleToAssign - Array of person objects to assign
+   * @param {Array} availableShelters - Array of shelter objects with remaining capacity
+   * @param {Object} assignments - Mapping of person IDs to assignments (modified in place)
+   * @param {number} maxDistanceKm - Maximum allowed distance
+   */
   assignPeopleToNearestShelters(
     peopleToAssign,
     availableShelters,
@@ -956,10 +1111,11 @@ class ShelterSimulationVisualizer {
       // Skip if already assigned
       if (assignments[person.id]) return;
 
-      // Find shelters with capacity within max distance
+      // Find shelters with capacity within max distance for this person
       const accessibleShelters = availableShelters
-        .filter((s) => s.remainingCapacity > 0)
+        .filter((s) => s.remainingCapacity > 0) // Only consider shelters with capacity
         .map((shelter) => {
+          // Calculate distance from person to shelter
           const distance = this.calculateAirDistance(
             person.latitude,
             person.longitude,
@@ -968,26 +1124,31 @@ class ShelterSimulationVisualizer {
           );
           return { shelter, distance };
         })
-        .filter((pair) => pair.distance <= maxDistanceKm)
-        .sort((a, b) => a.distance - b.distance);
+        .filter((pair) => pair.distance <= maxDistanceKm) // Filter by max distance
+        .sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
 
+      // Assign to the nearest shelter if any are accessible
       if (accessibleShelters.length > 0) {
         const { shelter, distance } = accessibleShelters[0];
 
-        // Create assignment
+        // Create assignment record
         assignments[person.id] = {
           personId: person.id,
           shelterId: shelter.id,
           distance: distance,
         };
 
-        // Update shelter capacity
+        // Update shelter capacity and tracking
         shelter.remainingCapacity--;
         shelter.assignedPeople.push(person);
       }
     });
   }
 
+  /**
+   * Updates the statistics display in the UI with current simulation results
+   * Populates tables and charts with data about assignments, shelter usage, etc.
+   */
   updateStatisticsDisplay() {
     // Update main statistics in the control panel
     const statsTotal = document.getElementById("stats-total");
@@ -996,6 +1157,7 @@ class ShelterSimulationVisualizer {
     const statsAvgDistance = document.getElementById("stats-avg-distance");
     const statsMaxDistance = document.getElementById("stats-max-distance");
 
+    // Update summary count values
     if (statsTotal) statsTotal.textContent = this.stats.totalPeople;
     if (statsAssigned) statsAssigned.textContent = this.stats.assignedPeople;
     if (statsUnassigned)
@@ -1005,15 +1167,16 @@ class ShelterSimulationVisualizer {
     if (statsMaxDistance)
       statsMaxDistance.textContent = this.stats.maxDistance.toFixed(2);
 
-    // Update age group statistics
+    // Update age group statistics table
     const ageStatsContainer = document.getElementById("age-stats-container");
     if (ageStatsContainer) {
-      ageStatsContainer.innerHTML = "";
+      ageStatsContainer.innerHTML = ""; // Clear previous content
 
       // Create age group table
       const ageTable = document.createElement("table");
       ageTable.className = "age-stats-table";
 
+      // Populate table with age group statistics
       ageTable.innerHTML = `
       <thead>
         <tr>
@@ -1084,7 +1247,7 @@ class ShelterSimulationVisualizer {
 
       ageStatsContainer.appendChild(ageTable);
 
-      // Add time constraint information
+      // Add time constraint information box
       const timeConstraintInfo = document.createElement("div");
       timeConstraintInfo.className = "time-constraint-info";
       timeConstraintInfo.innerHTML = `
@@ -1096,7 +1259,7 @@ class ShelterSimulationVisualizer {
       ageStatsContainer.appendChild(timeConstraintInfo);
     }
 
-    // Update shelter usage statistics
+    // Update shelter usage statistics table
     const shelterUsageContainer = document.getElementById(
       "shelter-usage-container"
     );
@@ -1104,7 +1267,7 @@ class ShelterSimulationVisualizer {
       // Clear previous content
       shelterUsageContainer.innerHTML = "";
 
-      // Sort shelters by usage percentage
+      // Sort shelters by usage percentage (most full first)
       const sortedShelters = [...this.stats.shelterUsage].sort(
         (a, b) => b.percentUsed - a.percentUsed
       );
@@ -1124,20 +1287,21 @@ class ShelterSimulationVisualizer {
     `;
       table.appendChild(thead);
 
-      // Add table body
+      // Add table body with rows for each shelter
       const tbody = document.createElement("tbody");
 
       sortedShelters.forEach((shelter) => {
         const row = document.createElement("tr");
 
-        // Determine status class based on usage
+        // Determine status class based on usage percentage
         let statusClass = "status-available";
         if (shelter.percentUsed >= 100) {
-          statusClass = "status-full";
+          statusClass = "status-full"; // Red for full
         } else if (shelter.percentUsed >= 80) {
-          statusClass = "status-almost-full";
+          statusClass = "status-almost-full"; // Orange for almost full
         }
 
+        // Create row content with shelter info and capacity visualization
         row.innerHTML = `
         <td>${shelter.name}</td>
         <td class="${statusClass}">${shelter.assigned}/${
@@ -1159,11 +1323,11 @@ class ShelterSimulationVisualizer {
       table.appendChild(tbody);
       shelterUsageContainer.appendChild(table);
 
-      // Add summary statistics
+      // Add summary statistics about shelter usage
       const summaryDiv = document.createElement("div");
       summaryDiv.className = "shelter-summary";
 
-      // Calculate additional stats
+      // Calculate additional stats about shelter status
       const fullShelters = sortedShelters.filter(
         (s) => s.percentUsed >= 100
       ).length;
@@ -1184,12 +1348,25 @@ class ShelterSimulationVisualizer {
     }
   }
 
-  // Helper to calculate percentage with safe division
+  /**
+   * Helper method to calculate percentage with safe division (avoids divide by zero)
+   *
+   * @param {number} part - The numerator (part of the total)
+   * @param {number} total - The denominator (the total amount)
+   * @returns {string} - Formatted percentage with one decimal place
+   */
   calculatePercentage(part, total) {
     if (total === 0) return "0.0";
     return ((part / total) * 100).toFixed(1);
   }
 
+  /**
+   * Returns a color for the line based on the person's age
+   * Used to color-code paths on the map
+   *
+   * @param {number} age - Age of the person
+   * @returns {string} - CSS color string
+   */
   getLineColor(age) {
     if (age < 12) {
       return "#32cd32"; // Green for children
@@ -1201,7 +1378,15 @@ class ShelterSimulationVisualizer {
   }
 }
 
-// Server simulation function
+// Export the class for use in other modules
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = ShelterSimulationVisualizer;
+}
+
+/**
+ * Function to handle server-side simulation
+ * Calls a remote API to run the simulation and visualizes the results
+ */
 async function runServerSimulation() {
   const statusElement = document.getElementById("simulation-status");
 
@@ -1211,7 +1396,7 @@ async function runServerSimulation() {
   }
 
   try {
-    // Get parameters from UI
+    // Get parameters from UI controls
     const peopleCount =
       parseInt(document.getElementById("people-count").value) || 100;
     const shelterCount =
@@ -1220,7 +1405,7 @@ async function runServerSimulation() {
     const priorityEnabled =
       document.getElementById("priority").value === "true";
 
-    // Prepare request payload
+    // Prepare request payload with simulation parameters
     const requestData = {
       peopleCount: peopleCount,
       shelterCount: shelterCount,
@@ -1234,7 +1419,7 @@ async function runServerSimulation() {
       },
     };
 
-    // Call your API - adjust the URL based on your environment
+    // Call the server API
     const response = await fetch("https://localhost:7094/api/Simulation/run", {
       method: "POST",
       headers: {
@@ -1243,25 +1428,27 @@ async function runServerSimulation() {
       body: JSON.stringify(requestData),
     });
 
+    // Handle error responses
     if (!response.ok) {
       throw new Error(
         `Server responded with ${response.status}: ${response.statusText}`
       );
     }
 
-    // Parse the response
+    // Parse the successful response
     const data = await response.json();
 
-    // Display the results on the map
+    // Display the results on the map using the visualizer
     visualizer.visualizeSimulation(
       data.people,
       data.shelters,
       data.assignments
     );
 
-    // Show statistics
+    // Update statistics with server-provided data
     updateServerStatistics(data.statistics);
 
+    // Update status message
     if (statusElement) {
       statusElement.textContent = "Server simulation complete";
       statusElement.className = "status-message success";
@@ -1273,6 +1460,7 @@ async function runServerSimulation() {
       }, 3000);
     }
   } catch (error) {
+    // Handle errors
     console.error("Server simulation error:", error);
     if (statusElement) {
       statusElement.textContent = `Error: ${error.message}`;
@@ -1281,16 +1469,23 @@ async function runServerSimulation() {
   }
 }
 
-// Helper function to update statistics panel with server data
+/**
+ * Helper function to update statistics panel with server-provided data
+ * Used when running server-side simulations
+ *
+ * @param {Object} stats - Statistics object from server response
+ */
 function updateServerStatistics(stats) {
-  if (!stats) return;
+  if (!stats) return; // Safety check
 
+  // Update UI elements with statistics
   const statsTotal = document.getElementById("stats-total");
   const statsAssigned = document.getElementById("stats-assigned");
   const statsUnassigned = document.getElementById("stats-unassigned");
   const statsAvgDistance = document.getElementById("stats-avg-distance");
   const statsMaxDistance = document.getElementById("stats-max-distance");
 
+  // Update the values in the DOM
   if (statsTotal)
     statsTotal.textContent = stats.assignedCount + stats.unassignedCount;
   if (statsAssigned) statsAssigned.textContent = stats.assignedCount;
@@ -1299,4 +1494,26 @@ function updateServerStatistics(stats) {
     statsAvgDistance.textContent = stats.averageDistance.toFixed(2);
   if (statsMaxDistance)
     statsMaxDistance.textContent = stats.maxDistance.toFixed(2);
+}
+
+/**
+ * Initialization code for the application
+ * Creates the visualizer instance and sets up the application when the DOM is ready
+ */
+document.addEventListener("DOMContentLoaded", function () {
+  // Create a new ShelterSimulationVisualizer instance targeting the 'map' element
+  window.visualizer = new ShelterSimulationVisualizer("map");
+
+  console.log("Shelter simulation visualizer initialized");
+
+  // Optional: Run an initial simulation with default values
+  // visualizer.runSimulationFromUI();
+});
+
+// Export functions for use in other modules
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    runServerSimulation,
+    updateServerStatistics,
+  };
 }
