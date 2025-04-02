@@ -310,4 +310,11 @@ public class DBservices
             }
         }
     }
+
+    //
+    //public userpreferences
+
+    public UserPreferences? GetUserPreferences(int preferencesId) { return null; }
+
+    public UserPreferences? UpdateUserPreferences(int preferencesId, string shelterType, int myProperty) { return null; }
 }
