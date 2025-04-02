@@ -165,5 +165,36 @@ namespace FC_Server.Controllers
         public void Delete(int id)
         {
         }
+
+        // GET api/<UserController>/preferences
+        [HttpGet("preferences")]
+        public IActionResult GetPreferences(int user_id) //TODO: CHECK AUTHENTICATION
+        {
+            var preferences = FC_Server.Models.UserPreferences.GetPreferences(user_id);
+            if (preferences != null)
+            {
+                return Ok(new
+                {
+                    message = "Preferences data transfer successful",
+                    preferences = preferences
+                });
+            }
+            return BadRequest(new { message = "Invalid ID" });
+        }
+        // POST api/<UserController>/preferences
+        [HttpPost("preferences")]
+        public IActionResult UpdatePreferences([FromBody] FC_Server.Models.UserPreferences preferences)//todo : check authentication
+        {
+            var updatedPreferences = FC_Server.Models.UserPreferences.UpdatePreferences(preferences.Id, preferences);
+            if (updatedPreferences != null)
+            {
+                return Ok(new
+                {
+                    message = "Preferences updated successfully",
+                    preferences = updatedPreferences
+                });
+            }
+            return BadRequest(new { message = "Update failed" });
+        }
     }
 }
