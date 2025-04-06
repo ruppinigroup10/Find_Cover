@@ -164,115 +164,266 @@ namespace FindCover.Controllers
         }
 
         // Main algorithm for assigning people to shelters with time constraints
+        // Update the AssignPeopleToShelters method in your SimulationController.cs file
+
         private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
             List<PersonDto> people,
             List<ShelterDto> shelters,
             PrioritySettingsDto prioritySettings)
         {
-            var assignments = new Dictionary<int, AssignmentDto>();
+            Console.WriteLine("Starting global optimization shelter assignment...");
 
-            // Constants
+            // Constants defining time and distance constraints
             const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
-            const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // ~600m in 1 minute
+            const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE;
 
-            // Working list of shelters with remaining capacity
-            var remainingShelters = shelters.Select(s => new ShelterWithCapacity
-            {
-                Id = s.Id,
-                Name = s.Name,
-                Latitude = s.Latitude,
-                Longitude = s.Longitude,
-                Capacity = s.Capacity,
-                RemainingCapacity = s.Capacity
-            }).ToList();
+            Console.WriteLine($"Time constraint: Maximum distance = {MAX_DISTANCE_KM:F4} km");
 
-            // First, count how many shelters and total capacity are available
-            int totalShelterCapacity = remainingShelters.Sum(s => s.Capacity);
-            int totalPeople = people.Count;
-            bool enoughSheltersForAll = totalShelterCapacity >= totalPeople;
-
-            // Create a list of all valid person-shelter pairs within time constraint
-            var allValidPairs = new List<(PersonDto Person, ShelterWithCapacity Shelter, double Distance)>();
+            // Step 1: Create a distance matrix between all people and shelters
+            Console.WriteLine("Building distance matrix...");
+            var distanceMatrix = new List<List<AssignmentOption>>();
 
             foreach (var person in people)
             {
-                var accessibleShelters = remainingShelters
-                    .Select(shelter =>
-                    {
-                        double distance = CalculateDistance(
-                            person.Latitude, person.Longitude,
-                            shelter.Latitude, shelter.Longitude);
-                        return (Shelter: shelter, Distance: distance);
-                    })
-                    .Where(pair => pair.Distance <= MAX_DISTANCE_KM)
-                    .OrderBy(pair => pair.Distance)
-                    .ToList();
+                var personDistances = new List<AssignmentOption>();
 
-                foreach (var (shelter, distance) in accessibleShelters)
+                foreach (var shelter in shelters)
                 {
-                    allValidPairs.Add((person, shelter, distance));
+                    double distance = CalculateDistance(
+                        person.Latitude, person.Longitude,
+                        shelter.Latitude, shelter.Longitude);
+
+                    // Store whether this shelter is reachable within time constraints
+                    bool isReachable = distance <= MAX_DISTANCE_KM;
+
+                    personDistances.Add(new AssignmentOption
+                    {
+                        PersonId = person.Id,
+                        ShelterId = shelter.Id,
+                        Distance = distance,
+                        IsReachable = isReachable,
+                        // Add vulnerability score if priority is enabled
+                        VulnerabilityScore = prioritySettings?.EnableAgePriority == true
+                            ? CalculateVulnerabilityScore(person.Age)
+                            : 0
+                    });
+                }
+
+                distanceMatrix.Add(personDistances);
+            }
+
+            // Step 2: Calculate total shelter capacity
+            int totalCapacity = shelters.Sum(s => s.Capacity);
+            int totalPeople = people.Count;
+
+            Console.WriteLine($"Total shelter capacity: {totalCapacity}, Total people: {totalPeople}");
+
+            // Step 3: Prepare working data structures
+            // Track remaining capacity of each shelter
+            var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
+
+            // Create a flattened list of all possible person-shelter assignments
+            var allPossibleAssignments = distanceMatrix.SelectMany(x => x)
+                .Where(entry => entry.IsReachable)
+                .OrderBy(entry => prioritySettings?.EnableAgePriority == true ? -entry.VulnerabilityScore : 0)
+                .ThenBy(entry => entry.Distance)
+                .ToList();
+
+            Console.WriteLine($"Found {allPossibleAssignments.Count} possible assignments within time constraints");
+
+            // Step 4: Global assignment optimization 
+            // Initialize assignment tracking
+            var assignments = new Dictionary<int, AssignmentDto>();
+            var assignedPeople = new HashSet<int>();
+            var criticalPeople = new HashSet<int>();
+
+            // First pass: Identify "critical" people who can only reach one shelter
+            for (int i = 0; i < people.Count; i++)
+            {
+                var personOptions = distanceMatrix[i].Where(entry => entry.IsReachable).ToList();
+
+                if (personOptions.Count == 1)
+                {
+                    criticalPeople.Add(people[i].Id);
                 }
             }
 
-            // If there are enough shelters for everyone and prioritization is enabled
-            if (enoughSheltersForAll && prioritySettings?.EnableAgePriority == true)
+            Console.WriteLine($"Identified {criticalPeople.Count} critical people with only one shelter option");
+
+            // Second pass: Assign critical people first
+            if (criticalPeople.Count > 0)
             {
-                // First, assign elderly to nearest shelters
-                var elderlyPeople = people
-                    .Where(p => p.Age >= prioritySettings.ElderlyMinAge)
+                // Sort critical people by vulnerability if priority is enabled
+                var sortedCriticalPeople = criticalPeople
+                    .Select(id => people.First(p => p.Id == id))
+                    .OrderByDescending(p => prioritySettings?.EnableAgePriority == true ?
+                        CalculateVulnerabilityScore(p.Age) : 0)
+                    .Select(p => p.Id)
                     .ToList();
 
-                AssignPeopleToNearestShelters(elderlyPeople, remainingShelters, assignments, MAX_DISTANCE_KM);
+                // Assign critical people to their only option
+                foreach (var personId in sortedCriticalPeople)
+                {
+                    int personIndex = people.FindIndex(p => p.Id == personId);
+                    var personOptions = distanceMatrix[personIndex].Where(entry => entry.IsReachable).ToList();
 
-                // Then, assign children to nearest shelters
-                var childrenPeople = people
-                    .Where(p => p.Age <= prioritySettings.ChildMaxAge)
-                    .Where(p => !assignments.ContainsKey(p.Id))
+                    if (personOptions.Count == 1 && shelterCapacity[personOptions[0].ShelterId] > 0)
+                    {
+                        // Assign this person to their only available shelter
+                        assignments[personId] = new AssignmentDto
+                        {
+                            PersonId = personId,
+                            ShelterId = personOptions[0].ShelterId,
+                            Distance = personOptions[0].Distance
+                        };
+
+                        // Update shelter capacity and tracking
+                        shelterCapacity[personOptions[0].ShelterId]--;
+                        assignedPeople.Add(personId);
+
+                        Console.WriteLine($"Assigned critical person {personId} to shelter {personOptions[0].ShelterId}");
+                    }
+                }
+            }
+
+            // Third pass: Process the remaining people
+            // Iterate through all possible assignments, sorted by priority and distance
+            foreach (var entry in allPossibleAssignments)
+            {
+                int personId = entry.PersonId;
+                int shelterId = entry.ShelterId;
+                double distance = entry.Distance;
+
+                // Skip if this person is already assigned or the shelter is full
+                if (assignedPeople.Contains(personId) || shelterCapacity[shelterId] <= 0)
+                {
+                    continue;
+                }
+
+                // Before making the assignment, check if this is the best option
+                // Does this person have other shelter options?
+                int personIndex = people.FindIndex(p => p.Id == personId);
+                var personOptions = distanceMatrix[personIndex]
+                    .Where(opt => opt.IsReachable && shelterCapacity[opt.ShelterId] > 0)
+                    .OrderBy(opt => opt.Distance)
                     .ToList();
 
-                AssignPeopleToNearestShelters(childrenPeople, remainingShelters, assignments, MAX_DISTANCE_KM);
+                // Are there other people who can ONLY use this shelter?
+                var peopleWhoNeedThisShelter = new List<int>();
 
-                // Finally, assign remaining adults to nearest shelters
-                var adultPeople = people
-                    .Where(p => p.Age > prioritySettings.ChildMaxAge && p.Age < prioritySettings.ElderlyMinAge)
-                    .Where(p => !assignments.ContainsKey(p.Id))
+                for (int i = 0; i < people.Count; i++)
+                {
+                    int pid = people[i].Id;
+                    if (assignedPeople.Contains(pid)) continue;
+
+                    var options = distanceMatrix[i]
+                        .Where(opt => opt.IsReachable && shelterCapacity[opt.ShelterId] > 0)
+                        .ToList();
+
+                    if (options.Count == 1 && options[0].ShelterId == shelterId)
+                    {
+                        peopleWhoNeedThisShelter.Add(pid);
+                    }
+                }
+
+                // If this person has multiple options but others can only use this shelter,
+                // skip for now to save the spot for those who need it
+                if (personOptions.Count > 1 &&
+                    peopleWhoNeedThisShelter.Count > 0 &&
+                    shelterCapacity[shelterId] <= peopleWhoNeedThisShelter.Count)
+                {
+                    continue;
+                }
+
+                // Make the assignment
+                assignments[personId] = new AssignmentDto
+                {
+                    PersonId = personId,
+                    ShelterId = shelterId,
+                    Distance = distance
+                };
+
+                // Update shelter capacity and tracking
+                shelterCapacity[shelterId]--;
+                assignedPeople.Add(personId);
+            }
+
+            // Final pass: Try to assign any remaining people to any available shelter
+            foreach (var person in people)
+            {
+                if (assignedPeople.Contains(person.Id)) continue; // Already assigned
+
+                // Find any shelter with remaining capacity within range
+                int personIndex = people.IndexOf(person);
+                var options = distanceMatrix[personIndex]
+                    .Where(entry => entry.IsReachable && shelterCapacity[entry.ShelterId] > 0)
+                    .OrderBy(entry => entry.Distance)
                     .ToList();
 
-                AssignPeopleToNearestShelters(adultPeople, remainingShelters, assignments, MAX_DISTANCE_KM);
+                if (options.Count > 0)
+                {
+                    var bestOption = options[0];
+                    assignments[person.Id] = new AssignmentDto
+                    {
+                        PersonId = person.Id,
+                        ShelterId = bestOption.ShelterId,
+                        Distance = bestOption.Distance
+                    };
+
+                    // Update shelter capacity
+                    shelterCapacity[bestOption.ShelterId]--;
+                    assignedPeople.Add(person.Id);
+                }
+            }
+
+            Console.WriteLine($"Final assignments: {assignments.Count} people assigned");
+            return assignments;
+        }
+
+        /**
+         * Helper class to store assignment options with additional metadata
+         */
+        private class AssignmentOption
+        {
+            public int PersonId { get; set; }
+            public int ShelterId { get; set; }
+            public double Distance { get; set; }
+            public bool IsReachable { get; set; }
+            public int VulnerabilityScore { get; set; }
+        }
+
+        /**
+         * Calculates a vulnerability score based on age
+         * Higher scores indicate higher priority (elderly and children)
+         */
+        private int CalculateVulnerabilityScore(int age)
+        {
+            if (age >= 70)
+            {
+                // Elderly (70+): highest priority
+                return 10;
+            }
+            else if (age <= 12)
+            {
+                // Children (0-12): second highest priority
+                return 8;
+            }
+            else if (age >= 60)
+            {
+                // Older adults (60-69): medium-high priority
+                return 6;
+            }
+            else if (age <= 18)
+            {
+                // Teenagers (13-18): medium priority
+                return 4;
             }
             else
             {
-                // Not enough shelters for everyone or no priority - perform random selection
-
-                // First, randomly select people who can reach a shelter within the time limit
-                var eligiblePeople = allValidPairs
-                    .Select(p => p.Person)
-                    .Distinct()
-                    .OrderBy(p => Guid.NewGuid()) // Random order
-                    .ToList();
-
-                // Limit to available total capacity
-                int availableCapacity = remainingShelters.Sum(s => s.RemainingCapacity);
-                eligiblePeople = eligiblePeople.Take(availableCapacity).ToList();
-
-                // Prioritize elderly among the randomly selected people
-                var selectedElderly = eligiblePeople
-                    .Where(p => p.Age >= prioritySettings?.ElderlyMinAge)
-                    .ToList();
-
-                var selectedNonElderly = eligiblePeople
-                    .Where(p => !selectedElderly.Any(e => e.Id == p.Id))
-                    .ToList();
-
-                // Assign elderly to their nearest shelters first
-                AssignPeopleToNearestShelters(selectedElderly, remainingShelters, assignments, MAX_DISTANCE_KM);
-
-                // Then assign remaining people to available shelters
-                AssignPeopleToNearestShelters(selectedNonElderly, remainingShelters, assignments, MAX_DISTANCE_KM);
+                // Adults (19-59): lowest priority
+                return 2;
             }
-
-            return assignments;
         }
 
         // Helper method to assign people to their nearest shelters
