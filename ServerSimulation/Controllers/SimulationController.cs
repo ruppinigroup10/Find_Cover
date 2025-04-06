@@ -85,11 +85,11 @@ namespace FindCover.Controllers
                 double ageRandom = _random.NextDouble();
                 if (ageRandom < 0.15) // 15% are children
                 {
-                    age = _random.Next(1, 13); // Ages 1-12
+                    age = _random.Next(1, 19); // Ages 1-18
                 }
                 else if (ageRandom < 0.85) // 70% are adults
                 {
-                    age = _random.Next(13, 70); // Ages 13-69
+                    age = _random.Next(19, 70); // Ages 19-69
                 }
                 else // 15% are elderly
                 {
@@ -108,7 +108,7 @@ namespace FindCover.Controllers
             return people;
         }
 
-        // Helper method to generate shelters
+        // Helper method to generate shelters with capacity between 1 and 5
         private List<ShelterDto> GenerateShelters(int count, double centerLat, double centerLon, double radiusKm)
         {
             var shelters = new List<ShelterDto>();
@@ -119,12 +119,12 @@ namespace FindCover.Controllers
 
             // Add some known Beer Sheva locations for realism
             var knownLocations = new List<(string Name, double Lat, double Lon)>
-            {
-                ("Ben Gurion University", 31.2634, 34.8044),
-                ("Beer Sheva Central Station", 31.2434, 34.7980),
-                ("Grand Canyon Mall", 31.2508, 34.7738),
-                ("Soroka Medical Center", 31.2534, 34.8018)
-            };
+    {
+        ("Ben Gurion University", 31.2634, 34.8044),
+        ("Beer Sheva Central Station", 31.2434, 34.7980),
+        ("Grand Canyon Mall", 31.2508, 34.7738),
+        ("Soroka Medical Center", 31.2534, 34.8018)
+    };
 
             // Add known locations first (if we have fewer shelters than known locations, take a subset)
             for (int i = 0; i < Math.Min(count, knownLocations.Count); i++)
@@ -136,7 +136,7 @@ namespace FindCover.Controllers
                     Name = location.Name,
                     Latitude = location.Lat,
                     Longitude = location.Lon,
-                    Capacity = 1 + _random.Next(5) // 1-5 capacity
+                    Capacity = _random.Next(1, 6) // Capacity between 1 and 5
                 });
             }
 
@@ -156,7 +156,7 @@ namespace FindCover.Controllers
                     Name = $"Shelter {i + 1}",
                     Latitude = centerLat + latOffset,
                     Longitude = centerLon + lonOffset,
-                    Capacity = 1 + _random.Next(5) // 1-5 capacity
+                    Capacity = _random.Next(1, 6) // Capacity between 1 and 5
                 });
             }
 

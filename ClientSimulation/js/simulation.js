@@ -295,6 +295,7 @@ class ShelterSimulationVisualizer {
   /**
    * Creates custom map icons for different entity types
    * Uses div icons with color-coded dots to distinguish between different types
+   * For shelters, the size is dynamically calculated based on capacity (1-5)
    *
    * @returns {Object} - Object containing Leaflet icon objects for each entity type
    */
@@ -335,6 +336,45 @@ class ShelterSimulationVisualizer {
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
+
+      // For shelters, we'll create a function that returns a sized icon
+      // This will be called dynamically for each shelter based on its capacity
+      getShelterIcon: function (capacity) {
+        // Ensure capacity is within range 1-5
+        const cappedCapacity = Math.max(1, Math.min(5, capacity));
+
+        // Define specific sizes for each capacity value (1-5)
+        const sizeMap = {
+          1: 14, // Smallest size
+          2: 18,
+          3: 22,
+          4: 26,
+          5: 30, // Largest size
+        };
+
+        // Define color shades for each capacity (light to dark red)
+        const colorMap = {
+          1: "#CC3333", // Light red
+          2: "#CC0000",
+          3: "#BB0000",
+          4: "#990000",
+          5: "#660000", // Darkest red
+        };
+
+        // Get the size and color based on the capacity
+        const size = sizeMap[cappedCapacity];
+        const color = colorMap[cappedCapacity];
+
+        // Calculate the anchor (center point) based on size
+        const anchor = size / 2;
+
+        return L.divIcon({
+          className: "marker-shelter",
+          html: `<div style="background-color: ${color}; border-radius: 50%; width: ${size}px; height: ${size}px;"></div>`,
+          iconSize: [size, size],
+          iconAnchor: [anchor, anchor],
+        });
+      },
     };
   }
 
@@ -429,6 +469,7 @@ class ShelterSimulationVisualizer {
 
   /**
    * Displays shelter markers on the map and initializes shelter usage statistics
+   * Uses dynamically sized icons based on shelter capacity
    *
    * @param {Array} shelters - Array of shelter objects
    */
@@ -444,16 +485,19 @@ class ShelterSimulationVisualizer {
 
     // Add each shelter as a marker on the map
     shelters.forEach((shelter) => {
+      // Get a dynamically sized icon based on this shelter's capacity
+      const shelterIcon = this.icons.getShelterIcon(shelter.capacity);
+
       const marker = L.marker([shelter.latitude, shelter.longitude], {
-        icon: this.icons.shelter,
+        icon: shelterIcon,
       });
 
       // Add popup with shelter information
       marker.bindPopup(`
-                <h3>${shelter.name}</h3>
-                <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
-                <p>Status: <span id="shelter-${shelter.id}-status">Empty</span></p>
-            `);
+      <h3>${shelter.name}</h3>
+      <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
+      <p>Status: <span id="shelter-${shelter.id}-status">Empty</span></p>
+    `);
 
       // Add the marker to the shelter layer group
       this.shelterMarkers.addLayer(marker);
