@@ -992,13 +992,16 @@ async function runZeroCapacitySheltersSimulation() {
 
     // Call server simulation with our special flag
     // Modified server-side handler will generate some shelters with zero capacity
-    const response = await fetch("https://localhost:7094/api/Simulation/run", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestData),
-    });
+    const response = await fetch(
+      "https://localhost:{PORT}/api/Simulation/run",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      }
+    );
 
     // Process response as normal
     if (!response.ok) {

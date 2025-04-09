@@ -87,13 +87,16 @@ async function runServerSimulation() {
     };
 
     // Call the server API
-    const response = await fetch("https://localhost:7094/api/Simulation/run", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestData),
-    });
+    const response = await fetch(
+      "https://localhost:{PORT}/api/Simulation/run",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      }
+    );
 
     // Handle error responses
     if (!response.ok) {
