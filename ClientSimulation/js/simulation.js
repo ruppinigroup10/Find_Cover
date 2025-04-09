@@ -1,3 +1,5 @@
+console.log("Using port:", PORT);
+
 /**
  * ShelterSimulationVisualizer - Main class that handles the visualization of shelter assignments
  * This class creates and manages an interactive map for visualizing emergency shelter assignments
@@ -1109,7 +1111,7 @@ class ShelterSimulationVisualizer {
 
       // Call the server API with our custom request
       const response = await fetch(
-        "https://localhost:{PORT}/api/Simulation/run",
+        `https://localhost:${PORT}/api/Simulation/run`,
         {
           method: "POST",
           headers: {
@@ -1222,7 +1224,7 @@ class ShelterSimulationVisualizer {
 
       // Call the server API with our custom request
       const response = await fetch(
-        "https://localhost:{PORT}/api/Simulation/run",
+        `https://localhost:${PORT}/api/Simulation/run`,
         {
           method: "POST",
           headers: {
@@ -1383,7 +1385,7 @@ class ShelterSimulationVisualizer {
 
       // Call the server API with our custom request
       const response = await fetch(
-        "https://localhost:{PORT}/api/Simulation/run",
+        `https://localhost:${PORT}/api/Simulation/run`,
         {
           method: "POST",
           headers: {
@@ -1521,7 +1523,7 @@ async function runServerSimulation() {
 
     // Call the server API
     const response = await fetch(
-      "https://localhost:{PORT}/api/Simulation/run",
+      `https://localhost:${PORT}/api/Simulation/run`,
       {
         method: "POST",
         headers: {

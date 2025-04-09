@@ -1,1 +1,1 @@
-PORT = 7094;
+const PORT = 7094;

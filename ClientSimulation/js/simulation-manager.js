@@ -88,7 +88,7 @@ async function runServerSimulation() {
 
     // Call the server API
     const response = await fetch(
-      "https://localhost:{PORT}/api/Simulation/run",
+      `https://localhost:${PORT}/api/Simulation/run`,
       {
         method: "POST",
         headers: {
