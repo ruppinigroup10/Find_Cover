@@ -1,3 +1,5 @@
+// This version supports the new layout with controls outside the map
+
 // Ensure we only have one global instance of the visualizer
 let globalVisualizer = null;
 
@@ -39,8 +41,9 @@ function initializeVisualizer() {
     }
   }
 
-  // Create a new visualizer instance
-  globalVisualizer = new ShelterSimulationVisualizer("map");
+  // Created new visualizer instance for the map
+  // No need to add UI controls since we now have them outside the map
+  globalVisualizer = new ShelterSimulationVisualizer("map", false);
   return globalVisualizer;
 }
 
@@ -50,12 +53,12 @@ function initializeVisualizer() {
  */
 async function runServerSimulation() {
   // Ensure we have a valid visualizer
-  const visualizer = initializeVisualizer();
+  const visualizer = window.visualizer || initializeVisualizer();
 
   const statusElement = document.getElementById("simulation-status");
 
   if (statusElement) {
-    statusElement.textContent = "Calling server simulation...";
+    statusElement.textContent = "Running simulation...";
     statusElement.className = "status-message running";
   }
 
@@ -105,16 +108,26 @@ async function runServerSimulation() {
     // Clear any existing data
     visualizer.clearMap();
 
-    // Display the results on the map using the visualizer
+    // Save as original data for future reference
+    visualizer.originalSimulationData = {
+      people: [...data.people],
+      shelters: [...data.shelters],
+      assignments: { ...data.assignments },
+    };
+
+    // Display the results on the map
     visualizer.visualizeSimulation(
       data.people,
       data.shelters,
       data.assignments
     );
 
+    // Update statistics manually (we no longer rely on Leaflet controls)
+    updateStatistics(data.statistics, data.people);
+
     // Update status message
     if (statusElement) {
-      statusElement.textContent = "Server simulation complete";
+      statusElement.textContent = "Simulation complete";
       statusElement.className = "status-message success";
 
       // Clear the status after a few seconds
@@ -125,7 +138,7 @@ async function runServerSimulation() {
     }
   } catch (error) {
     // Handle errors
-    console.error("Server simulation error:", error);
+    console.error("Simulation error:", error);
     if (statusElement) {
       statusElement.textContent = `Error: ${error.message}`;
       statusElement.className = "status-message error";
@@ -134,23 +147,164 @@ async function runServerSimulation() {
 }
 
 /**
+ * Updates the statistics panel with simulation results
+ */
+function updateStatistics(stats, people) {
+  if (!stats) return;
+
+  // Update basic statistics
+  const statsTotal = document.getElementById("stats-total");
+  const statsAssigned = document.getElementById("stats-assigned");
+  const statsUnassigned = document.getElementById("stats-unassigned");
+  const statsAvgDistance = document.getElementById("stats-avg-distance");
+  const statsMaxDistance = document.getElementById("stats-max-distance");
+
+  if (statsTotal) statsTotal.textContent = people.length;
+  if (statsAssigned) statsAssigned.textContent = stats.assignedCount;
+  if (statsUnassigned) statsUnassigned.textContent = stats.unassignedCount;
+  if (statsAvgDistance)
+    statsAvgDistance.textContent = stats.averageDistance.toFixed(2);
+  if (statsMaxDistance)
+    statsMaxDistance.textContent = stats.maxDistance.toFixed(2);
+
+  // Update age group statistics (if needed)
+  updateAgeGroupStats(people, stats);
+}
+
+/**
+ * Updates age group statistics in the UI
+ */
+function updateAgeGroupStats(people, stats) {
+  const ageStatsContainer = document.getElementById("age-stats-container");
+  if (!ageStatsContainer) return;
+
+  // Calculate age groups
+  const assigned = { children: 0, adults: 0, elderly: 0 };
+  const unassigned = { children: 0, adults: 0, elderly: 0 };
+
+  // We would need assignments data for this
+  // Simple placeholder for now
+  ageStatsContainer.innerHTML = `
+    <table class="age-stats-table">
+      <tr>
+        <th>Age Group</th>
+        <th>Assigned</th>
+        <th>Unassigned</th>
+      </tr>
+      <tr>
+        <td>Children</td>
+        <td>${stats.assignedChildren || "N/A"}</td>
+        <td>${stats.unassignedChildren || "N/A"}</td>
+      </tr>
+      <tr>
+        <td>Adults</td>
+        <td>${stats.assignedAdults || "N/A"}</td>
+        <td>${stats.unassignedAdults || "N/A"}</td>
+      </tr>
+      <tr>
+        <td>Elderly</td>
+        <td>${stats.assignedElderly || "N/A"}</td>
+        <td>${stats.unassignedElderly || "N/A"}</td>
+      </tr>
+    </table>
+  `;
+}
+
+/**
  * Initialization code for the application
  * Creates the visualizer instance and sets up the application when the DOM is ready
  */
 document.addEventListener("DOMContentLoaded", function () {
-  // Initialize the visualizer
-  initializeVisualizer();
+  // Initialize the map
+  window.visualizer = initializeVisualizer();
 
-  // Set up the event listener for the run button
+  // Set up event handlers for UI controls
+  setupEventHandlers();
+
+  console.log("FindCover application initialized");
+});
+
+/**
+ * Set up event handlers for all UI controls
+ */
+function setupEventHandlers() {
+  // Run simulation button
   const runButton = document.getElementById("run-simulation");
   if (runButton) {
-    // Remove any existing event listeners
-    const newRunButton = runButton.cloneNode(true);
-    runButton.parentNode.replaceChild(newRunButton, runButton);
-
-    // Add the event listener to the new button
-    newRunButton.addEventListener("click", runServerSimulation);
+    runButton.addEventListener("click", function () {
+      // Clear manual people first
+      if (window.visualizer) {
+        window.visualizer.clearManualPeople();
+      }
+      runServerSimulation();
+    });
   }
 
-  console.log("Shelter simulation visualizer initialized");
-});
+  // Manual people placement
+  const enableButton = document.getElementById("enable-placement");
+  if (enableButton) {
+    enableButton.addEventListener("click", function () {
+      const isActive = this.classList.toggle("active");
+
+      if (isActive) {
+        this.textContent = "Placing People (Click Map)";
+        if (window.visualizer) {
+          window.visualizer.enableManualPlacement(true);
+        }
+      } else {
+        this.textContent = "Place People Manually";
+        if (window.visualizer) {
+          window.visualizer.enableManualPlacement(false);
+        }
+      }
+    });
+  }
+
+  // Run with manual people
+  const runManualButton = document.getElementById("run-with-manual");
+  if (runManualButton) {
+    runManualButton.addEventListener("click", function () {
+      if (window.visualizer) {
+        window.visualizer.runWithManualPeople();
+      }
+    });
+  }
+
+  // Clear manual people
+  const clearButton = document.getElementById("clear-manual");
+  if (clearButton) {
+    clearButton.addEventListener("click", function () {
+      if (window.visualizer) {
+        window.visualizer.clearManualPeople();
+
+        // Reset the run with manual button
+        const manualButton = document.getElementById("run-with-manual");
+        if (manualButton) {
+          manualButton.textContent = "Run With Manual People (0)";
+          manualButton.disabled = true;
+        }
+      }
+    });
+  }
+
+  // Initialize extreme scenarios if available
+  setTimeout(() => {
+    if (typeof addExtremeScenarioControls === "function") {
+      addExtremeScenarioControls();
+    }
+  }, 500);
+}
+
+// Expose to global scope for debugging
+window.debugFindCover = function () {
+  console.log("=== DEBUG INFO ===");
+  console.log(
+    "Visualizer defined:",
+    typeof ShelterSimulationVisualizer !== "undefined"
+  );
+  console.log("Visualizer instance:", window.visualizer);
+  console.log(
+    "Current simulation data:",
+    window.visualizer?.currentSimulationData
+  );
+};

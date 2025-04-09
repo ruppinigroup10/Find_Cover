@@ -7,7 +7,6 @@ class ShelterSimulationVisualizer {
   /**
    * Constructor - initializes the map, layers, statistics, and UI controls
    * @param {string} mapElementId - The HTML element ID where the map will be rendered
-   * @param {boolean} addControls - Whether to add controls (now false by default)
    */
   constructor(mapElementId) {
     // Better approach: check if the map container element exists first
@@ -64,9 +63,8 @@ class ShelterSimulationVisualizer {
     // Create custom map icons for different entities
     this.icons = this.createIcons();
 
-    //old view
     // Set up UI control panels
-    //this.addControlPanel();
+    this.addControlPanel();
 
     this.originalSimulationData = null; // store the base simulation without any manual people
     this.manualPeople = []; // store manual people

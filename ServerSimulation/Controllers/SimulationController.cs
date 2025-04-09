@@ -26,8 +26,38 @@ namespace FindCover.Controllers
                 double centerLat = 31.2518; // Override with Beer Sheva coordinates
                 double centerLon = 34.7913; // Override with Beer Sheva coordinates
 
-                var people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
-                var shelters = GenerateShelters(request.ShelterCount, centerLat, centerLon, request.RadiusKm);
+                // Check if we should use custom people instead of generating them
+                List<PersonDto> people;
+                if (request.UseCustomPeople && request.CustomPeople != null && request.CustomPeople.Any())
+                {
+                    // Use the provided custom people
+                    people = request.CustomPeople;
+                }
+                else
+                {
+                    // Generate people as usual
+                    people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
+                }
+
+                // Check if we should use custom shelters
+                List<ShelterDto> shelters;
+                if (request.UseCustomShelters && request.CustomShelters != null && request.CustomShelters.Any())
+                {
+                    // Use provided custom shelters
+                    shelters = request.CustomShelters;
+                }
+                else
+                {
+                    // Generate shelters as usual
+                    shelters = GenerateShelters(
+                        request.ShelterCount,
+                        centerLat,
+                        centerLon,
+                        request.RadiusKm,
+                        request.ZeroCapacityShelters);
+                }
+
+                //var people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
                 var assignments = AssignPeopleToShelters(people, shelters, request.PrioritySettings);
 
                 // Calculate statistics
@@ -109,7 +139,7 @@ namespace FindCover.Controllers
         }
 
         // Helper method to generate shelters with capacity between 1 and 5
-        private List<ShelterDto> GenerateShelters(int count, double centerLat, double centerLon, double radiusKm)
+        private List<ShelterDto> GenerateShelters(int count, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false)
         {
             var shelters = new List<ShelterDto>();
 
@@ -150,13 +180,24 @@ namespace FindCover.Controllers
                 double latOffset = distance * Math.Cos(angle);
                 double lonOffset = distance * Math.Sin(angle);
 
+                // Determine capacity - handle zero capacity scenario
+                int capacity;
+                if (zeroCapacityShelters && _random.NextDouble() < 0.4) // 40% chance of zero capacity for random shelters
+                {
+                    capacity = 0; // Zero capacity
+                }
+                else
+                {
+                    capacity = _random.Next(1, 6); // Normal capacity between 1 and 5
+                }
+
                 shelters.Add(new ShelterDto
                 {
                     Id = i + 1,
-                    Name = $"Shelter {i + 1}",
+                    Name = capacity == 0 ? $"Closed Shelter {i + 1}" : $"Shelter {i + 1}",
                     Latitude = centerLat + latOffset,
                     Longitude = centerLon + lonOffset,
-                    Capacity = _random.Next(1, 6) // Capacity between 1 and 5
+                    Capacity = capacity
                 });
             }
 
@@ -164,8 +205,7 @@ namespace FindCover.Controllers
         }
 
         // Main algorithm for assigning people to shelters with time constraints
-        // Update the AssignPeopleToShelters method in your SimulationController.cs file
-
+        // Using global assignment optimization 
         private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
             List<PersonDto> people,
             List<ShelterDto> shelters,
@@ -426,50 +466,50 @@ namespace FindCover.Controllers
             }
         }
 
-        // Helper method to assign people to their nearest shelters
-        private void AssignPeopleToNearestShelters(
-            List<PersonDto> peopleToAssign,
-            List<ShelterWithCapacity> availableShelters,
-            Dictionary<int, AssignmentDto> assignments,
-            double maxDistanceKm)
-        {
-            foreach (var person in peopleToAssign)
-            {
-                // Skip if already assigned
-                if (assignments.ContainsKey(person.Id))
-                    continue;
+        // // Helper method to assign people to their nearest shelters
+        // private void AssignPeopleToNearestShelters(
+        //     List<PersonDto> peopleToAssign,
+        //     List<ShelterWithCapacity> availableShelters,
+        //     Dictionary<int, AssignmentDto> assignments,
+        //     double maxDistanceKm)
+        // {
+        //     foreach (var person in peopleToAssign)
+        //     {
+        //         // Skip if already assigned
+        //         if (assignments.ContainsKey(person.Id))
+        //             continue;
 
-                // Find shelters with capacity within max distance
-                var accessibleShelters = availableShelters
-                    .Where(s => s.RemainingCapacity > 0)
-                    .Select(shelter =>
-                    {
-                        double distance = CalculateDistance(
-                            person.Latitude, person.Longitude,
-                            shelter.Latitude, shelter.Longitude);
-                        return (Shelter: shelter, Distance: distance);
-                    })
-                    .Where(pair => pair.Distance <= maxDistanceKm)
-                    .OrderBy(pair => pair.Distance)
-                    .ToList();
+        //         // Find shelters with capacity within max distance
+        //         var accessibleShelters = availableShelters
+        //             .Where(s => s.RemainingCapacity > 0)
+        //             .Select(shelter =>
+        //             {
+        //                 double distance = CalculateDistance(
+        //                     person.Latitude, person.Longitude,
+        //                     shelter.Latitude, shelter.Longitude);
+        //                 return (Shelter: shelter, Distance: distance);
+        //             })
+        //             .Where(pair => pair.Distance <= maxDistanceKm)
+        //             .OrderBy(pair => pair.Distance)
+        //             .ToList();
 
-                if (accessibleShelters.Any())
-                {
-                    var (nearestShelter, distance) = accessibleShelters.First();
+        //         if (accessibleShelters.Any())
+        //         {
+        //             var (nearestShelter, distance) = accessibleShelters.First();
 
-                    // Create assignment
-                    assignments[person.Id] = new AssignmentDto
-                    {
-                        PersonId = person.Id,
-                        ShelterId = nearestShelter.Id,
-                        Distance = distance
-                    };
+        //             // Create assignment
+        //             assignments[person.Id] = new AssignmentDto
+        //             {
+        //                 PersonId = person.Id,
+        //                 ShelterId = nearestShelter.Id,
+        //                 Distance = distance
+        //             };
 
-                    // Update shelter capacity
-                    nearestShelter.RemainingCapacity--;
-                }
-            }
-        }
+        //             // Update shelter capacity
+        //             nearestShelter.RemainingCapacity--;
+        //         }
+        //     }
+        // }
 
         // Helper to calculate distance between points
         private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
@@ -508,6 +548,11 @@ namespace FindCover.Controllers
         public double CenterLongitude { get; set; } = 34.7913; // Beer Sheva
         public double RadiusKm { get; set; } = 5;
         public PrioritySettingsDto PrioritySettings { get; set; } = new PrioritySettingsDto();
+        public bool UseCustomPeople { get; set; } = false;
+        public List<PersonDto> CustomPeople { get; set; } = new List<PersonDto>();
+        public bool ZeroCapacityShelters { get; set; } = false;
+        public bool UseCustomShelters { get; set; } = false;
+        public List<ShelterDto> CustomShelters { get; set; } = new List<ShelterDto>();
     }
 
     public class SimulationResponseDto

@@ -1,0 +1,148 @@
+/* Styles for the extreme scenario controls */
+
+.control-divider {
+  margin: 15px 0;
+  border: 0;
+  height: 1px;
+  background-color: #ddd;
+}
+
+.scenario-heading {
+  margin: 10px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.scenario-button {
+  margin: 5px 0;
+  width: 100%;
+  padding: 8px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.scenario-button:hover {
+  background-color: #e0e0e0;
+}
+
+/* Specific styles for each button type */
+#scenario-overcrowd {
+  background-color: #fc93a3;
+  border-color: #ffcdd2;
+}
+
+#scenario-overcrowd:hover {
+  background-color: #ffcdd2;
+}
+
+#scenario-families {
+  background-color: #77c5fc;
+  border-color: #93cbfa;
+}
+
+#scenario-families:hover {
+  background-color: #bbdefb;
+}
+
+#scenario-elderly {
+  background-color: #d0b458;
+  border-color: #ffe082;
+}
+
+#scenario-elderly:hover {
+  background-color: #ffe082;
+}
+
+#scenario-reset {
+  background-color: #5ac263;
+  border-color: #c8e6c9;
+}
+
+#scenario-reset:hover {
+  background-color: #c8e6c9;
+}
+
+/* Family information display */
+.info-container {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.info-container h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.family-group {
+  margin-bottom: 8px;
+  padding: 5px 8px;
+  background-color: white;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.family-group h5 {
+  margin: 0 0 5px 0;
+  font-size: 13px;
+  color: #333;
+}
+
+.family-group p {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Enhanced status message styles */
+.status-message {
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 5px;
+  border-radius: 3px;
+  text-align: center;
+}
+
+.status-message.running {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-message.success {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.status-message.error {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+/* Enhanced styles for people markers to show family groups */
+.marker-family {
+  border: 2px solid black !important;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Add subtle animation for family markers */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.marker-family {
+  animation: pulse 2s infinite;
+}
