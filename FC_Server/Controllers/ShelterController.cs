@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -8,6 +9,100 @@ namespace FC_Server.Controllers
     [ApiController]
     public class ShelterController : ControllerBase
     {
+        // POST api/<ShelterController>/AddShelter
+        [HttpPost("AddShelter")]
+        public IActionResult AddShelter([FromBody] FC_Server.Models.Shelter shelter)
+        {
+            try
+            {
+                var newShelter = FC_Server.Models.Shelter.AddShelter(shelter.ShelterType, shelter.Name, shelter.Latitude, shelter.Longitude,
+                                shelter.Address, shelter.Capacity, shelter.AdditionalInformation, shelter.ProviderId);
+
+                if (newShelter != null)
+                {
+                    return Ok(new
+                    {
+                        message = "Added successfuly",
+                        shelter = newShelter
+                    });
+                }
+                return BadRequest(new { message = "Add failed" });
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("User added this shelter already"))
+                {
+                    return BadRequest(new { message = "User added this shelter already" });
+                }
+                throw new Exception("Addition failed");
+            }
+        }
+
+        // POST api/<ShelterController>/UpdateShelter
+        [HttpPost("UpdateShelter")]
+        public IActionResult UpdateShelter([FromBody] FC_Server.Models.Shelter shelter)
+        {
+            try
+            {
+                var newShelter = FC_Server.Models.Shelter.UpdateShelter(shelter.ShelterId, shelter.ShelterType, shelter.Name, shelter.Latitude, shelter.Longitude,
+                                shelter.Address, shelter.Capacity, shelter.AdditionalInformation, shelter.ProviderId);
+
+                if (newShelter != null)
+                {
+                    return Ok(new
+                    {
+                        message = "Shelter updated successfuly",
+                        shelter = newShelter
+                    });
+                }
+                return BadRequest(new { message = "update failed" });
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("User added this shelter already"))
+                {
+                    return BadRequest(new { message = "User added this shelter already" });
+                }
+                throw new Exception("update failed");
+            }
+        }
+
+        // GET: api/<ShelterController> getShelter
+        [HttpGet("getShelter")]
+        public IActionResult getShelter(int shelter_id)
+        {
+            var shelterData = FC_Server.Models.Shelter.getShelter(shelter_id);
+
+            if (shelterData != null)
+            {
+                return Ok(new
+                {
+                    message = "User data trensfer successful",
+                    shlter = new
+                    {
+                        shelter_id = shelterData.ShelterId,
+                        provider_id = shelterData.ProviderId,
+                        shelter_type = shelterData.ShelterType,
+                        name = shelterData.Name,
+                        latitude = shelterData.Latitude,
+                        longitude = shelterData.Longitude,
+                        address = shelterData.Address,
+                        capacity = shelterData.Capacity,
+                        is_accessible = shelterData.IsAccessible,
+                        is_active = shelterData.IsActive,
+                        additional_information = shelterData.AdditionalInformation,
+                        created_at = shelterData.CreatedAt,
+                        last_updated = shelterData.LastUpdated
+                    }
+                });
+            }
+            return BadRequest(new { message = "Invalid ID" });
+        }
+
+        //--------------------------------------------------------------------------------------------------
+        // Default controllers
+        //--------------------------------------------------------------------------------------------------
+
         // GET: api/<ShelterController>
         [HttpGet]
         public IEnumerable<string> Get()
