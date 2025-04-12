@@ -250,7 +250,7 @@ function setupEventHandlers() {
       const isActive = this.classList.toggle("active");
 
       if (isActive) {
-        this.textContent = "Placing People (Click Map)";
+        this.textContent = "Stop Placing People";
         if (window.visualizer) {
           window.visualizer.enableManualPlacement(true);
         }

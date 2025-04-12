@@ -118,19 +118,19 @@ namespace FindCover.Controllers
                 {
                     age = _random.Next(1, 15); // Ages 1-14
                 }
-                else if (ageRandom < 0.151) // 15.1% young adults
+                else if (ageRandom < 0.282 + 0.151) // 28.2% + 15.1% = 43.3% for young adults
                 {
                     age = _random.Next(15, 25); // Ages 15-24
                 }
-                else if (ageRandom < 0.364) // 36.4% are adults
+                else if (ageRandom < 0.282 + 0.151 + 0.364) // 28.2% + 15.1% + 36.4% = 79.7% for adults
                 {
                     age = _random.Next(25, 55); // Ages 25-54
                 }
-                else if (ageRandom < 0.085) // 8.5%  are older adults
+                else if (ageRandom < 0.282 + 0.151 + 0.364 + 0.085) // 28.2% + 15.1% + 36.4% + 8.5% = 88.2% for older adults
                 {
                     age = _random.Next(55, 65); // Ages 55-64
                 }
-                else // 11.8% are elderly
+                else // Remaining 11.8% are elderly
                 {
                     age = _random.Next(65, 95); // Ages 65-94
                 }
@@ -301,7 +301,8 @@ namespace FindCover.Controllers
                 }
             }
 
-            Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
+            //check
+            //Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
 
             // Step 5: Create all possible assignments and group by distance segment
             // Create a list of all possible assignments

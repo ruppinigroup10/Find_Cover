@@ -149,25 +149,25 @@ class ShelterSimulationVisualizer {
       // For shelters, we'll create a function that returns a sized icon
       // This will be called dynamically for each shelter based on its capacity
       getShelterIcon: function (capacity) {
-        // Ensure capacity is within range 1-5
-        const cappedCapacity = Math.max(1, Math.min(5, capacity));
+        // Ensure capacity is within range 3-7
+        const cappedCapacity = Math.max(3, Math.min(7, capacity));
 
         // Define specific sizes for each capacity value (1-5)
         const sizeMap = {
-          1: 14, // Smallest size
-          2: 18,
-          3: 22,
-          4: 26,
-          5: 30, // Largest size
+          3: 14, // Smallest size
+          4: 18,
+          5: 22,
+          6: 26,
+          7: 30, // Largest size
         };
 
         // Define color shades for each capacity (light to dark red)
         const colorMap = {
-          1: "#CC3333", // Light red
-          2: "#CC0000",
-          3: "#BB0000",
-          4: "#990000",
-          5: "#660000", // Darkest red
+          3: "#CC3333", // Light red
+          4: "#CC0000",
+          5: "#BB0000",
+          6: "#990000",
+          7: "#660000", // Darkest red
         };
 
         // Get the size and color based on the capacity
@@ -512,8 +512,9 @@ class ShelterSimulationVisualizer {
           .filter((shelter) => shelter.capacity > 0) // Only show shelters with capacity
           .sort((a, b) => b.percentUsed - a.percentUsed);
 
-        // Display statistics for each shelter (limit to top 5 for UI clarity)
-        sortedShelters.slice(0, 5).forEach((shelter) => {
+        // Display statistics for each shelter
+        // sortedShelters.slice(0, 5).forEach((shelter) - (limit to top 5 for UI clarity)
+        sortedShelters.forEach((shelter) => {
           const shelterDiv = document.createElement("div");
           shelterDiv.className = "shelter-usage-item";
 
@@ -774,7 +775,7 @@ class ShelterSimulationVisualizer {
         enableButton.addEventListener("click", () => {
           const isEnabled = enableButton.classList.toggle("active");
           if (isEnabled) {
-            enableButton.textContent = "Placing People (Click Map)";
+            enableButton.textContent = "Stop Placing People";
             this.enableManualPlacement(true);
           } else {
             enableButton.textContent = "Place People Manually";
@@ -1013,10 +1014,6 @@ class ShelterSimulationVisualizer {
     }
   }
 
-  /**
-   * Run simulation with manually placed people added to existing simulation
-   * Preserves current shelters and only adds the manual people
-   */
   /**
    * Run simulation with manually placed people added to existing simulation
    * Preserves current shelters and only adds the manual people
@@ -1280,7 +1277,7 @@ class ShelterSimulationVisualizer {
       }
 
       // Call the fallback method
-      this.fallbackCustomSimulation(customPeople);
+      //this.fallbackCustomSimulation(customPeople);
     }
   }
 
@@ -1288,193 +1285,193 @@ class ShelterSimulationVisualizer {
    * Fallback method if the server doesn't support custom people
    * This will simply display manually placed people without assignments
    */
-  fallbackCustomSimulation(customPeople) {
-    const statusElement = document.getElementById("simulation-status");
+  //   fallbackCustomSimulation(customPeople) {
+  //     const statusElement = document.getElementById("simulation-status");
 
-    if (statusElement) {
-      statusElement.textContent =
-        "Using fallback for manual people (no assignments)";
-      statusElement.className = "status-message warning";
-    }
+  //     if (statusElement) {
+  //       statusElement.textContent =
+  //         "Using fallback for manual people (no assignments)";
+  //       statusElement.className = "status-message warning";
+  //     }
 
-    // If we have existing simulation data, use it as the base
-    let people = [];
-    let shelters = [];
-    let assignments = {};
+  //     // If we have existing simulation data, use it as the base
+  //     let people = [];
+  //     let shelters = [];
+  //     let assignments = {};
 
-    if (this.currentSimulationData) {
-      // Start with current data
-      people = [...this.currentSimulationData.people];
-      shelters = [...this.currentSimulationData.shelters];
-      assignments = { ...this.currentSimulationData.assignments };
+  //     if (this.currentSimulationData) {
+  //       // Start with current data
+  //       people = [...this.currentSimulationData.people];
+  //       shelters = [...this.currentSimulationData.shelters];
+  //       assignments = { ...this.currentSimulationData.assignments };
 
-      // Add manual people
-      customPeople.forEach((person) => {
-        // Only add if not already present (by checking coordinates)
-        const exists = people.some(
-          (p) =>
-            Math.abs(p.latitude - person.latitude) < 0.0001 &&
-            Math.abs(p.longitude - person.longitude) < 0.0001
-        );
+  //       // Add manual people
+  //       customPeople.forEach((person) => {
+  //         // Only add if not already present (by checking coordinates)
+  //         const exists = people.some(
+  //           (p) =>
+  //             Math.abs(p.latitude - person.latitude) < 0.0001 &&
+  //             Math.abs(p.longitude - person.longitude) < 0.0001
+  //         );
 
-        if (!exists) {
-          // Find the next available ID
-          const nextId = Math.max(...people.map((p) => p.id), 0) + 1;
-          people.push({
-            ...person,
-            id: nextId,
-          });
-        }
-      });
-    } else {
-      // No existing data, just use the manual people and generate shelters
-      people = customPeople.map((person, idx) => ({
-        ...person,
-        id: idx + 1,
-      }));
+  //         if (!exists) {
+  //           // Find the next available ID
+  //           const nextId = Math.max(...people.map((p) => p.id), 0) + 1;
+  //           people.push({
+  //             ...person,
+  //             id: nextId,
+  //           });
+  //         }
+  //       });
+  //     } else {
+  //       // No existing data, just use the manual people and generate shelters
+  //       people = customPeople.map((person, idx) => ({
+  //         ...person,
+  //         id: idx + 1,
+  //       }));
 
-      // Generate shelters
-      const shelterCount =
-        parseInt(document.getElementById("shelter-count").value) || 8;
-      shelters = this.generateShelters({
-        shelterCount: shelterCount,
-        centerLatitude: 31.2518,
-        centerLongitude: 34.7913,
-        radiusKm: 0.5,
-      });
-    }
+  //       // Generate shelters
+  //       const shelterCount =
+  //         parseInt(document.getElementById("shelter-count").value) || 8;
+  //       shelters = this.generateShelters({
+  //         shelterCount: shelterCount,
+  //         centerLatitude: 31.2518,
+  //         centerLongitude: 34.7913,
+  //         radiusKm: 0.5,
+  //       });
+  //     }
 
-    // Visualize just the people and shelters, without assignments
-    this.visualizeSimulation(people, shelters, assignments);
+  //     // Visualize just the people and shelters, without assignments
+  //     this.visualizeSimulation(people, shelters, assignments);
 
-    // Inform the user
-    alert(
-      "Manual people placement is working, but assignment is not available in this mode. Please use the server simulation for assignments."
-    );
-  }
+  //     // Inform the user
+  //     alert(
+  //       "Manual people placement is working, but assignment is not available in this mode. Please use the server simulation for assignments."
+  //     );
+  //   }
 
   /**
    * Run server simulation with custom shelter data
    */
-  async runServerSimulationWithCustomShelters(customShelters) {
-    const statusElement = document.getElementById("simulation-status");
+  //   async runServerSimulationWithCustomShelters(customShelters) {
+  //     const statusElement = document.getElementById("simulation-status");
 
-    try {
-      // Get parameters from UI controls
-      const peopleCount =
-        parseInt(document.getElementById("people-count").value) || 100;
-      const radius = parseFloat(document.getElementById("radius").value) || 0.5;
-      const priorityEnabled =
-        document.getElementById("priority").value === "true";
+  //     try {
+  //       // Get parameters from UI controls
+  //       const peopleCount =
+  //         parseInt(document.getElementById("people-count").value) || 100;
+  //       const radius = parseFloat(document.getElementById("radius").value) || 0.5;
+  //       const priorityEnabled =
+  //         document.getElementById("priority").value === "true";
 
-      // Create a modified request that includes our custom shelters
-      const requestData = {
-        peopleCount: peopleCount,
-        shelterCount: 0, // We're providing our own shelters, so don't generate any
-        centerLatitude: 31.2518, // Beer Sheva
-        centerLongitude: 34.7913, // Beer Sheva
-        radiusKm: radius,
-        prioritySettings: {
-          enableAgePriority: priorityEnabled,
-          childMaxAge: 12,
-          elderlyMinAge: 70,
-        },
-        useCustomShelters: true,
-        customShelters: customShelters,
-      };
+  //       // Create a modified request that includes our custom shelters
+  //       const requestData = {
+  //         peopleCount: peopleCount,
+  //         shelterCount: 0, // We're providing our own shelters, so don't generate any
+  //         centerLatitude: 31.2518, // Beer Sheva
+  //         centerLongitude: 34.7913, // Beer Sheva
+  //         radiusKm: radius,
+  //         prioritySettings: {
+  //           enableAgePriority: priorityEnabled,
+  //           childMaxAge: 12,
+  //           elderlyMinAge: 70,
+  //         },
+  //         useCustomShelters: true,
+  //         customShelters: customShelters,
+  //       };
 
-      // Call the server API with our custom request
-      const response = await fetch(
-        `https://localhost:${PORT}/api/Simulation/run`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestData),
-        }
-      );
+  //       // Call the server API with our custom request
+  //       const response = await fetch(
+  //         `https://localhost:${PORT}/api/Simulation/run`,
+  //         {
+  //           method: "POST",
+  //           headers: {
+  //             "Content-Type": "application/json",
+  //           },
+  //           body: JSON.stringify(requestData),
+  //         }
+  //       );
 
-      // Handle error responses
-      if (!response.ok) {
-        throw new Error(
-          `Server responded with ${response.status}: ${response.statusText}`
-        );
-      }
+  //       // Handle error responses
+  //       if (!response.ok) {
+  //         throw new Error(
+  //           `Server responded with ${response.status}: ${response.statusText}`
+  //         );
+  //       }
 
-      // Parse the successful response
-      const data = await response.json();
+  //       // Parse the successful response
+  //       const data = await response.json();
 
-      // Display the results on the map
-      this.visualizeSimulation(data.people, data.shelters, data.assignments);
+  //       // Display the results on the map
+  //       this.visualizeSimulation(data.people, data.shelters, data.assignments);
 
-      // Update status message
-      if (statusElement) {
-        statusElement.textContent = "Manual shelter simulation complete";
-        statusElement.className = "status-message success";
+  //       // Update status message
+  //       if (statusElement) {
+  //         statusElement.textContent = "Manual shelter simulation complete";
+  //         statusElement.className = "status-message success";
 
-        // Clear the status after a few seconds
-        setTimeout(() => {
-          statusElement.textContent = "";
-          statusElement.className = "status-message";
-        }, 3000);
-      }
-    } catch (error) {
-      console.error("Server simulation with custom shelters failed:", error);
-      // Fallback to a simpler approach if needed
-      this.fallbackCustomShelterSimulation(customShelters);
-    }
-  }
+  //         // Clear the status after a few seconds
+  //         setTimeout(() => {
+  //           statusElement.textContent = "";
+  //           statusElement.className = "status-message";
+  //         }, 3000);
+  //       }
+  //     } catch (error) {
+  //       console.error("Server simulation with custom shelters failed:", error);
+  //       // Fallback to a simpler approach if needed
+  //       this.fallbackCustomShelterSimulation(customShelters);
+  //     }
+  //   }
 
   /**
    * Generate shelters for manual simulations
    */
-  generateShelters(requestData) {
-    const shelters = [];
+  //   generateShelters(requestData) {
+  //     const shelters = [];
 
-    // Known Beer Sheva locations for realism
-    const knownLocations = [
-      { name: "Ben Gurion University", lat: 31.2634, lon: 34.8044 },
-      { name: "Beer Sheva Central Station", lat: 31.2434, lon: 34.798 },
-      { name: "Grand Canyon Mall", lat: 31.2508, lon: 34.7738 },
-      { name: "Soroka Medical Center", lat: 31.2534, lon: 34.8018 },
-    ];
+  //     // Known Beer Sheva locations for realism
+  //     const knownLocations = [
+  //       { name: "Ben Gurion University", lat: 31.2634, lon: 34.8044 },
+  //       { name: "Beer Sheva Central Station", lat: 31.2434, lon: 34.798 },
+  //       { name: "Grand Canyon Mall", lat: 31.2508, lon: 34.7738 },
+  //       { name: "Soroka Medical Center", lat: 31.2534, lon: 34.8018 },
+  //     ];
 
-    // Add known locations first
-    for (
-      let i = 0;
-      i < Math.min(requestData.shelterCount, knownLocations.length);
-      i++
-    ) {
-      const location = knownLocations[i];
-      shelters.push({
-        id: i + 1,
-        name: location.name,
-        latitude: location.lat,
-        longitude: location.lon,
-        capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
-      });
-    }
+  //     // Add known locations first
+  //     for (
+  //       let i = 0;
+  //       i < Math.min(requestData.shelterCount, knownLocations.length);
+  //       i++
+  //     ) {
+  //       const location = knownLocations[i];
+  //       shelters.push({
+  //         id: i + 1,
+  //         name: location.name,
+  //         latitude: location.lat,
+  //         longitude: location.lon,
+  //         capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
+  //       });
+  //     }
 
-    // Add remaining random shelters if needed
-    for (let i = knownLocations.length; i < requestData.shelterCount; i++) {
-      const angle = Math.random() * 2 * Math.PI;
-      const distance = (Math.random() * requestData.radiusKm * 0.7) / 111.0;
+  //     // Add remaining random shelters if needed
+  //     for (let i = knownLocations.length; i < requestData.shelterCount; i++) {
+  //       const angle = Math.random() * 2 * Math.PI;
+  //       const distance = (Math.random() * requestData.radiusKm * 0.7) / 111.0;
 
-      const latOffset = distance * Math.cos(angle);
-      const lonOffset = distance * Math.sin(angle);
+  //       const latOffset = distance * Math.cos(angle);
+  //       const lonOffset = distance * Math.sin(angle);
 
-      shelters.push({
-        id: i + 1,
-        name: `Shelter ${i + 1}`,
-        latitude: requestData.centerLatitude + latOffset,
-        longitude: requestData.centerLongitude + lonOffset,
-        capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
-      });
-    }
+  //       shelters.push({
+  //         id: i + 1,
+  //         name: `Shelter ${i + 1}`,
+  //         latitude: requestData.centerLatitude + latOffset,
+  //         longitude: requestData.centerLongitude + lonOffset,
+  //         capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
+  //       });
+  //     }
 
-    return shelters;
-  }
+  //     return shelters;
+  //   }
 }
 
 // Export the class for use in other modules
