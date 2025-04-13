@@ -274,6 +274,9 @@ async function runServerSimulationWithElderlyFocus() {
       data.assignments
     );
 
+    // update statistics with the enhanced age group information:
+    updateStatistics(data.statistics, data.people, data.assignments);
+
     // Count elderly percentage for status message
     const elderlyCount = data.people.filter((p) => p.age >= 70).length;
     const elderlyPercentage = Math.round(
@@ -465,6 +468,9 @@ async function runZeroCapacitySheltersSimulation() {
       data.shelters,
       data.assignments
     );
+
+    //update statistics with the enhanced age group information:
+    updateStatistics(data.statistics, data.people, data.assignments);
 
     // Update status with count of zero capacity shelters
     const zeroCapacityShelters = customShelters.filter(

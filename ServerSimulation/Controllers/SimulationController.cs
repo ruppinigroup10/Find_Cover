@@ -186,8 +186,8 @@ namespace FindCover.Controllers
                 double angle = _random.NextDouble() * 2 * Math.PI;
                 double distance = _random.NextDouble() * radiusKm * 0.7 / 111.0; // Convert to degrees, more central
 
-                double latOffset = distance * Math.Cos(angle);
-                double lonOffset = distance * Math.Sin(angle);
+                double latOffset = distance * Math.Cos(angle); // distance * cos(angle) = north-south offset
+                double lonOffset = distance * Math.Sin(angle); // distance * sin(angle) = east-west offset
 
                 // Determine capacity - handle zero capacity scenario
                 int capacity;
@@ -214,7 +214,7 @@ namespace FindCover.Controllers
         }
 
         // Main algorithm for assigning people to shelters with time constraints
-        // Using global assignment optimization- partially 
+        // Using global optimization approach
         // Modified to prioritize by distance first, then age only when necessary, and protect people with only one shelter option
         private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
             List<PersonDto> people,
@@ -227,7 +227,7 @@ namespace FindCover.Controllers
             const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
             const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
-            const int SEGMENT_SIZE_METERS = 50; // Changed from 100m to 50m segments
+            const int SEGMENT_SIZE_METERS = 50;
             const int DISTANCE_SEGMENTS = 12; // 600m divided into 50m segments = 12 segments
             const double SEGMENT_SIZE_KM = SEGMENT_SIZE_METERS / 1000.0;
 
@@ -301,8 +301,7 @@ namespace FindCover.Controllers
                 }
             }
 
-            //check
-            //Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
+            Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
 
             // Step 5: Create all possible assignments and group by distance segment
             // Create a list of all possible assignments
@@ -549,10 +548,11 @@ namespace FindCover.Controllers
                             }
                         }
 
-                        if (!reassignmentMade)
-                        {
-                            Console.WriteLine($"Could not assign one-shelter person {personId} - no reassignment options available");
-                        }
+                        // check log for those who could not be reassigned
+                        // if (!reassignmentMade)
+                        // {
+                        //     Console.WriteLine($"Could not assign one-shelter person {personId} - no reassignment options available");
+                        // }
                     }
                 }
             }

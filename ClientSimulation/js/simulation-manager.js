@@ -126,7 +126,7 @@ async function runServerSimulation() {
     );
 
     // Update statistics manually (we no longer rely on Leaflet controls)
-    updateStatistics(data.statistics, data.people);
+    updateStatistics(data.statistics, data.people, data.assignments);
 
     // Update status message
     if (statusElement) {
@@ -152,7 +152,7 @@ async function runServerSimulation() {
 /**
  * Updates the statistics panel with simulation results
  */
-function updateStatistics(stats, people) {
+function updateStatistics(stats, people, assignments) {
   if (!stats) return;
 
   // Update basic statistics
@@ -170,49 +170,138 @@ function updateStatistics(stats, people) {
   if (statsMaxDistance)
     statsMaxDistance.textContent = stats.maxDistance.toFixed(2);
 
-  // Update age group statistics (if needed)
-  updateAgeGroupStats(people, stats);
+  // Update age group statistics
+  updateAgeGroupStats(people, stats, assignments);
 }
 
 /**
  * Updates age group statistics in the UI
  */
-function updateAgeGroupStats(people, stats) {
+function updateAgeGroupStats(people, stats, assignments) {
   const ageStatsContainer = document.getElementById("age-stats-container");
   if (!ageStatsContainer) return;
 
   // Calculate age groups
-  const assigned = { children: 0, adults: 0, elderly: 0 };
-  const unassigned = { children: 0, adults: 0, elderly: 0 };
+  const ageGroups = {
+    assigned: { children: 0, adults: 0, elderly: 0 },
+    unassigned: { children: 0, adults: 0, elderly: 0 },
+    total: { children: 0, adults: 0, elderly: 0 },
+  };
 
-  // We would need assignments data for this
-  // Simple placeholder for now
-  ageStatsContainer.innerHTML = `
-    <table class="age-stats-table">
-      <tr>
-        <th>Age Group</th>
-        <th>Assigned</th>
-        <th>Unassigned</th>
-      </tr>
-      <tr>
-        <td>Children</td>
-        <td>${stats.assignedChildren || "N/A"}</td>
-        <td>${stats.unassignedChildren || "N/A"}</td>
-      </tr>
-      <tr>
-        <td>Adults</td>
-        <td>${stats.assignedAdults || "N/A"}</td>
-        <td>${stats.unassignedAdults || "N/A"}</td>
-      </tr>
-      <tr>
-        <td>Elderly</td>
-        <td>${stats.assignedElderly || "N/A"}</td>
-        <td>${stats.unassignedElderly || "N/A"}</td>
-      </tr>
-    </table>
-  `;
+  // Process each person to count by age group
+  people.forEach((person) => {
+    const isAssigned = assignments && assignments[person.id];
+    const ageCategory =
+      person.age >= 70 ? "elderly" : person.age <= 12 ? "children" : "adults";
+
+    // Track totals by age category
+    ageGroups.total[ageCategory]++;
+
+    if (isAssigned) {
+      ageGroups.assigned[ageCategory]++;
+    } else {
+      ageGroups.unassigned[ageCategory]++;
+    }
+  });
+
+  // Calculate totals
+  const totalAssigned =
+    ageGroups.assigned.elderly +
+    ageGroups.assigned.children +
+    ageGroups.assigned.adults;
+
+  const totalUnassigned =
+    ageGroups.unassigned.elderly +
+    ageGroups.unassigned.children +
+    ageGroups.unassigned.adults;
+
+  ageStatsContainer.innerHTML = "";
+
+  // Create a table for age group statistics
+  const table = document.createElement("table");
+  table.className = "age-stats-table";
+
+  // Add table headers with the new column
+  const headerRow = document.createElement("tr");
+  ["", "Assigned", "Unassigned", "% Assigned"].forEach((header) => {
+    const th = document.createElement("th");
+    th.textContent = header;
+    headerRow.appendChild(th);
+  });
+  table.appendChild(headerRow);
+
+  // Add data rows for each age group
+  const ageCategories = [
+    {
+      name: "Children",
+      assigned: ageGroups.assigned.children,
+      unassigned: ageGroups.unassigned.children,
+      total: ageGroups.total.children,
+    },
+    {
+      name: "Adults",
+      assigned: ageGroups.assigned.adults,
+      unassigned: ageGroups.unassigned.adults,
+      total: ageGroups.total.adults,
+    },
+    {
+      name: "Elderly",
+      assigned: ageGroups.assigned.elderly,
+      unassigned: ageGroups.unassigned.elderly,
+      total: ageGroups.total.elderly,
+    },
+  ];
+
+  ageCategories.forEach((category) => {
+    const row = document.createElement("tr");
+
+    // Add name cell
+    const nameCell = document.createElement("td");
+    nameCell.textContent = category.name;
+    row.appendChild(nameCell);
+
+    // Add assigned cell with percentage of total assigned
+    const assignedCell = document.createElement("td");
+    const assignedPct =
+      totalAssigned > 0
+        ? Math.round((category.assigned / totalAssigned) * 100)
+        : 0;
+    assignedCell.textContent = `${category.assigned} (${assignedPct}%)`;
+    row.appendChild(assignedCell);
+
+    // Add unassigned cell with percentage of total unassigned
+    const unassignedCell = document.createElement("td");
+    const unassignedPct =
+      totalUnassigned > 0
+        ? Math.round((category.unassigned / totalUnassigned) * 100)
+        : 0;
+    unassignedCell.textContent = `${category.unassigned} (${unassignedPct}%)`;
+    row.appendChild(unassignedCell);
+
+    // Add new column: percentage of this age group that was assigned
+    const percentAssignedCell = document.createElement("td");
+    const percentAssigned =
+      category.total > 0
+        ? Math.round((category.assigned / category.total) * 100)
+        : 0;
+    percentAssignedCell.textContent = `${percentAssigned}%`;
+    // Add a color indicator for the percentage
+    if (percentAssigned > 80) {
+      percentAssignedCell.style.color = "green";
+      percentAssignedCell.style.fontWeight = "bold";
+    } else if (percentAssigned < 50) {
+      percentAssignedCell.style.color = "red";
+      percentAssignedCell.style.fontWeight = "bold";
+    } else {
+      percentAssignedCell.style.color = "orange";
+    }
+    row.appendChild(percentAssignedCell);
+
+    table.appendChild(row);
+  });
+
+  ageStatsContainer.appendChild(table);
 }
-
 /**
  * Initialization code for the application
  * Creates the visualizer instance and sets up the application when the DOM is ready
