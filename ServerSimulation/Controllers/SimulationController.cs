@@ -60,6 +60,35 @@ namespace FindCover.Controllers
                 //var people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
                 var assignments = AssignPeopleToShelters(people, shelters, request.PrioritySettings);
 
+                // Add nearest shelter info for unassigned people
+                var unassignedPeople = people.Where(p => !assignments.ContainsKey(p.Id)).ToList();
+                foreach (var person in unassignedPeople)
+                {
+                    // Find nearest shelter
+                    ShelterDto nearestShelter = null;
+                    double nearestDistance = double.MaxValue;
+
+                    foreach (var shelter in shelters)
+                    {
+                        double distance = CalculateDistance(
+                            person.Latitude, person.Longitude,
+                            shelter.Latitude, shelter.Longitude);
+
+                        if (distance < nearestDistance)
+                        {
+                            nearestDistance = distance;
+                            nearestShelter = shelter;
+                        }
+                    }
+
+                    // Add nearest shelter info to the person object
+                    if (nearestShelter != null)
+                    {
+                        person.NearestShelterId = nearestShelter.Id;
+                        person.NearestShelterDistance = nearestDistance;
+                    }
+                }
+
                 // Calculate statistics
                 var assignedCount = assignments.Count;
                 var averageDistance = assignments.Values.Count > 0 ? assignments.Values.Average(a => a.Distance) : 0;
@@ -78,6 +107,9 @@ namespace FindCover.Controllers
                         UnassignedCount = people.Count - assignedCount,
                         AssignmentPercentage = people.Count > 0 ? (double)assignedCount / people.Count : 0,
                         TotalShelterCapacity = shelters.Sum(s => s.Capacity),
+                        ShelterUsagePercentage = shelters.Sum(s => s.Capacity) > 0
+                        ? (double)assignedCount / shelters.Sum(s => s.Capacity) * 100
+                        : 0,
                         AverageDistance = averageDistance,
                         MaxDistance = maxDistance,
                         MinDistance = assignments.Values.Count > 0 ? assignments.Values.Min(a => a.Distance) : 0
@@ -214,7 +246,7 @@ namespace FindCover.Controllers
         }
 
         // Main algorithm for assigning people to shelters with time constraints
-        // Using global optimization approach
+        // Using greedy approach with global optimization approach in the end
         // Modified to prioritize by distance first, then age only when necessary, and protect people with only one shelter option
         private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
             List<PersonDto> people,
@@ -227,8 +259,10 @@ namespace FindCover.Controllers
             const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
             const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
-            const int SEGMENT_SIZE_METERS = 50;
-            const int DISTANCE_SEGMENTS = 12; // 600m divided into 50m segments = 12 segments
+            //const int SEGMENT_SIZE_METERS = 50;
+            //const int DISTANCE_SEGMENTS = 12; // 600m divided into 50m segments = 12 segments
+            const int SEGMENT_SIZE_METERS = 5;
+            const int DISTANCE_SEGMENTS = 120; // 600m divided into 5m segments = 120 segments
             const double SEGMENT_SIZE_KM = SEGMENT_SIZE_METERS / 1000.0;
 
             Console.WriteLine($"Time constraint: Maximum distance = {MAX_DISTANCE_KM:F4} km");
@@ -702,6 +736,8 @@ namespace FindCover.Controllers
         public int Age { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+        public int? NearestShelterId { get; set; }
+        public double? NearestShelterDistance { get; set; }
     }
 
     public class ShelterDto
@@ -737,5 +773,7 @@ namespace FindCover.Controllers
         public double AverageDistance { get; set; }
         public double MaxDistance { get; set; }
         public double MinDistance { get; set; }
+        public double ShelterUsagePercentage { get; set; }
+
     }
 }

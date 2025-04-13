@@ -148,7 +148,7 @@ class ShelterSimulationVisualizer {
 
       // For shelters, we'll create a function that returns a sized icon
       // This will be called dynamically for each shelter based on its capacity
-      getShelterIcon: function (capacity) {
+      getShelterIcon: function (capacity, shelterId = "") {
         // Ensure capacity is within range 3-7
         const cappedCapacity = Math.max(3, Math.min(7, capacity));
 
@@ -177,9 +177,25 @@ class ShelterSimulationVisualizer {
         // Calculate the anchor (center point) based on size
         const anchor = size / 2;
 
+        // Create HTML that includes both the circular marker and the shelter ID
+        // The ID is displayed in the center of the circle
         return L.divIcon({
           className: "marker-shelter",
-          html: `<div style="background-color: ${color}; border-radius: 50%; width: ${size}px; height: ${size}px;"></div>`,
+          html: `
+            <div style="
+            position: relative;
+            background-color: ${color}; 
+            border-radius: 50%; 
+            width: ${size}px; 
+            height: ${size}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: ${size > 20 ? 12 : 10}px;
+            ">${shelterId}</div>
+            `,
           iconSize: [size, size],
           iconAnchor: [anchor, anchor],
         });
@@ -265,6 +281,9 @@ class ShelterSimulationVisualizer {
 
     // Update the statistics display in the UI
     this.updateStatisticsDisplay();
+
+    // Update shelter popups with current assignment data
+    this.updateShelterPopups();
   }
 
   /**
@@ -312,8 +331,11 @@ class ShelterSimulationVisualizer {
 
     // Add each shelter as a marker on the map
     shelters.forEach((shelter) => {
-      // Get a dynamically sized icon based on this shelter's capacity
-      const shelterIcon = this.icons.getShelterIcon(shelter.capacity);
+      // Get a dynamically sized icon based on this shelter's capacity and include ID
+      const shelterIcon = this.icons.getShelterIcon(
+        shelter.capacity,
+        shelter.id
+      );
 
       const marker = L.marker([shelter.latitude, shelter.longitude], {
         icon: shelterIcon,
@@ -328,6 +350,51 @@ class ShelterSimulationVisualizer {
 
       // Add the marker to the shelter layer group
       this.shelterMarkers.addLayer(marker);
+    });
+  }
+
+  updateShelterPopups() {
+    // Find all shelter markers and update their popups
+    this.shelterMarkers.eachLayer((marker) => {
+      // Get the shelter ID from the marker
+      const shelterIdMatch =
+        marker._popup._content.match(/shelter-(\d+)-count/);
+      if (shelterIdMatch && shelterIdMatch[1]) {
+        const shelterId = parseInt(shelterIdMatch[1]);
+
+        // Find this shelter's stats
+        const shelterStat = this.stats.shelterUsage.find(
+          (s) => s.id === shelterId
+        );
+
+        if (shelterStat) {
+          // Update the popup content with current data
+          const shelter = this.currentSimulationData.shelters.find(
+            (s) => s.id === shelterId
+          );
+          if (shelter) {
+            marker.setPopupContent(`
+            <h3>${shelter.name}</h3>
+            <p>Capacity: <span id="shelter-${shelter.id}-count">${
+              shelterStat.assigned
+            }</span>/${shelter.capacity}</p>
+            <p>Status: <span id="shelter-${shelter.id}-status" class="${
+              shelterStat.assigned >= shelter.capacity
+                ? "status-full"
+                : shelterStat.assigned >= shelter.capacity * 0.8
+                ? "status-almost-full"
+                : "status-available"
+            }">${
+              shelterStat.assigned >= shelter.capacity
+                ? "Full"
+                : shelterStat.assigned >= shelter.capacity * 0.8
+                ? "Almost Full"
+                : "Available"
+            }</span></p>
+          `);
+          }
+        }
+      }
     });
   }
 
@@ -449,18 +516,44 @@ class ShelterSimulationVisualizer {
 
           // Add popup with assignment information
           marker.bindPopup(`
-          <p>Person #${person.id}</p>
-          <p>Age: ${person.age}</p>
-          <p>Assigned to: ${shelter.name}</p>
-          <p>Distance: ${assignment.distance.toFixed(2)} km</p>
-        `);
+        <p>Person #${person.id}</p>
+        <p>Age: ${person.age}</p>
+        <p>Assigned to: ${shelter.name}</p>
+        <p>Distance: ${assignment.distance.toFixed(2)} km</p>
+      `);
         }
       } else {
-        // Popup for unassigned person
+        // For unassigned person, find the nearest shelter
+        let nearestShelter = null;
+        let nearestDistance = Infinity;
+
+        shelters.forEach((shelter) => {
+          const distance = this.calculateAirDistance(
+            person.latitude,
+            person.longitude,
+            shelter.latitude,
+            shelter.longitude
+          );
+
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestShelter = shelter;
+          }
+        });
+
+        // Popup for unassigned person with nearest shelter info
         marker.bindPopup(`
         <p>Person #${person.id}</p>
         <p>Age: ${person.age}</p>
         <p>Status: <span class="status-unassigned">Unassigned</span></p>
+        ${
+          nearestShelter
+            ? `
+        <p>Nearest shelter: ${nearestShelter.name}</p>
+        <p>Distance: ${nearestDistance.toFixed(2)} km</p>
+        `
+            : ""
+        }
       `);
       }
 
@@ -473,7 +566,6 @@ class ShelterSimulationVisualizer {
       this.stats.averageDistance = totalDistance / this.stats.assignedPeople;
     }
   }
-
   /**
    * Updates the statistics panel with current simulation data
    * Called after visualization to show results in the UI
@@ -649,7 +741,7 @@ class ShelterSimulationVisualizer {
         <div id="stats-container">
           <p>Total people: <span id="stats-total">0</span></p>
           <p>Assigned: <span id="stats-assigned">0</span></p>
-          <p>Unassigned: <span id="stats-unassigned">0</span></p>
+          <p>Shelter usage: <span id="stats-shelter-usage">0</span>%</p>
           <p>Avg. distance: <span id="stats-avg-distance">0</span> km</p>
           <p>Max distance: <span id="stats-max-distance">0</span> km</p>
         </div>

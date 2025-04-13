@@ -161,6 +161,8 @@ function updateStatistics(stats, people, assignments) {
   const statsUnassigned = document.getElementById("stats-unassigned");
   const statsAvgDistance = document.getElementById("stats-avg-distance");
   const statsMaxDistance = document.getElementById("stats-max-distance");
+  const statsTotalCapacity = document.getElementById("stats-total-capacity");
+  const statsShelterUsage = document.getElementById("stats-shelter-usage");
 
   if (statsTotal) statsTotal.textContent = people.length;
   if (statsAssigned) statsAssigned.textContent = stats.assignedCount;
@@ -169,6 +171,10 @@ function updateStatistics(stats, people, assignments) {
     statsAvgDistance.textContent = stats.averageDistance.toFixed(2);
   if (statsMaxDistance)
     statsMaxDistance.textContent = stats.maxDistance.toFixed(2);
+  if (statsTotalCapacity)
+    statsTotalCapacity.textContent = stats.totalShelterCapacity;
+  if (statsShelterUsage)
+    statsShelterUsage.textContent = stats.shelterUsagePercentage.toFixed(1);
 
   // Update age group statistics
   updateAgeGroupStats(people, stats, assignments);
