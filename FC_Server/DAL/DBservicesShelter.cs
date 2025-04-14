@@ -260,4 +260,72 @@ public class DBservicesShelter
                 }
             }
         }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method geting shelters data
+    //--------------------------------------------------------------------------------------------------
+    public Shelter? shelterActiveStatus(int shelter_id, bool status)
+    {
+
+        SqlConnection con;
+        SqlCommand cmd;
+        Shelter? shelter = null;
+
+        try
+        {
+            con = connect("myProjDB"); // create the connection
+        }
+        catch (Exception)
+        {
+            // write to log
+            throw;
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@shelter_id", shelter_id);
+        paramDic.Add("@status", status);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_shelterActiveStatus", con, paramDic);
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    shelter = new Shelter
+                    {
+                        ShelterId = Convert.ToInt32(dr["shelter_id"]),
+                        ShelterType = dr["shelter_type"].ToString() ?? "",
+                        Name = dr["name"].ToString() ?? "",
+                        Latitude = Convert.ToSingle(dr["latitude"]),
+                        Longitude = Convert.ToSingle(dr["longitude"]),
+                        Address = dr["address"].ToString() ?? "",
+                        Capacity = Convert.ToInt32(dr["capacity"]),
+                        AdditionalInformation = dr["additional_information"].ToString() ?? "",
+                        ProviderId = Convert.ToInt32(dr["provider_id"]),
+                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                        IsActive = Convert.ToBoolean(dr["is_active"])
+                    };
+                }
+            }
+            return shelter;
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                throw new Exception("Invalid ID");
+            }
+            throw new Exception("Shelter data transfer failed");
+        }
+        finally
+        {
+            if (con != null)
+            {
+                // close the db connection
+                con.Close();
+            }
+        }
+    }
 }

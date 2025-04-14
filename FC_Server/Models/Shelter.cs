@@ -72,21 +72,27 @@
         public static Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
                                 string address, int capacity, string additional_information, int provider_id)
         {
-            DBservices dbs = new DBservices();
+            DBservicesShelter dbs = new DBservicesShelter();
             return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity, additional_information, provider_id);
         }
 
         public static Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,
                                 string address, int capacity, string additional_information, int provider_id)
         {
-            DBservices dbs = new DBservices();
+            DBservicesShelter dbs = new DBservicesShelter();
             return dbs.UpdateShelter(shelter_id, shelter_type, name, latitude, longitude, address, capacity, additional_information, provider_id);
         }
 
         public static Shelter? getShelter(int shelter_id)
         {
-            DBservices dbs = new DBservices();
+            DBservicesShelter dbs = new DBservicesShelter();
             return dbs.getShelter(shelter_id);
+        }
+
+        public static Shelter? shelterActiveStatus(int shelter_id, bool status)
+        {
+            DBservicesShelter dbs = new DBservicesShelter();
+            return dbs.shelterActiveStatus(shelter_id, status);
         }
     }
 }

@@ -99,6 +99,34 @@ namespace FC_Server.Controllers
             return BadRequest(new { message = "Invalid ID" });
         }
 
+        // POST api/<ShelterController>/shelterActiveStatus
+        [HttpPost("shelterActiveStatus")]
+        public IActionResult shelterActiveStatus([FromBody] FC_Server.Models.Shelter shelter)
+        {
+            try
+            {
+                var newShelter = FC_Server.Models.Shelter.shelterActiveStatus(shelter.ShelterId, shelter.IsActive);
+
+                if (newShelter != null)
+                {
+                    return Ok(new
+                    {
+                        message = "Shelter updated successfuly",
+                        shelter = newShelter
+                    });
+                }
+                return BadRequest(new { message = "update failed" });
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("Invalid ID"))
+                {
+                    return BadRequest(new { message = "Invalid ID" });
+                }
+                throw new Exception("update failed");
+            }
+        }
+
         //--------------------------------------------------------------------------------------------------
         // Default controllers
         //--------------------------------------------------------------------------------------------------
