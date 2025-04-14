@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-dotnettools.csharp",
+    "ms-vscode.vscode-node-azure-pack",
+    "ms-mssql.mssql",
+    "formulahendry.dotnet-test-explorer",
+    "ritwickdey.liveserver",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
+  ]
+}

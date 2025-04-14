@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Data;
 using System.Collections.Generic;
 using System.Linq;
+using ServerSimulation.Models;
+using System.Data.SqlClient;
+using Microsoft.AspNetCore.Builder;
 
 namespace FindCover.Controllers
 {
@@ -11,6 +15,237 @@ namespace FindCover.Controllers
     {
         private static readonly Random _random = new Random();
 
+        //===================================
+        // Senity check start here
+        //===================================
+
+        [HttpGet("connection")]
+        public ActionResult TestConnection()
+        {
+            try
+            {
+                // Test basic database connectivity
+                IConfigurationRoot configuration = new ConfigurationBuilder()
+                    .AddJsonFile("appsettings.json").Build();
+                string connectionString = configuration.GetConnectionString("myProjDB");
+
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    return Ok(new
+                    {
+                        Success = true,
+                        Message = "Database connection successful",
+                        ConnectionString = connectionString.Replace(
+                            connectionString.Contains("Password=") ?
+                            connectionString.Substring(
+                                connectionString.IndexOf("Password=")) : "",
+                            "Password=***")
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Success = false,
+                    Error = "Connection failed",
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                });
+            }
+        }
+
+        [HttpGet("sp-exists")]
+        public ActionResult CheckStoredProcedure()
+        {
+            try
+            {
+                IConfigurationRoot configuration = new ConfigurationBuilder()
+                    .AddJsonFile("appsettings.json").Build();
+                string connectionString = configuration.GetConnectionString("myProjDB");
+
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string sql = @"
+                        SELECT COUNT(*) 
+                        FROM INFORMATION_SCHEMA.ROUTINES 
+                        WHERE ROUTINE_TYPE = 'PROCEDURE' 
+                        AND ROUTINE_NAME = 'FC_SP_getAllShelters'";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    {
+                        int count = (int)cmd.ExecuteScalar();
+                        return Ok(new
+                        {
+                            Success = true,
+                            Exists = count > 0,
+                            Message = count > 0 ?
+                                "SP 'FC_SP_getAllShelters' exists" :
+                                "SP 'FC_SP_getAllShelters' does NOT exist"
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Success = false,
+                    Error = "SP check failed",
+                    Message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("table-data")]
+        public ActionResult CheckTableData()
+        {
+            try
+            {
+                IConfigurationRoot configuration = new ConfigurationBuilder()
+                    .AddJsonFile("appsettings.json").Build();
+                string connectionString = configuration.GetConnectionString("myProjDB");
+
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string sql = "SELECT COUNT(*) FROM FC_SHELTER WHERE is_active = 1";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    {
+                        int count = (int)cmd.ExecuteScalar();
+                        return Ok(new
+                        {
+                            Success = true,
+                            RecordCount = count,
+                            Message = count > 0 ?
+                                $"Found {count} active shelters in FC_SHELTER" :
+                                "No active shelters found in FC_SHELTER"
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Success = false,
+                    Error = "Table check failed",
+                    Message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("raw-sp-call")]
+        public ActionResult TestStoredProcedure()
+        {
+            try
+            {
+                IConfigurationRoot configuration = new ConfigurationBuilder()
+                    .AddJsonFile("appsettings.json").Build();
+                string connectionString = configuration.GetConnectionString("myProjDB");
+
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    using (SqlCommand cmd = new SqlCommand("FC_SP_getAllShelters", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            // Create result list
+                            var results = new System.Collections.Generic.List<object>();
+                            int rowCount = 0;
+
+                            // Check if we have rows before reading
+                            if (reader.HasRows)
+                            {
+                                while (reader.Read())
+                                {
+                                    rowCount++;
+                                    if (rowCount <= 3) // only return first 3 for brevity
+                                    {
+                                        var row = new System.Collections.Generic.Dictionary<string, object>();
+                                        for (int i = 0; i < reader.FieldCount; i++)
+                                        {
+                                            row[reader.GetName(i)] = reader.IsDBNull(i) ? "NULL" : reader.GetValue(i);
+                                        }
+                                        results.Add(row);
+                                    }
+                                }
+                            }
+
+                            return Ok(new
+                            {
+                                Success = true,
+                                TotalRows = rowCount,
+                                SampleData = results,
+                                Message = rowCount > 0 ?
+                                    $"SP returned {rowCount} rows" :
+                                    "SP executed but returned no rows"
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Success = false,
+                    Error = "SP execution failed",
+                    Message = ex.Message,
+                    StackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        [HttpGet("dbservices-test")]
+        public ActionResult TestDBServices()
+        {
+            try
+            {
+                DBservices db = new DBservices();
+                var shelters = db.GetAllShelters();
+
+                return Ok(new
+                {
+                    Success = true,
+                    ShelterCount = shelters?.Count ?? 0,
+                    SampleShelters = shelters?.Take(3).Select(s => new
+                    {
+                        Id = s.shelter_id,
+                        Name = s.name,
+                        Capacity = s.capacity,
+                        IsActive = s.is_active
+                    }).ToList(),
+                    Message = shelters?.Count > 0 ?
+                        $"DBservices returned {shelters.Count} shelters" :
+                        "DBservices returned no shelters"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Success = false,
+                    Error = "DBservices test failed",
+                    Message = ex.Message,
+                    StackTrace = ex.StackTrace,
+                    InnerException = ex.InnerException?.Message
+                });
+            }
+        }
+
+
+        //===================================
+        // Simulation start here
+        //===================================
+
+        /// POST api/simulation/run
         [HttpPost("run")]
         public ActionResult<SimulationResponseDto> RunSimulation([FromBody] SimulationRequestDto request)
         {
@@ -48,9 +283,9 @@ namespace FindCover.Controllers
                 }
                 else
                 {
-                    // Generate shelters as usual
+                    // Generate shelters, treating request.ShelterCount as ADDITIONAL shelters on top of DB ones
                     shelters = GenerateShelters(
-                        request.ShelterCount,
+                        request.ShelterCount, // Now this is the count of ADDITIONAL shelters
                         centerLat,
                         centerLon,
                         request.RadiusKm,
@@ -180,50 +415,156 @@ namespace FindCover.Controllers
         }
 
         // Helper method to generate shelters with capacity between 1 and 5
-        private List<ShelterDto> GenerateShelters(int count, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false)
+        //     private List<ShelterDto> GenerateShelters(int count, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false)
+        //     {
+        //         var shelters = new List<ShelterDto>();
+
+        //         // Convert radius from km to degrees for latitude and longitude
+        //         double latDelta = radiusKm / 111.0;
+        //         double lonDelta = radiusKm / (111.0 * Math.Cos(centerLat * Math.PI / 180));
+
+        //         // Add some known Beer Sheva locations for realism
+        //         var knownLocations = new List<(string Name, double Lat, double Lon)>
+        // {
+        //     ("Ben Gurion University", 31.2634, 34.8044),
+        //     ("Beer Sheva Central Station", 31.2434, 34.7980),
+        //     ("Grand Canyon Mall", 31.2508, 34.7738),
+        //     ("Soroka Medical Center", 31.2534, 34.8018)
+        // };
+
+
+
+        //         // Add known locations first (if we have fewer shelters than known locations, take a subset)
+        //         for (int i = 0; i < Math.Min(count, knownLocations.Count); i++)
+        //         {
+        //             var location = knownLocations[i];
+        //             shelters.Add(new ShelterDto
+        //             {
+        //                 Id = i + 1,
+        //                 Name = location.Name,
+        //                 Latitude = location.Lat,
+        //                 Longitude = location.Lon,
+        //                 Capacity = _random.Next(3, 8) // Capacity between 3 and 7
+        //             });
+        //         }
+
+        //         // Add remaining random shelters if needed
+        //         for (int i = knownLocations.Count; i < count; i++)
+        //         {
+        //             // Generate random location (more central than the people)
+        //             double angle = _random.NextDouble() * 2 * Math.PI;
+        //             double distance = _random.NextDouble() * radiusKm * 0.7 / 111.0; // Convert to degrees, more central
+
+        //             double latOffset = distance * Math.Cos(angle); // distance * cos(angle) = north-south offset
+        //             double lonOffset = distance * Math.Sin(angle); // distance * sin(angle) = east-west offset
+
+        //             // Determine capacity - handle zero capacity scenario
+        //             int capacity;
+        //             if (zeroCapacityShelters && _random.NextDouble() < 0.4) // 40% chance of zero capacity for random shelters
+        //             {
+        //                 capacity = 0; // Zero capacity
+        //             }
+        //             else
+        //             {
+        //                 capacity = _random.Next(3, 8); // Normal capacity between 3 and 7
+        //             }
+
+        //             shelters.Add(new ShelterDto
+        //             {
+        //                 Id = i + 1,
+        //                 Name = capacity == 0 ? $"Closed Shelter {i + 1}" : $"Shelter {i + 1}",
+        //                 Latitude = centerLat + latOffset,
+        //                 Longitude = centerLon + lonOffset,
+        //                 Capacity = capacity
+        //             });
+        //         }
+
+        //         return shelters;
+        //     }
+
+        private List<ShelterDto> GenerateShelters(int additionalCount, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false)
         {
             var shelters = new List<ShelterDto>();
+            bool usingDatabaseShelters = false;
 
-            // Convert radius from km to degrees for latitude and longitude
-            double latDelta = radiusKm / 111.0;
-            double lonDelta = radiusKm / (111.0 * Math.Cos(centerLat * Math.PI / 180));
-
-            // Add some known Beer Sheva locations for realism
-            var knownLocations = new List<(string Name, double Lat, double Lon)>
-    {
-        ("Ben Gurion University", 31.2634, 34.8044),
-        ("Beer Sheva Central Station", 31.2434, 34.7980),
-        ("Grand Canyon Mall", 31.2508, 34.7738),
-        ("Soroka Medical Center", 31.2534, 34.8018)
-    };
-
-            // Add known locations first (if we have fewer shelters than known locations, take a subset)
-            for (int i = 0; i < Math.Min(count, knownLocations.Count); i++)
+            try
             {
-                var location = knownLocations[i];
-                shelters.Add(new ShelterDto
+                // Get shelters from the database
+                DBservices db = new DBservices();
+                List<Shelter> dbShelters = db.GetAllShelters();
+
+                // Check if we actually got shelters
+                if (dbShelters != null && dbShelters.Count > 0)
                 {
-                    Id = i + 1,
-                    Name = location.Name,
-                    Latitude = location.Lat,
-                    Longitude = location.Lon,
-                    Capacity = _random.Next(3, 8) // Capacity between 3 and 7
-                });
+                    usingDatabaseShelters = true;
+                    Console.WriteLine($"✅ Successfully retrieved {dbShelters.Count} shelters from database");
+
+                    // Add database shelters to the result list
+                    foreach (var dbShelter in dbShelters)
+                    {
+                        shelters.Add(ConvertToShelterDto(dbShelter));
+                        Console.WriteLine($"Added shelter: {dbShelter.name} (ID: {dbShelter.shelter_id})");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ No shelters found in database");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                Console.Error.WriteLine($"⚠️ DATABASE ERROR: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
             }
 
-            // Add remaining random shelters if needed
-            for (int i = knownLocations.Count; i < count; i++)
+            // If we couldn't get shelters from the database, use hardcoded ones
+            if (!usingDatabaseShelters)
             {
-                // Generate random location (more central than the people)
+                Console.WriteLine("Using hardcoded shelters as fallback");
+
+                // Add hardcoded shelters
+                var knownLocations = new List<(string Name, double Lat, double Lon)>
+        {
+            ("Ben Gurion University", 31.2634, 34.8044),
+            ("Beer Sheva Central Station", 31.2434, 34.7980),
+            ("Grand Canyon Mall", 31.2508, 34.7738),
+            ("Soroka Medical Center", 31.2534, 34.8018)
+        };
+
+                for (int i = 0; i < knownLocations.Count; i++)
+                {
+                    var location = knownLocations[i];
+                    shelters.Add(new ShelterDto
+                    {
+                        Id = i + 1,
+                        Name = location.Name,
+                        Latitude = location.Lat,
+                        Longitude = location.Lon,
+                        Capacity = _random.Next(3, 8)
+                    });
+                }
+            }
+
+            // Now generate additional random shelters
+            int baseId = shelters.Count > 0 ? shelters.Max(s => s.Id) + 1 : 1;
+            Console.WriteLine($"Generating {additionalCount} additional shelters starting with ID {baseId}");
+
+            for (int i = 0; i < additionalCount; i++)
+            {
+                // Generate random location
                 double angle = _random.NextDouble() * 2 * Math.PI;
-                double distance = _random.NextDouble() * radiusKm * 0.7 / 111.0; // Convert to degrees, more central
+                double distance = _random.NextDouble() * radiusKm * 0.7 / 111.0;
 
-                double latOffset = distance * Math.Cos(angle); // distance * cos(angle) = north-south offset
-                double lonOffset = distance * Math.Sin(angle); // distance * sin(angle) = east-west offset
+                double latOffset = distance * Math.Cos(angle);
+                double lonOffset = distance * Math.Sin(angle);
 
-                // Determine capacity - handle zero capacity scenario
+                // Determine capacity
                 int capacity;
-                if (zeroCapacityShelters && _random.NextDouble() < 0.4) // 40% chance of zero capacity for random shelters
+                if (zeroCapacityShelters && _random.NextDouble() < 0.4)
                 {
                     capacity = 0; // Zero capacity
                 }
@@ -234,8 +575,8 @@ namespace FindCover.Controllers
 
                 shelters.Add(new ShelterDto
                 {
-                    Id = i + 1,
-                    Name = capacity == 0 ? $"Closed Shelter {i + 1}" : $"Shelter {i + 1}",
+                    Id = baseId + i,
+                    Name = capacity == 0 ? $"Additional Closed Shelter {i + 1}" : $"Additional Shelter {i + 1}",
                     Latitude = centerLat + latOffset,
                     Longitude = centerLon + lonOffset,
                     Capacity = capacity
@@ -704,6 +1045,18 @@ namespace FindCover.Controllers
             public int Capacity { get; set; }
             public int RemainingCapacity { get; set; }
         }
+
+        private ShelterDto ConvertToShelterDto(Shelter dbShelter)
+        {
+            return new ShelterDto
+            {
+                Id = dbShelter.shelter_id,
+                Name = dbShelter.name ?? $"Shelter {dbShelter.shelter_id}", // Handle null names
+                Latitude = dbShelter.latitude,
+                Longitude = dbShelter.longitude,
+                Capacity = dbShelter.capacity
+            };
+        }
     }
 
     // DTOs for requests and responses
@@ -776,4 +1129,6 @@ namespace FindCover.Controllers
         public double ShelterUsagePercentage { get; set; }
 
     }
+
+
 }
