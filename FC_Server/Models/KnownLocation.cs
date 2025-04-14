@@ -50,11 +50,11 @@ public class KnownLocation
         this.nickname = nickname;
         this.added_at = addedAt;
     }
-    public static KnownLocation? GetKnownLocation(int user_id)
-    {
-        DBservices dbs = new DBservices();
-        return dbs.GetKnownLocation(user_id);
-    }
+    //public static KnownLocation? GetKnownLocation(int user_id)
+    //{
+        //DBservices dbs = new DBservices();
+        //return dbs.GetKnownLocation(user_id);
+    //}
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname, DateTime added_at)
     {
         DBservices dbs = new DBservices();

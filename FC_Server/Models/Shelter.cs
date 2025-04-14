@@ -88,5 +88,11 @@
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.getShelter(shelter_id);
         }
+
+        public static Shelter? shelterActiveStatus(int shelter_id, bool status)
+        {
+            DBservicesShelter dbs = new DBservicesShelter();
+            return dbs.shelterActiveStatus(shelter_id, status);
+        }
     }
 }
