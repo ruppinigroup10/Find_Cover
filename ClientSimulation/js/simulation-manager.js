@@ -1,3 +1,5 @@
+console.log("Using port:", PORT);
+
 // This version supports the new layout with controls outside the map
 
 // Ensure we only have one global instance of the visualizer
@@ -54,7 +56,6 @@ function initializeVisualizer() {
 async function runServerSimulation() {
   // Ensure we have a valid visualizer
   const visualizer = window.visualizer || initializeVisualizer();
-
   const statusElement = document.getElementById("simulation-status");
 
   if (statusElement) {
@@ -71,6 +72,9 @@ async function runServerSimulation() {
     const radius = parseFloat(document.getElementById("radius").value) || 5;
     const priorityEnabled =
       document.getElementById("priority").value === "true";
+    const useDatabaseShelters = document.getElementById(
+      "use-database-shelters"
+    ).checked;
 
     // Prepare request payload with simulation parameters
     const requestData = {
@@ -84,6 +88,7 @@ async function runServerSimulation() {
         childMaxAge: 12,
         elderlyMinAge: 70,
       },
+      useDatabaseShelters: useDatabaseShelters,
     };
 
     // Call the server API

@@ -10,7 +10,7 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (true)
+if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     // app.UseSwaggerUI(); //for windows
@@ -22,8 +22,6 @@ if (true)
 }
 
 app.UseHttpsRedirection();
-
-app.UseStaticFiles(new StaticFileOptions()); // added for mac
 
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
