@@ -50,10 +50,10 @@ public class UserPreferences
         return dbs.GetUserPreferences(user_id);
     }
 
-    //public static UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed, DateTime last_update)
-    //{
-        //DBservices dbs = new DBservices();
-        //return dbs.UpdateUserPreferences(preference_id, user_id, shelter_type, accessibility_needed, num_default_people, pets_allowed, last_update);
-    //}
+    public static UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed, DateTime last_update)
+    {
+        DBservices dbs = new DBservices();
+        return dbs.UpdateUserPreferences(preference_id, user_id, shelter_type, accessibility_needed, num_default_people, pets_allowed, last_update);
+    }
 
 }
