@@ -13,17 +13,17 @@ var app = builder.Build();
 if (true)
 {
     app.UseSwagger();
-    app.UseSwaggerUI(); //for windows
-    // app.UseSwaggerUI(c =>
-    // {
-    //     c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-    //     c.RoutePrefix = string.Empty; // Access Swagger at the root URL
-    // }); // for mac
+    // app.UseSwaggerUI(); //for windows
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+        c.RoutePrefix = string.Empty; // Access Swagger at the root URL
+    }); // for mac
 }
 
 app.UseHttpsRedirection();
 
-app.UseStaticFiles(); // added for mac
+app.UseStaticFiles(new StaticFileOptions()); // added for mac
 
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
