@@ -312,7 +312,9 @@ public class DBservices
         }
     }
 
-    //public userpreferences
+    //--------------------------------------------------------------------------------------------------
+    // This method geting users preferences data
+    //--------------------------------------------------------------------------------------------------
     public UserPreferences? GetUserPreferences(int user_id)
     {
         {
@@ -369,6 +371,9 @@ public class DBservices
         }
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // This method updates users preferences
+    //--------------------------------------------------------------------------------------------------
     public UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed, DateTime last_update)
     {
         SqlConnection con;
