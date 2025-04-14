@@ -289,7 +289,8 @@ namespace FindCover.Controllers
                         centerLat,
                         centerLon,
                         request.RadiusKm,
-                        request.ZeroCapacityShelters);
+                        request.ZeroCapacityShelters,
+                        request.UseDatabaseShelters);
                 }
 
                 //var people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
@@ -482,78 +483,63 @@ namespace FindCover.Controllers
         //         return shelters;
         //     }
 
-        private List<ShelterDto> GenerateShelters(int additionalCount, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false)
+        private List<ShelterDto> GenerateShelters(int additionalCount, double centerLat, double centerLon, double radiusKm, bool zeroCapacityShelters = false, bool useDatabaseShelters = true)
         {
             var shelters = new List<ShelterDto>();
             bool usingDatabaseShelters = false;
 
-            try
+            if (useDatabaseShelters)
             {
-                // Get shelters from the database
-                DBservices db = new DBservices();
-                List<Shelter> dbShelters = db.GetAllShelters();
-
-                // Check if we actually got shelters
-                if (dbShelters != null && dbShelters.Count > 0)
+                try
                 {
-                    usingDatabaseShelters = true;
-                    Console.WriteLine($"✅ Successfully retrieved {dbShelters.Count} shelters from database");
+                    // Get shelters from the database
+                    DBservices db = new DBservices();
+                    List<Shelter> dbShelters = db.GetAllShelters();
 
-                    // Add database shelters to the result list
-                    foreach (var dbShelter in dbShelters)
+                    // Check if we actually got shelters
+                    if (dbShelters != null && dbShelters.Count > 0)
                     {
-                        shelters.Add(ConvertToShelterDto(dbShelter));
-                        Console.WriteLine($"Added shelter: {dbShelter.name} (ID: {dbShelter.shelter_id})");
+                        usingDatabaseShelters = true;
+                        Console.WriteLine($"✅ Successfully retrieved {dbShelters.Count} shelters from database");
+
+                        // Add database shelters to the result list
+                        foreach (var dbShelter in dbShelters)
+                        {
+                            shelters.Add(ConvertToShelterDto(dbShelter));
+                            Console.WriteLine($"Added shelter: {dbShelter.name} (ID: {dbShelter.shelter_id})");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ No shelters found in database");
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("⚠️ No shelters found in database");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log the error
-                Console.Error.WriteLine($"⚠️ DATABASE ERROR: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
-            }
-
-            // If we couldn't get shelters from the database, use hardcoded ones
-            if (!usingDatabaseShelters)
-            {
-                Console.WriteLine("Using hardcoded shelters as fallback");
-
-                // Add hardcoded shelters
-                var knownLocations = new List<(string Name, double Lat, double Lon)>
-        {
-            ("Ben Gurion University", 31.2634, 34.8044),
-            ("Beer Sheva Central Station", 31.2434, 34.7980),
-            ("Grand Canyon Mall", 31.2508, 34.7738),
-            ("Soroka Medical Center", 31.2534, 34.8018)
-        };
-
-                for (int i = 0; i < knownLocations.Count; i++)
-                {
-                    var location = knownLocations[i];
-                    shelters.Add(new ShelterDto
+                    // Log the error
+                    Console.Error.WriteLine($"⚠️ DATABASE ERROR: {ex.Message}");
+                    if (ex.InnerException != null)
                     {
-                        Id = i + 1,
-                        Name = location.Name,
-                        Latitude = location.Lat,
-                        Longitude = location.Lon,
-                        Capacity = _random.Next(3, 8)
-                    });
+                        Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    }
                 }
+            }
+            else
+            {
+                Console.WriteLine("Database shelters excluded by user request");
             }
 
             // Now generate additional random shelters
+            // If no database shelters were loaded, we'll start with ID 1
             int baseId = shelters.Count > 0 ? shelters.Max(s => s.Id) + 1 : 1;
-            Console.WriteLine($"Generating {additionalCount} additional shelters starting with ID {baseId}");
 
-            for (int i = 0; i < additionalCount; i++)
+            // If no database shelters were used, add the requested number of shelters,
+            // otherwise add the additionalCount
+            int sheltersToAdd = usingDatabaseShelters ? additionalCount : additionalCount;
+
+            Console.WriteLine($"Generating {sheltersToAdd} {(usingDatabaseShelters ? "additional" : "")} shelters starting with ID {baseId}");
+
+            for (int i = 0; i < sheltersToAdd; i++)
             {
                 // Generate random location
                 double angle = _random.NextDouble() * 2 * Math.PI;
@@ -576,7 +562,9 @@ namespace FindCover.Controllers
                 shelters.Add(new ShelterDto
                 {
                     Id = baseId + i,
-                    Name = capacity == 0 ? $"Additional Closed Shelter {i + 1}" : $"Additional Shelter {i + 1}",
+                    Name = usingDatabaseShelters
+                        ? (capacity == 0 ? $"Additional Closed Shelter {i + 1}" : $"Additional Shelter {i + 1}")
+                        : (capacity == 0 ? $"Closed Shelter {i + 1}" : $"Shelter {i + 1}"),
                     Latitude = centerLat + latOffset,
                     Longitude = centerLon + lonOffset,
                     Capacity = capacity
@@ -932,7 +920,7 @@ namespace FindCover.Controllers
                 }
             }
 
-            // Step 8: Final pass - ensure no available assignments were missed
+            // Step 8: ensure no available assignments were missed
             var remainingPeople = people
                 .Where(p => !assignedPeople.Contains(p.Id))
                 .ToList();
@@ -969,8 +957,161 @@ namespace FindCover.Controllers
                 }
             }
 
+            // After all assignments are done, run the optimization phase
+            Console.WriteLine($"Initial assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
+            Console.WriteLine("Starting optimization phase to improve assignments...");
+
+            // Only optimize if we have more than one assigned person
+            if (assignments.Count > 1)
+            {
+                assignments = OptimizeAssignments(assignments, people, shelters);
+            }
+
             Console.WriteLine($"Final assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
             return assignments;
+        }
+
+
+        // Optimize AssignPeopleToShelters after assignment phase
+        // This method will swap people between shelters to minimize total distance
+        private Dictionary<int, AssignmentDto> OptimizeAssignments(
+            Dictionary<int, AssignmentDto> initialAssignments,
+            List<PersonDto> people,
+            List<ShelterDto> shelters)
+        {
+            Console.WriteLine("Starting post-assignment optimization phase...");
+
+            // Create a copy of the assignments to work with
+            var optimizedAssignments = new Dictionary<int, AssignmentDto>(initialAssignments);
+
+            // Create lookup dictionaries for faster access
+            var personLookup = people.ToDictionary(p => p.Id);
+            var shelterLookup = shelters.ToDictionary(s => s.Id);
+
+            // Track people assigned to each shelter for easier iteration
+            var shelterAssignments = new Dictionary<int, List<int>>();
+            foreach (var shelter in shelters)
+            {
+                shelterAssignments[shelter.Id] = new List<int>();
+            }
+
+            foreach (var assignment in optimizedAssignments)
+            {
+                int personId = assignment.Key;
+                int shelterId = assignment.Value.ShelterId;
+                shelterAssignments[shelterId].Add(personId);
+            }
+
+            // Track if any improvements were made
+            bool improvementFound;
+            int swapCount = 0;
+            double totalDistanceImprovement = 0;
+
+            Console.WriteLine("Starting swap optimization iterations...");
+            // Repeat until no more improvements can be found
+            do
+            {
+                improvementFound = false;
+
+                // Iterate through all possible shelter pairs
+                for (int i = 0; i < shelters.Count; i++)
+                {
+                    int shelter1Id = shelters[i].Id;
+
+                    // Skip if this shelter has no assigned people
+                    if (shelterAssignments[shelter1Id].Count == 0)
+                        continue;
+
+                    for (int j = i + 1; j < shelters.Count; j++)
+                    {
+                        int shelter2Id = shelters[j].Id;
+
+                        // Skip if this shelter has no assigned people
+                        if (shelterAssignments[shelter2Id].Count == 0)
+                            continue;
+
+                        // Try swapping people between these two shelters
+                        foreach (int person1Id in shelterAssignments[shelter1Id])
+                        {
+                            var person1 = personLookup[person1Id];
+                            double person1CurrentDistance = optimizedAssignments[person1Id].Distance;
+
+                            foreach (int person2Id in shelterAssignments[shelter2Id])
+                            {
+                                var person2 = personLookup[person2Id];
+                                double person2CurrentDistance = optimizedAssignments[person2Id].Distance;
+
+                                // Calculate what the distances would be if we swap
+                                double person1NewDistance = CalculateDistance(
+                                    person1.Latitude, person1.Longitude,
+                                    shelterLookup[shelter2Id].Latitude, shelterLookup[shelter2Id].Longitude);
+
+                                double person2NewDistance = CalculateDistance(
+                                    person2.Latitude, person2.Longitude,
+                                    shelterLookup[shelter1Id].Latitude, shelterLookup[shelter1Id].Longitude);
+
+                                // Calculate total current distance and potential new distance
+                                double currentTotalDistance = person1CurrentDistance + person2CurrentDistance;
+                                double newTotalDistance = person1NewDistance + person2NewDistance;
+
+                                // If swapping would reduce total distance, do it
+                                if (newTotalDistance < currentTotalDistance)
+                                {
+                                    // Calculate the improvement
+                                    double improvement = currentTotalDistance - newTotalDistance;
+                                    totalDistanceImprovement += improvement;
+
+                                    // Update assignments
+                                    optimizedAssignments[person1Id] = new AssignmentDto
+                                    {
+                                        PersonId = person1Id,
+                                        ShelterId = shelter2Id,
+                                        Distance = person1NewDistance
+                                    };
+
+                                    optimizedAssignments[person2Id] = new AssignmentDto
+                                    {
+                                        PersonId = person2Id,
+                                        ShelterId = shelter1Id,
+                                        Distance = person2NewDistance
+                                    };
+
+                                    // Update our shelter assignment tracking
+                                    shelterAssignments[shelter1Id].Remove(person1Id);
+                                    shelterAssignments[shelter1Id].Add(person2Id);
+                                    shelterAssignments[shelter2Id].Remove(person2Id);
+                                    shelterAssignments[shelter2Id].Add(person1Id);
+
+                                    swapCount++;
+                                    improvementFound = true;
+
+                                    Console.WriteLine($"Swap {swapCount}: Persons {person1Id} and {person2Id} between shelters {shelter1Id} and {shelter2Id}, saving {improvement:F4} km");
+
+                                    // Break out of inner loop once we find an improvement
+                                    break;
+                                }
+                            }
+
+                            // Break out of outer person loop if we found an improvement
+                            if (improvementFound)
+                                break;
+                        }
+
+                        // Break out of shelter loop if we found an improvement
+                        if (improvementFound)
+                            break;
+                    }
+
+                    // Break out of outer shelter loop if we found an improvement
+                    if (improvementFound)
+                        break;
+                }
+
+            } while (improvementFound);
+
+            Console.WriteLine($"Optimization complete: Made {swapCount} swaps, reducing total distance by {totalDistanceImprovement:F4} km");
+
+            return optimizedAssignments;
         }
 
         /**
@@ -1073,6 +1214,7 @@ namespace FindCover.Controllers
         public bool ZeroCapacityShelters { get; set; } = false;
         public bool UseCustomShelters { get; set; } = false;
         public List<ShelterDto> CustomShelters { get; set; } = new List<ShelterDto>();
+        public bool UseDatabaseShelters { get; set; } = true; // Default to true
     }
 
     public class SimulationResponseDto
