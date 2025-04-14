@@ -107,75 +107,6 @@ public class UserController : ControllerBase
             }
             return BadRequest(new { message = "Login failed" });
         }
-
-        // GET api/<UserController>/preferences
-        [HttpGet("preferences")]
-        public IActionResult GetPreferences(int user_id) //TODO: CHECK AUTHENTICATION
-        {
-            var preferences = FC_Server.Models.UserPreferences.GetPreferences(user_id);
-            if (preferences != null)
-            {
-                return Ok(new
-                {
-                    message = "Preferences data transfer successful",
-                    preferences = preferences
-                });
-            }
-            return BadRequest(new { message = "Invalid ID" });
-        }
-<<<<<<< Updated upstream
-        // POST api/<UserController>/preferences
-        [HttpPost("preferences")]
-        public IActionResult UpdatePreferences([FromBody] FC_Server.Models.UserPreferences preferences)//todo : check authentication
-=======
-
-
-        //--------------------------------------------------------------------------------------------------
-        // Default controllers
-        //--------------------------------------------------------------------------------------------------
-
-        // GET: api/<UserController>
-        [HttpGet]
-        public IEnumerable<string> Get()
-        {
-            return new string[] { "value1", "value2" };
-        }
-
-        // GET api/<UserController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
-        }
-
-        // POST api/<UserController>
-        [HttpPost]
-        public void Post([FromBody] string value)
-        {
-        }
-
-        // PUT api/<UserController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
-        {
-        }
-
-        // DELETE api/<UserController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
->>>>>>> Stashed changes
-        {
-            var updatedPreferences = FC_Server.Models.UserPreferences.UpdatePreferences(preferences.Id, preferences);
-            if (updatedPreferences != null)
-            {
-                return Ok(new
-                {
-                    message = "Preferences updated successfully",
-                    preferences = updatedPreferences
-                });
-            }
-            return BadRequest(new { message = "Update failed" });
-        }
     }
 
     // GET: api/<UsersController> getUser
@@ -202,6 +133,71 @@ public class UserController : ControllerBase
         }
         return BadRequest(new { message = "Invalid ID" });
     }
+
+    // GET: api/<UserController>/UserPreferences
+    [HttpGet("UserPreferences")]
+    public IActionResult GetUserPreferences(int user_id)
+    {
+        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
+        if (preferences != null)
+        {
+            return Ok(new
+            {
+                message = "Preferences data transfer successful",
+                preferences = preferences
+            });
+        }
+        return BadRequest(new { message = "Invalid ID" });
+    }
+    // POST api/<UserController>/UserPreferences
+    [HttpPost("UserPreferences")]
+    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
+    {
+        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
+        if (updatedPreferences != null)
+        {
+            return Ok(new
+            {
+                message = "Preferences updated successfully",
+                preferences = updatedPreferences
+            });
+        }
+        return BadRequest(new { message = "Update failed" });
+    }
+    // GET: api/<UserController>/KnownLocation
+    [HttpGet("KnownLocation")]
+    public IActionResult GetKnownLocation(int user_id)
+    {
+        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id);
+        if (knownLocation != null)
+        {
+            return Ok(new
+            {
+                message = "Known location data transfer successful",
+                knownLocation = knownLocation
+            });
+        }
+        return BadRequest(new { message = "Invalid ID" });
+    }
+    // POST api/<UserController>/KnownLocation
+    [HttpPost("KnownLocation")]
+    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    {
+        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt);
+        if (updatedKnownLocation != null)
+        {
+            return Ok(new
+            {
+                message = "Known location updated successfully",
+                knownLocation = updatedKnownLocation
+            });
+        }
+        return BadRequest(new { message = "Update failed" });
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Default controllers
+    //--------------------------------------------------------------------------------------------------
 
     // GET: api/<UserController>
     [HttpGet]

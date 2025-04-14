@@ -312,224 +312,73 @@ public class DBservices
         }
     }
 
-<<<<<<< Updated upstream
-    //
     //public userpreferences
-
-    public UserPreferences? GetUserPreferences(int preferencesId) { return null; }
-
-    public UserPreferences? UpdateUserPreferences(int preferencesId, string shelterType, int myProperty) { return null; }
-=======
-    //--------------------------------------------------------------------------------------------------
-    // This method adds a shelter
-    //--------------------------------------------------------------------------------------------------
-    public Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
-                            string address, int capacity, string additional_information, int provider_id)
+    public UserPreferences? GetUserPreferences(int user_id)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-        Shelter? shelter = null;
-
-        try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
+            SqlConnection con;
+            SqlCommand cmd;
+            UserPreferences? UserPreferences = null;
 
-        Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@shelter_type", shelter_type);
-        paramDic.Add("@name", name);
-        paramDic.Add("@latitude", latitude);
-        paramDic.Add("@longitude", longitude);
-        paramDic.Add("@address", address);
-        paramDic.Add("@capacity", capacity);
-        paramDic.Add("@additional_information", additional_information);
-        paramDic.Add("@provider_id", provider_id);
-
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddShelter", con, paramDic);
-
-        try
-        {
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            try
             {
-                if (dr.Read())
+                con = connect("myProjDB"); // create the connection
+            }
+            catch (Exception)
+            {
+                // write to log
+                throw;
+            }
+
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@user_id", user_id);
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetPreferences", con, paramDic);
+
+            try
+            {
+                using (SqlDataReader dr = cmd.ExecuteReader())
                 {
-                    shelter = new Shelter
+                    if (dr.Read())
                     {
-                        ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        Name = dr["name"].ToString() ?? "",
-                        Latitude = Convert.ToSingle(dr["latitude"]),
-                        Longitude = Convert.ToSingle(dr["longitude"]),
-                        Address = dr["address"].ToString() ?? "",
-                        Capacity = Convert.ToInt32(dr["capacity"]),
-                        AdditionalInformation = dr["additional_information"].ToString() ?? "",
-                        ProviderId = Convert.ToInt32(dr["provider_id"]),
-                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
-                        IsActive = Convert.ToBoolean(dr["is_active"])
-                    };
+                        UserPreferences = new UserPreferences
+                        {
+                            UserId = Convert.ToInt32(dr["user_id"]),
+
+                        };
+                    }
                 }
+                return UserPreferences;
             }
-            return shelter;
-        }
-        catch (SqlException ex)
-        {
-            if (ex.Message.Contains("User added this shelter already"))
+            catch (Exception ex)
             {
-                throw new Exception("User added this shelter already");
+                if (ex.Message.Contains("Invalid ID"))
+                {
+                    throw new Exception("Invalid ID");
+                }
+                throw new Exception("User data trensfer failed");
             }
-            throw new Exception("Addition failed");
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            finally
             {
-                con.Close();
+                if (con != null)
+                {
+                    // close the db connection
+                    con.Close();
+                }
             }
         }
     }
 
-    //--------------------------------------------------------------------------------------------------
-    // This method updates a shelter
-    //--------------------------------------------------------------------------------------------------
-    public Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,
-                            string address, int capacity, string additional_information, int provider_id)
+    public UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed, DateTime last_update)
     {
         SqlConnection con;
         SqlCommand cmd;
-        Shelter? shelter = null;
+        UserPreferences? userPreferences = null;
 
-        try
-        {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
+        public UserPreferences? UpdateUserPreferences(int preferencesId, string shelterType, int myProperty) { return null; }
 
-        Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@shelter_id", shelter_id);
-        paramDic.Add("@shelter_type", shelter_type);
-        paramDic.Add("@name", name);
-        paramDic.Add("@latitude", latitude);
-        paramDic.Add("@longitude", longitude);
-        paramDic.Add("@address", address);
-        paramDic.Add("@capacity", capacity);
-        paramDic.Add("@additional_information", additional_information);
-        paramDic.Add("@provider_id", provider_id);
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateShelter", con, paramDic);
 
-        try
-        {
-            using (SqlDataReader dr = cmd.ExecuteReader())
-            {
-                if (dr.Read())
-                {
-                    shelter = new Shelter
-                    {
-                        ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        Name = dr["name"].ToString() ?? "",
-                        Latitude = Convert.ToSingle(dr["latitude"]),
-                        Longitude = Convert.ToSingle(dr["longitude"]),
-                        Address = dr["address"].ToString() ?? "",
-                        Capacity = Convert.ToInt32(dr["capacity"]),
-                        AdditionalInformation = dr["additional_information"].ToString() ?? "",
-                        ProviderId = Convert.ToInt32(dr["provider_id"]),
-                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
-                        IsActive = Convert.ToBoolean(dr["is_active"])
-                    };
-                }
-            }
-            return shelter;
-        }
-        catch (SqlException ex)
-        {
-            if (ex.Message.Contains("User added this shelter already"))
-            {
-                throw new Exception("User added this shelter already");
-            }
-            throw new Exception("Update failed");
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
-                con.Close();
-            }
-        }
     }
 
-    //--------------------------------------------------------------------------------------------------
-    // This method geting shelters data
-    //--------------------------------------------------------------------------------------------------
-    public Shelter? getShelter(int shelter_id)
-    {
-
-        SqlConnection con;
-        SqlCommand cmd;
-        Shelter? shelter = null;
-
-        try
-        {
-            con = connect("myProjDB"); // create the connection
-        }
-        catch (Exception)
-        {
-            // write to log
-            throw;
-        }
-
-        Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@shelter_id", shelter_id);
-
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_getShelter", con, paramDic);
-
-        try
-        {
-            using (SqlDataReader dr = cmd.ExecuteReader())
-            {
-                if (dr.Read())
-                {
-                    shelter = new Shelter
-                    {
-                        ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        Name = dr["name"].ToString() ?? "",
-                        Latitude = Convert.ToSingle(dr["latitude"]),
-                        Longitude = Convert.ToSingle(dr["longitude"]),
-                        Address = dr["address"].ToString() ?? "",
-                        Capacity = Convert.ToInt32(dr["capacity"]),
-                        AdditionalInformation = dr["additional_information"].ToString() ?? "",
-                        ProviderId = Convert.ToInt32(dr["provider_id"]),
-                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
-                        IsActive = Convert.ToBoolean(dr["is_active"])
-                    };
-                }
-            }
-            return shelter;
-        }
-        catch (Exception ex)
-        {
-            if (ex.Message.Contains("Invalid ID"))
-            {
-                throw new Exception("Invalid ID");
-            }
-            throw new Exception("Shelter data transfer failed");
-        }
-        finally
-        {
-            if (con != null)
-            {
-                // close the db connection
-                con.Close();
-            }
-        }
-    }
->>>>>>> Stashed changes
 }
