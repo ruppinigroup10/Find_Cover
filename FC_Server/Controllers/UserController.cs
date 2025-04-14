@@ -151,35 +151,35 @@ public class UserController : ControllerBase
     }
     // POST api/<UserController>/UserPreferences
     [HttpPost("UserPreferences")]
-    //public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
-    //{
-        //var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
-        //if (updatedPreferences != null)
-        //{
-            //return Ok(new
-           // {
-             //   message = "Preferences updated successfully",
-            //    preferences = updatedPreferences
-           // });
-       // }
-       // return BadRequest(new { message = "Update failed" });
-    //}
+    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
+    {
+        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
+        if (updatedPreferences != null)
+        {
+            return Ok(new
+            {
+                message = "Preferences updated successfully",
+                preferences = updatedPreferences
+            });
+        }
+        return BadRequest(new { message = "Update failed" });
+    }
 
     // GET: api/<UserController>/KnownLocation
     [HttpGet("KnownLocation")]
-    //public IActionResult GetKnownLocation(int user_id)
-    //{
-       // var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id);
-      //  if (knownLocation != null)
-       // {
-        //    return Ok(new
-        //    {
-       //        message = "Known location data transfer successful",
-       //         knownLocation = knownLocation
-       //     });
-      //  }
-      //  return BadRequest(new { message = "Invalid ID" });
-  //  }
+    public IActionResult GetKnownLocation(int user_id)
+    {
+        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id);
+        if (knownLocation != null)
+        {
+            return Ok(new
+            {
+               message = "Known location data transfer successful",
+                knownLocation = knownLocation
+            });
+        }
+        return BadRequest(new { message = "Invalid ID" });
+    }
 
     // POST api/<UserController>/KnownLocation
     [HttpPost("KnownLocation")]
