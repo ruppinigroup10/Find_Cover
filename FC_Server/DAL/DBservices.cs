@@ -347,7 +347,6 @@ public class DBservices
                         UserPreferences = new UserPreferences
                         {
                             UserId = Convert.ToInt32(dr["user_id"]),
-
                         };
                     }
                 }
@@ -392,7 +391,9 @@ public class DBservices
         paramDic.Add("@user_id", user_id);
         paramDic.Add("@shelter_type", shelter_type);
         paramDic.Add("@num_default_people", num_default_people);
+
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateUserPreferences", con, paramDic);
+
         try
         {
             using (SqlDataReader dr = cmd.ExecuteReader())

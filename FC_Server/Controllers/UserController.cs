@@ -134,8 +134,8 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" });
     }
 
-    // GET: api/<UserController>/UserPreferences
-    [HttpGet("UserPreferences")]
+    // GET: api/<UserController>/GetUserPreferences
+    [HttpGet("GetUserPreferences")]
     public IActionResult GetUserPreferences(int user_id)
     {
         var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
@@ -149,8 +149,9 @@ public class UserController : ControllerBase
         }
         return BadRequest(new { message = "Invalid ID" });
     }
-    // POST api/<UserController>/UserPreferences
-    [HttpPost("UserPreferences")]
+
+    // POST api/<UserController>/UpdateUserPreferences
+    [HttpPost("UpdateUserPreferences")]
     public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
     {
         var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
@@ -165,8 +166,8 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Update failed" });
     }
 
-    // GET: api/<UserController>/KnownLocation
-    [HttpGet("KnownLocation")]
+    // GET: api/<UserController>/GetKnownLocation
+    [HttpGet("GetKnownLocation")]
     public IActionResult GetKnownLocation(int user_id)
     {
         var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id);
@@ -181,8 +182,8 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" });
     }
 
-    // POST api/<UserController>/KnownLocation
-    [HttpPost("KnownLocation")]
+    // POST api/<UserController>/UpdateKnownLocation
+    [HttpPost("UpdateKnownLocation")]
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
         var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt);
