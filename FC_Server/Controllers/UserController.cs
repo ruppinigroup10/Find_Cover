@@ -1,4 +1,5 @@
-﻿using FC_Server.Models;
+﻿using System.Linq.Expressions;
+using FC_Server.Models;
 using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -175,7 +176,7 @@ public class UserController : ControllerBase
         {
             return Ok(new
             {
-               message = "Known location data transfer successful",
+                message = "Known location data transfer successful",
                 knownLocation = knownLocation
             });
         }
@@ -233,5 +234,35 @@ public class UserController : ControllerBase
     public void Delete(int id)
     {
     }
-//משהו
+
+    // POST api/<UserController>/AddPreference    
+    [HttpPost("AddPreference")]
+    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)
+    {
+        var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
+        if (newPreference != null)
+        {
+            return Ok(new
+            {
+                message = "Preferences added successfully",
+                preferences = newPreference
+            });
+        }
+        return BadRequest(new { message = "Add failed" });
+    }
+    // POST api/<UserController>/AddKnownLocation
+    [HttpPost("AddKnownLocation")]
+    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    {
+        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname);
+        if (newKnownLocation != null)
+        {
+            return Ok(new
+            {
+                message = "Known location added successfully",
+                knownLocation = newKnownLocation
+            });
+        }
+        return BadRequest(new { message = "Add failed" });
+    }
 }

@@ -431,6 +431,61 @@ public class DBservices
         }
     }
 
+    public UserPreferences? AddPreference(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        UserPreferences? userPreferences = null;
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+        paramDic.Add("@shelter_type", shelter_type);
+        paramDic.Add("@num_default_people", num_default_people);
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddPreference", con, paramDic);
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    userPreferences = new UserPreferences
+                    {
+                        PreferenceId = Convert.ToInt32(dr["preference_id"]),
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        ShelterType = dr["shelter_type"].ToString() ?? "",
+                        AccessibilityNeeded = Convert.ToBoolean(dr["accessibility_needed"]),
+                        NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
+                        PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
+                        LastUpdate = Convert.ToDateTime(dr["last_update"])
+                    };
+                }
+            }
+            return userPreferences;
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                throw new Exception("Invalid ID");
+            }
+            throw new Exception("Update failed");
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
     //--------------------------------------------------------------------------------------------------
     // This method updates users known location data
     //--------------------------------------------------------------------------------------------------
