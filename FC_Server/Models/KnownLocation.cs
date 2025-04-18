@@ -60,4 +60,9 @@ public class KnownLocation
         DBservices dbs = new DBservices();
         return dbs.UpdateKnownLocation(location_id, user_id, latitude, longitude, radius, address, location_name, nickname, added_at);
     }
+    public static KnownLocation? AddKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+    {
+        DBservices dbs = new DBservices();
+        return dbs.AddKnownLocation(location_id, user_id, latitude, longitude, radius, address, location_name, nickname);
+    }
 }

@@ -611,4 +611,64 @@ public class DBservices
             }
         }
     }
+    public KnownLocation? AddKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        KnownLocation? knownLocation = null;
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+        paramDic.Add("@latitude", latitude);
+        paramDic.Add("@longitude", longitude);
+        paramDic.Add("@radius", radius);
+        paramDic.Add("@address", address);
+        paramDic.Add("@location_name", location_name);
+        paramDic.Add("@nickname", nickname);
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddKnownLocation", con, paramDic);
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    knownLocation = new KnownLocation
+                    {
+                        LocationId = Convert.ToInt32(dr["location_id"]),
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        Latitude = Convert.ToSingle(dr["latitude"]),
+                        Longitude = Convert.ToSingle(dr["longitude"]),
+                        Radius = Convert.ToSingle(dr["radius"]),
+                        Address = dr["address"].ToString() ?? "",
+                        LocationName = dr["location_name"].ToString() ?? "",
+                        Nickname = dr["nickname"].ToString() ?? "",
+                    };
+                }
+            }
+            return knownLocation;
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                throw new Exception("Invalid ID");
+            }
+            throw new Exception("Update failed");
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
 }

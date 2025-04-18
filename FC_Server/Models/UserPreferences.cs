@@ -1,4 +1,6 @@
-﻿namespace FC_Server.Models;
+﻿using System.Reflection.Metadata.Ecma335;
+
+namespace FC_Server.Models;
 
 public class UserPreferences
 {
@@ -54,6 +56,11 @@ public class UserPreferences
     {
         DBservices dbs = new DBservices();
         return dbs.UpdateUserPreferences(preference_id, user_id, shelter_type, accessibility_needed, num_default_people, pets_allowed, last_update);
+    }
+
+    public static UserPreferences? AddPreference(int preferenc_id,int user_id,string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
+    {  DBservices dbs = new DBservices();
+       return dbs.AddPreference(preferenc_id, user_id, shelter_type, accessibility_needed, num_default_people, pets_allowed);
     }
 
 }
