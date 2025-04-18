@@ -975,6 +975,14 @@ class ShelterSimulationVisualizer {
         this.originalSimulationData.shelters,
         this.originalSimulationData.assignments
       );
+
+      // IMPORTANT FIX: Make sure current data is reset to original data
+      // This prevents problems when running with manual people multiple times
+      this.currentSimulationData = {
+        people: [...this.originalSimulationData.people],
+        shelters: [...this.originalSimulationData.shelters],
+        assignments: { ...this.originalSimulationData.assignments },
+      };
     }
 
     // Update the button text and FORCE it to be zero
@@ -1122,7 +1130,8 @@ class ShelterSimulationVisualizer {
       statusElement.className = "status-message running";
     }
 
-    // Use the original simulation data as our base
+    // IMPORTANT FIX: Always use the original simulation data as our base
+    // This prevents the accumulation of manual people across multiple runs
     const basePeople = this.originalSimulationData
       ? [...this.originalSimulationData.people]
       : [];
@@ -1165,7 +1174,6 @@ class ShelterSimulationVisualizer {
     // Run server simulation with combined people
     this.runServerSimulationWithCustomData(allPeople, baseShelters);
   }
-
   /**
    * Run server simulation with custom people and shelters
    * @param {Array} customPeople - Array of people objects

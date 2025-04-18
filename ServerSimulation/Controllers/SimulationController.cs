@@ -752,19 +752,22 @@ namespace FindCover.Controllers
                         {
                             var bestOption = options[0];
 
-                            // Make assignment
-                            assignments[personId] = new AssignmentDto
+                            // Make assignment - IMPORTANT FIX: Check if person is already assigned
+                            if (!assignments.ContainsKey(personId))
                             {
-                                PersonId = personId,
-                                ShelterId = bestOption.ShelterId,
-                                Distance = bestOption.Distance
-                            };
+                                assignments[personId] = new AssignmentDto
+                                {
+                                    PersonId = personId,
+                                    ShelterId = bestOption.ShelterId,
+                                    Distance = bestOption.Distance
+                                };
 
-                            // Update tracking
-                            shelterCapacity[bestOption.ShelterId]--;
-                            assignedPeople.Add(personId);
+                                // Update tracking
+                                shelterCapacity[bestOption.ShelterId]--;
+                                assignedPeople.Add(personId);
 
-                            Console.WriteLine($"Assigned person {personId} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
+                                Console.WriteLine($"Assigned person {personId} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
+                            }
                         }
                     }
                 }
@@ -954,6 +957,18 @@ namespace FindCover.Controllers
 
                         Console.WriteLine($"Final pass: Assigned person {person.Id} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
                     }
+                }
+            }
+
+            // Verify we don't have any duplicate assignments
+            var personIds = assignments.Keys.ToList();
+            var duplicateCheck = personIds.GroupBy(id => id).Where(g => g.Count() > 1).ToList();
+            if (duplicateCheck.Any())
+            {
+                Console.WriteLine($"WARNING: Found {duplicateCheck.Count} duplicate person assignments!");
+                foreach (var group in duplicateCheck)
+                {
+                    Console.WriteLine($"Person {group.Key} is assigned multiple times");
                 }
             }
 
