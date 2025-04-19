@@ -107,6 +107,14 @@ function runOvercrowdScenario() {
     shelterCountInput.value = "10";
   }
 
+  // Turn off database shelters
+  const databaseSheltersCheckbox = document.getElementById(
+    "use-database-shelters"
+  );
+  if (databaseSheltersCheckbox) {
+    databaseSheltersCheckbox.checked = false;
+  }
+
   // Run the simulation
   runServerSimulation();
 }
@@ -237,6 +245,7 @@ async function runServerSimulationWithElderlyFocus() {
       },
       useCustomPeople: true,
       customPeople: customPeople,
+      useDatabaseShelters: false,
     };
 
     // Call the server API with our custom people
@@ -369,43 +378,8 @@ async function runZeroCapacitySheltersSimulation() {
     // Create custom shelters - specifically include several with zero capacity
     const customShelters = [];
 
-    // Known locations to use first
-    const knownLocations = [
-      {
-        name: "Ben Gurion University",
-        lat: 31.2634,
-        lon: 34.8044,
-        capacity: 5,
-      },
-      {
-        name: "Beer Sheva Central Station",
-        lat: 31.2434,
-        lon: 34.798,
-        capacity: 0,
-      }, // Zero capacity!
-      { name: "Grand Canyon Mall", lat: 31.2508, lon: 34.7738, capacity: 7 },
-      {
-        name: "Soroka Medical Center",
-        lat: 31.2534,
-        lon: 34.8018,
-        capacity: 0,
-      }, // Zero capacity!
-    ];
-
-    // Add the known locations first
-    for (let i = 0; i < Math.min(shelterCount, knownLocations.length); i++) {
-      const loc = knownLocations[i];
-      customShelters.push({
-        id: i + 1,
-        name: loc.name,
-        latitude: loc.lat,
-        longitude: loc.lon,
-        capacity: loc.capacity, // Some are explicitly zero
-      });
-    }
-
-    // Add additional shelters to reach the desired count
-    for (let i = knownLocations.length; i < shelterCount; i++) {
+    // Generate shelters with some having zero capacity
+    for (let i = 0; i < shelterCount; i++) {
       // Every third shelter should have zero capacity
       const isZeroCapacity = i % 3 === 0;
       const capacity = isZeroCapacity ? 0 : Math.floor(Math.random() * 5) + 3;
