@@ -1,82 +1,85 @@
+// Log which port the application is using for server communication
 console.log("Using port:", PORT);
 
+//==============================================================
+// Shelter Simulation Visualizer
+//==============================================================
+
 /**
- * ShelterSimulationVisualizer - Main class that handles the visualization of shelter assignments
- * This class creates and manages an interactive map for visualizing emergency shelter assignments
- * It displays the results of server-side simulations
+ * ShelterSimulationVisualizer - This is the main class that shows shelter assignments on a map
+ * It's responsible for creating an interactive map that shows people, shelters,
+ * and the optimal routes between them in emergency situations
  */
 class ShelterSimulationVisualizer {
   /**
-   * Constructor - initializes the map, layers, statistics, and UI controls
-   * @param {string} mapElementId - The HTML element ID where the map will be rendered
-   * @param {boolean} addControls - Whether to add controls (now false by default)
+   * Constructor - Sets up the map, layers, and statistics objects when the class is created
+   * @param {string} mapElementId - The HTML element where the map will be displayed
+   * @param {boolean} addControls - Whether to add control buttons to the map
    */
   constructor(mapElementId) {
-    // Better approach: check if the map container element exists first
+    // First, check if the map container element exists on the page
     const mapContainer = document.getElementById(mapElementId);
     if (!mapContainer) {
+      // If the container doesn't exist, log an error and stop
       console.error(`Map container with ID ${mapElementId} not found`);
       return;
     }
 
-    // Make sure the map container has dimensions before initializing Leaflet
+    // Make sure the map container has proper dimensions before creating the map
     if (mapContainer.offsetWidth === 0 || mapContainer.offsetHeight === 0) {
+      // If container has no size, set default dimensions
       console.warn("Map container has zero dimensions. Setting default size.");
       mapContainer.style.width = "100%";
       mapContainer.style.height = "500px";
     }
 
-    // Clean approach: always create a new map instance, but first destroy any existing one
+    // If there's already a map in this container, clean it up first to avoid conflicts
     if (mapContainer._leaflet_id) {
       console.log("Cleaning up existing map instance");
-      // If there's an existing map in this container, remove it first
       mapContainer._leaflet = null;
       mapContainer._leaflet_id = null;
     }
 
-    // Initialize the map centered on Beer Sheva
+    // Create a new Leaflet map centered on Beer Sheva, Israel
     this.map = L.map(mapElementId).setView([31.2518, 34.7913], 13); // Beer Sheva coordinates
 
-    // Add OpenStreetMap as the base tile layer
+    // Add the basic map tiles from OpenStreetMap
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.map);
 
-    // Create layer groups to organize map elements
-    this.shelterMarkers = L.layerGroup().addTo(this.map);
-    this.peopleMarkers = L.layerGroup().addTo(this.map);
-    this.pathLines = L.layerGroup().addTo(this.map);
+    // Create separate layers for shelters, people, and path lines for better organization
+    this.shelterMarkers = L.layerGroup().addTo(this.map); // For shelter locations
+    this.peopleMarkers = L.layerGroup().addTo(this.map); // For people locations
+    this.pathLines = L.layerGroup().addTo(this.map); // For lines connecting people to shelters
 
     // Initialize statistics object to track simulation results
     this.stats = {
-      totalPeople: 0,
-      assignedPeople: 0,
-      unassignedPeople: 0,
-      averageDistance: 0,
-      maxDistance: 0,
+      totalPeople: 0, // Count of total people in simulation
+      assignedPeople: 0, // Count of people assigned to shelters
+      unassignedPeople: 0, // Count of people without shelter assignments
+      averageDistance: 0, // Average distance to assigned shelters
+      maxDistance: 0, // Maximum distance anyone has to travel
       shelterUsage: [], // Will store usage statistics for each shelter
       ageGroups: {
-        // Tracks age demographics of assigned/unassigned people
+        // Tracks demographics of assigned/unassigned people
         assigned: { elderly: 0, children: 0, adults: 0 },
         unassigned: { elderly: 0, children: 0, adults: 0 },
       },
     };
 
-    // Create custom map icons for different entities
+    // Create custom map icons for different entities (shelters, people of different ages)
     this.icons = this.createIcons();
 
-    //old view
-    // Set up UI control panels
-    //this.addControlPanel();
-
-    this.originalSimulationData = null; // store the base simulation without any manual people
-    this.manualPeople = []; // store manual people
+    // Store the original simulation data for reference
+    this.originalSimulationData = null; // Base simulation without manual additions
+    this.manualPeople = []; // Array to store manually added people
   }
 
   /**
-   * Calculates the "as the crow flies" distance between two points using the Haversine formula
-   * This is much faster than street distance but less accurate for actual travel
+   * Calculates the direct "as the crow flies" distance between two points on Earth
+   * Uses the Haversine formula, which accounts for Earth's curvature
    *
    * @param {number} lat1 - Latitude of the first point
    * @param {number} lon1 - Longitude of the first point
@@ -85,11 +88,12 @@ class ShelterSimulationVisualizer {
    * @returns {number} - Distance in kilometers
    */
   calculateAirDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180; // Convert degree difference to radians
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = ((lat2 - lat1) * Math.PI) / 180; // Convert latitude difference to radians
+    const dLon = ((lon2 - lon1) * Math.PI) / 180; // Convert longitude difference to radians
 
-    // Haversine formula for distance on a sphere
+    // Haversine formula calculates distance on a sphere (Earth)
+    // the formula provides a good approximation for small distances
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
@@ -98,47 +102,46 @@ class ShelterSimulationVisualizer {
         Math.sin(dLon / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in kilometers
+    return R * c; // Final distance in kilometers
   }
 
   /**
-   * Creates custom map icons for different entity types
-   * Uses div icons with color-coded dots to distinguish between different types
-   * For shelters, the size is dynamically calculated based on capacity (1-5)
+   * Creates custom map icons for different entity types on the map
+   * These icons help distinguish between shelters, adults, children, and elderly people
    *
-   * @returns {Object} - Object containing Leaflet icon objects for each entity type
+   * @returns {Object} - Collection of icons for different entity types
    */
   createIcons() {
     return {
-      // Shelter icon - orange dot
+      // Shelter icon - orange circular dot
       shelter: L.divIcon({
         className: "marker-shelter",
         html: '<div style="background-color: #ff4500; border-radius: 50%; width: 14px; height: 14px;"></div>',
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       }),
-      // Regular person icon - blue dot
+      // Regular person (adult) icon - blue circular dot
       person: L.divIcon({
         className: "marker-person",
         html: '<div style="background-color: #4169e1; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
-      // Child icon - green dot
+      // Child icon - green circular dot
       child: L.divIcon({
         className: "marker-child",
         html: '<div style="background-color: #32cd32; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
-      // Elderly icon - pink dot
+      // Elderly icon - pink circular dot
       elderly: L.divIcon({
         className: "marker-elderly",
         html: '<div style="background-color: #ff69b4; border-radius: 50%; width: 10px; height: 10px;"></div>',
         iconSize: [10, 10],
         iconAnchor: [5, 5],
       }),
-      // Unassigned person icon - gray dot
+      // Unassigned person icon - gray circular dot (no shelter assignment)
       unassigned: L.divIcon({
         className: "marker-unassigned",
         html: '<div style="background-color: #808080; border-radius: 50%; width: 10px; height: 10px;"></div>',
@@ -146,39 +149,38 @@ class ShelterSimulationVisualizer {
         iconAnchor: [5, 5],
       }),
 
-      // For shelters, we'll create a function that returns a sized icon
-      // This will be called dynamically for each shelter based on its capacity
+      // Special function to create shelter icons with size based on capacity
+      // Larger shelters get bigger icons, and the shelter ID is displayed inside
       getShelterIcon: function (capacity, shelterId = "") {
-        // Ensure capacity is within range 3-7
+        // Ensure capacity is within reasonable bounds (3-7)
         const cappedCapacity = Math.max(3, Math.min(7, capacity));
 
-        // Define specific sizes for each capacity value (1-5)
+        // Define specific sizes for each capacity value
         const sizeMap = {
-          3: 14, // Smallest size
+          3: 14, // Smallest shelter size
           4: 18,
           5: 22,
           6: 26,
-          7: 30, // Largest size
+          7: 30, // Largest shelter size
         };
 
         // Define color shades for each capacity (light to dark red)
         const colorMap = {
-          3: "#CC3333", // Light red
+          3: "#CC3333", // Light red for small shelters
           4: "#CC0000",
           5: "#BB0000",
           6: "#990000",
-          7: "#660000", // Darkest red
+          7: "#660000", // Darkest red for large shelters
         };
 
-        // Get the size and color based on the capacity
+        // Get the appropriate size and color based on the shelter's capacity
         const size = sizeMap[cappedCapacity];
         const color = colorMap[cappedCapacity];
 
-        // Calculate the anchor (center point) based on size
+        // Calculate the center point for proper positioning
         const anchor = size / 2;
 
-        // Create HTML that includes both the circular marker and the shelter ID
-        // The ID is displayed in the center of the circle
+        // Create HTML that includes both the circular marker and the shelter ID number
         return L.divIcon({
           className: "marker-shelter",
           html: `
@@ -204,16 +206,16 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Clears all layers and resets statistics
-   * Called before visualizing a new simulation
+   * Clears all map data and resets statistics
+   * Called before visualizing a new simulation to start fresh
    */
   clearMap() {
-    // Clear all markers and lines from the map
-    this.shelterMarkers.clearLayers();
-    this.peopleMarkers.clearLayers();
-    this.pathLines.clearLayers();
+    // Remove all markers and lines from the map
+    this.shelterMarkers.clearLayers(); // Clear shelter markers
+    this.peopleMarkers.clearLayers(); // Clear people markers
+    this.pathLines.clearLayers(); // Clear all connecting lines
 
-    // Reset statistics to initial state
+    // Reset all statistics to initial values
     this.stats = {
       totalPeople: 0,
       assignedPeople: 0,
@@ -229,54 +231,55 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Main visualization method - displays simulation results on the map
+   * Main function to display simulation results on the map
+   * Shows all people, shelters, and the connections between them
    *
-   * @param {Array} people - Array of person objects
-   * @param {Array} shelters - Array of shelter objects
+   * @param {Array} people - Array of person objects with location and age info
+   * @param {Array} shelters - Array of shelter objects with location and capacity
    * @param {Object} assignments - Object mapping person IDs to their shelter assignments
    */
   visualizeSimulation(people, shelters, assignments) {
-    // Save the current simulation data
+    // Save the current simulation data for reference
     this.currentSimulationData = {
       people: people,
       shelters: shelters,
       assignments: assignments,
     };
 
-    // If this is a regular simulation (not one with manual people added),
-    // save it as the original data
+    // If this is a standard simulation (not one with manual people added),
+    // save it as the original baseline data
     if (!people.some((p) => p.isManual)) {
       this.originalSimulationData = {
-        people: [...people], // Create a copy
+        people: [...people], // Create a copy to preserve the original
         shelters: [...shelters],
         assignments: { ...assignments },
       };
       console.log("Saved original simulation with", people.length, "people");
     }
 
-    // Call the original implementation
+    // Start fresh by clearing the map and statistics
     this.clearMap();
 
-    // Update basic statistics
+    // Update basic statistics about the current simulation
     this.stats.totalPeople = people.length;
     this.stats.assignedPeople = Object.keys(assignments).length;
     this.stats.unassignedPeople =
       this.stats.totalPeople - this.stats.assignedPeople;
 
-    // Reset age group statistics
+    // Reset age group statistics for a fresh count
     this.stats.ageGroups = {
       assigned: { elderly: 0, children: 0, adults: 0 },
       unassigned: { elderly: 0, children: 0, adults: 0 },
     };
 
-    // Calculate map bounds to ensure all entities are visible
+    // Calculate map bounds to ensure all people and shelters are visible
     const bounds = this.calculateBounds(people, shelters);
     this.map.fitBounds(bounds);
 
-    // Display shelters on the map
+    // Add all shelters to the map
     this.displayShelters(shelters);
 
-    // Display people and their shelter assignments
+    // Add all people and their shelter assignments to the map
     this.displayPeopleAndAssignments(people, shelters, assignments);
 
     // Update the statistics display in the UI
@@ -287,61 +290,64 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Calculates the geographical bounds that contain all people and shelters
-   * Used to set the map view to show all entities
+   * Calculates the geographical boundaries that contain all people and shelters
+   * Used to set the map view to show all entities at once
    *
    * @param {Array} people - Array of person objects with coordinates
    * @param {Array} shelters - Array of shelter objects with coordinates
-   * @returns {L.LatLngBounds} - Leaflet bounds object
+   * @returns {L.LatLngBounds} - Leaflet bounds object defining the area to show
    */
   calculateBounds(people, shelters) {
-    // Combine all coordinates into a single array
+    // Combine all coordinates (people and shelters) into a single array
     const allPoints = [
-      ...people.map((p) => [p.latitude, p.longitude]),
-      ...shelters.map((s) => [s.latitude, s.longitude]),
+      ...people.map((p) => [p.latitude, p.longitude]), // All people coordinates
+      ...shelters.map((s) => [s.latitude, s.longitude]), // All shelter coordinates
     ];
 
-    // If we have data, calculate bounds from all points
+    // If we have data points, calculate bounds that include all of them
     if (allPoints.length > 0) {
       return L.latLngBounds(allPoints);
     }
 
-    // Default bounds centered on Tel Aviv if no data
+    // Default bounds centered on Tel Aviv if no data is available
+    // Creates a small area around Tel Aviv coordinates
     return L.latLngBounds([
-      [32.0853 - 0.1, 34.7818 - 0.1],
-      [32.0853 + 0.1, 34.7818 + 0.1],
+      [32.0853 - 0.1, 34.7818 - 0.1], // Southwest corner
+      [32.0853 + 0.1, 34.7818 + 0.1], // Northeast corner
     ]);
   }
 
   /**
-   * Displays shelter markers on the map and initializes shelter usage statistics
-   * Uses dynamically sized icons based on shelter capacity
+   * Displays all shelter markers on the map
+   * Creates shelter icons sized based on capacity and initializes usage statistics
    *
-   * @param {Array} shelters - Array of shelter objects
+   * @param {Array} shelters - Array of shelter objects to display
    */
   displayShelters(shelters) {
-    // Initialize shelter usage statistics for each shelter
+    // Initialize shelter usage statistics tracking for each shelter
     this.stats.shelterUsage = shelters.map((s) => ({
       id: s.id,
       name: s.name,
       capacity: s.capacity,
-      assigned: 0, // Number of people assigned
-      percentUsed: 0, // Percentage of capacity used
+      assigned: 0, // Number of people assigned (starts at 0)
+      percentUsed: 0, // Percentage of capacity used (starts at 0)
     }));
 
     // Add each shelter as a marker on the map
     shelters.forEach((shelter) => {
-      // Get a dynamically sized icon based on this shelter's capacity and include ID
+      // Create a dynamically sized icon based on this shelter's capacity
+      // Larger capacity shelters get bigger icons, and the shelter ID is displayed
       const shelterIcon = this.icons.getShelterIcon(
         shelter.capacity,
         shelter.id
       );
 
+      // Create the marker at the shelter's coordinates
       const marker = L.marker([shelter.latitude, shelter.longitude], {
         icon: shelterIcon,
       });
 
-      // Add popup with shelter information
+      // Add popup with shelter information that appears when clicked
       marker.bindPopup(`
       <h3>${shelter.name}</h3>
       <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
@@ -353,26 +359,37 @@ class ShelterSimulationVisualizer {
     });
   }
 
+  /**
+   * Updates the popup content for all shelter markers
+   * Called when assignments change to reflect current occupancy
+   */
   updateShelterPopups() {
-    // Find all shelter markers and update their popups
+    // Find all shelter markers and update their popup contents
     this.shelterMarkers.eachLayer((marker) => {
-      // Get the shelter ID from the marker
+      // Extract the shelter ID from the marker's popup content
       const shelterIdMatch =
         marker._popup._content.match(/shelter-(\d+)-count/);
+
       if (shelterIdMatch && shelterIdMatch[1]) {
         const shelterId = parseInt(shelterIdMatch[1]);
 
-        // Find this shelter's stats
+        // Find this shelter's current statistics
         const shelterStat = this.stats.shelterUsage.find(
           (s) => s.id === shelterId
         );
 
         if (shelterStat) {
-          // Update the popup content with current data
+          // Find the shelter data to get name and capacity
           const shelter = this.currentSimulationData.shelters.find(
             (s) => s.id === shelterId
           );
+
           if (shelter) {
+            // Update the popup content with current occupancy data
+            // The status color changes based on how full the shelter is:
+            // - Green: Available (less than 80% full)
+            // - Orange: Almost Full (80% or more but not full)
+            // - Red: Full (at capacity)
             marker.setPopupContent(`
             <h3>${shelter.name}</h3>
             <p>Capacity: <span id="shelter-${shelter.id}-count">${
@@ -399,11 +416,11 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Displays people and their shelter assignments on the map
-   * Draws paths between people and their assigned shelters
-   * Updates statistics based on assignments
+   * Displays all people and their shelter assignments on the map
+   * Creates people markers with different colors based on age and assignment status
+   * Draws lines connecting people to their assigned shelters
    *
-   * @param {Array} people - Array of person objects
+   * @param {Array} people - Array of person objects to display
    * @param {Array} shelters - Array of shelter objects
    * @param {Object} assignments - Mapping of person IDs to shelter assignments
    */
@@ -412,16 +429,16 @@ class ShelterSimulationVisualizer {
     let totalDistance = 0;
     this.stats.maxDistance = 0;
 
-    // Process each person
+    // Process each person one by one
     people.forEach((person) => {
       // Determine which icon to use based on age and assignment status
-      let icon = this.icons.person; // Default icon
+      let icon = this.icons.person; // Default icon for adults
 
-      // Handle unassigned people
+      // Handle people who haven't been assigned to a shelter
       if (!assignments[person.id]) {
-        icon = this.icons.unassigned; // Gray icon for unassigned
+        icon = this.icons.unassigned; // Gray icon for unassigned people
 
-        // Update age group statistics for unassigned
+        // Update age group statistics for unassigned people
         if (person.age >= 70) {
           this.stats.ageGroups.unassigned.elderly++;
         } else if (person.age <= 12) {
@@ -430,22 +447,22 @@ class ShelterSimulationVisualizer {
           this.stats.ageGroups.unassigned.adults++;
         }
       } else {
-        // Handle assigned people - use age-specific icons
+        // Handle people who have been assigned to shelters - use age-specific icons
         if (person.age >= 70) {
-          icon = this.icons.elderly;
+          icon = this.icons.elderly; // Pink icon for elderly (age 70+)
           this.stats.ageGroups.assigned.elderly++;
         } else if (person.age <= 12) {
-          icon = this.icons.child;
+          icon = this.icons.child; // Green icon for children (age 0-12)
           this.stats.ageGroups.assigned.children++;
         } else {
-          this.stats.ageGroups.assigned.adults++;
+          this.stats.ageGroups.assigned.adults++; // Blue icon for adults (age 13-69)
         }
       }
 
-      // Create a marker for this person
+      // Create a marker for this person at their location
       const marker = L.marker([person.latitude, person.longitude], { icon });
 
-      // Check if the person has been assigned to a shelter
+      // If the person has been assigned to a shelter, draw a line and update statistics
       if (assignments[person.id]) {
         const assignment = assignments[person.id];
         const shelter = shelters.find((s) => s.id === assignment.shelterId);
@@ -456,12 +473,12 @@ class ShelterSimulationVisualizer {
             (s) => s.id === shelter.id
           );
           if (shelterStat) {
-            shelterStat.assigned++;
+            shelterStat.assigned++; // Increment the count of people assigned to this shelter
             shelterStat.percentUsed =
-              (shelterStat.assigned / shelter.capacity) * 100;
+              (shelterStat.assigned / shelter.capacity) * 100; // Calculate percentage used
           }
 
-          // Update DOM elements for this shelter's popup
+          // Update DOM elements for this shelter's popup if they exist
           const countElement = document.getElementById(
             `shelter-${shelter.id}-count`
           );
@@ -474,7 +491,7 @@ class ShelterSimulationVisualizer {
           }
 
           if (statusElement) {
-            // Update status text and class based on usage
+            // Update status text and class based on how full the shelter is
             if (shelterStat.assigned >= shelter.capacity) {
               statusElement.textContent = "Full";
               statusElement.className = "status-full";
@@ -488,20 +505,20 @@ class ShelterSimulationVisualizer {
           }
 
           // Draw the path from person to shelter
-          // Use the calculated route if available
+          // If a calculated route is available, use that
           if (assignment.route && assignment.route.coordinates) {
             const routeLine = L.polyline(assignment.route.coordinates, {
-              color: this.getLineColor(person.age),
+              color: this.getLineColor(person.age), // Color based on age
               opacity: 0.7,
               weight: 3,
             });
             this.pathLines.addLayer(routeLine);
           } else {
-            // Fallback to a straight line if no route is available
+            // If no detailed route is available, draw a simple straight line
             const line = L.polyline(
               [
-                [person.latitude, person.longitude],
-                [shelter.latitude, shelter.longitude],
+                [person.latitude, person.longitude], // From person
+                [shelter.latitude, shelter.longitude], // To shelter
               ],
               { color: this.getLineColor(person.age), opacity: 0.7, weight: 2 }
             );
@@ -509,9 +526,9 @@ class ShelterSimulationVisualizer {
           }
 
           // Update distance statistics
-          totalDistance += assignment.distance;
+          totalDistance += assignment.distance; // Add to total for average calculation
           if (assignment.distance > this.stats.maxDistance) {
-            this.stats.maxDistance = assignment.distance;
+            this.stats.maxDistance = assignment.distance; // Update max if this is larger
           }
 
           // Add popup with assignment information
@@ -523,10 +540,12 @@ class ShelterSimulationVisualizer {
       `);
         }
       } else {
-        // For unassigned person, find the nearest shelter
+        // For unassigned person, find and show the nearest shelter
+        // (even though they can't get there in time)
         let nearestShelter = null;
         let nearestDistance = Infinity;
 
+        // Check all shelters to find the closest one
         shelters.forEach((shelter) => {
           const distance = this.calculateAirDistance(
             person.latitude,
@@ -541,7 +560,7 @@ class ShelterSimulationVisualizer {
           }
         });
 
-        // Popup for unassigned person with nearest shelter info
+        // Create popup for unassigned person with nearest shelter info
         marker.bindPopup(`
         <p>Person #${person.id}</p>
         <p>Age: ${person.age}</p>
@@ -566,20 +585,22 @@ class ShelterSimulationVisualizer {
       this.stats.averageDistance = totalDistance / this.stats.assignedPeople;
     }
   }
+
   /**
    * Updates the statistics panel with current simulation data
-   * Called after visualization to show results in the UI
+   * Displays summary statistics in the UI
    */
   updateStatisticsDisplay() {
     console.log("Updating statistics display with:", this.stats);
 
-    // Update basic statistics
+    // Update basic statistics elements if they exist
     const statsTotal = document.getElementById("stats-total");
     const statsAssigned = document.getElementById("stats-assigned");
     const statsUnassigned = document.getElementById("stats-unassigned");
     const statsAvgDistance = document.getElementById("stats-avg-distance");
     const statsMaxDistance = document.getElementById("stats-max-distance");
 
+    // Update the basic count values
     if (statsTotal) statsTotal.textContent = this.stats.totalPeople;
     if (statsAssigned) statsAssigned.textContent = this.stats.assignedPeople;
     if (statsUnassigned)
@@ -596,21 +617,22 @@ class ShelterSimulationVisualizer {
     if (shelterUsageContainer) {
       shelterUsageContainer.innerHTML = ""; // Clear existing content
 
+      // Check if we have shelter data to display
       if (this.stats.shelterUsage.length === 0) {
         shelterUsageContainer.innerHTML = "<p>No shelter data available</p>";
       } else {
-        // Sort by usage percentage (highest first)
+        // Sort shelters by usage percentage (highest first)
+        // Only include shelters with capacity > 0 to avoid division by zero
         const sortedShelters = [...this.stats.shelterUsage]
-          .filter((shelter) => shelter.capacity > 0) // Only show shelters with capacity
+          .filter((shelter) => shelter.capacity > 0)
           .sort((a, b) => b.percentUsed - a.percentUsed);
 
         // Display statistics for each shelter
-        // sortedShelters.slice(0, 5).forEach((shelter) - (limit to top 5 for UI clarity)
         sortedShelters.forEach((shelter) => {
           const shelterDiv = document.createElement("div");
           shelterDiv.className = "shelter-usage-item";
 
-          // Determine status class and color
+          // Determine status color based on occupancy
           let statusClass = "status-available";
           let color = "green";
 
@@ -622,6 +644,7 @@ class ShelterSimulationVisualizer {
             color = "orange";
           }
 
+          // Create the shelter usage display with appropriate color
           shelterDiv.innerHTML = `
           <div class="shelter-name">Shelter ${shelter.id}</div>
           <div class="shelter-stats" style="color: ${color}">
@@ -639,6 +662,8 @@ class ShelterSimulationVisualizer {
     const ageStatsContainer = document.getElementById("age-stats-container");
     if (ageStatsContainer) {
       const ageGroups = this.stats.ageGroups;
+
+      // Calculate totals for percentage calculations
       const totalAssigned =
         ageGroups.assigned.elderly +
         ageGroups.assigned.children +
@@ -663,7 +688,7 @@ class ShelterSimulationVisualizer {
       });
       table.appendChild(headerRow);
 
-      // Add data rows for each age group
+      // Define age categories for the table
       const ageCategories = [
         {
           name: "Children",
@@ -682,6 +707,7 @@ class ShelterSimulationVisualizer {
         },
       ];
 
+      // Add a row for each age category
       ageCategories.forEach((category) => {
         const row = document.createElement("tr");
 
@@ -711,6 +737,7 @@ class ShelterSimulationVisualizer {
         table.appendChild(row);
       });
 
+      // Add the completed table to the container
       ageStatsContainer.appendChild(table);
     }
   }
@@ -718,6 +745,7 @@ class ShelterSimulationVisualizer {
   /**
    * Adds control panels to the map
    * Sets up UI elements for statistics and simulation controls
+   * Note: This is not currently used in the new layout (controls are elsewhere)
    */
   addControlPanel() {
     // Create both control panels
@@ -728,6 +756,7 @@ class ShelterSimulationVisualizer {
   /**
    * Adds a statistics panel to the top-right corner of the map
    * Displays summary statistics about the simulation
+   * Note: This is not currently used in the new layout
    */
   addStatisticsPanel() {
     // Create statistics panel HTML element
@@ -773,6 +802,7 @@ class ShelterSimulationVisualizer {
   /**
    * Adds a simulation control panel to the top-left corner of the map
    * Provides UI controls for configuring and running simulations
+   * Note: This is not currently used in the new layout
    */
   addSimulationControlPanel() {
     // Create control panel HTML element
@@ -898,13 +928,13 @@ class ShelterSimulationVisualizer {
    * @returns {string} - Formatted percentage with one decimal place
    */
   calculatePercentage(part, total) {
-    if (total === 0) return "0.0";
-    return ((part / total) * 100).toFixed(1);
+    if (total === 0) return "0.0"; // Avoid division by zero
+    return ((part / total) * 100).toFixed(1); // Format with one decimal place
   }
 
   /**
    * Returns a color for the line based on the person's age
-   * Used to color-code paths on the map
+   * Used to color-code paths on the map for better visibility
    *
    * @param {number} age - Age of the person
    * @returns {string} - CSS color string
@@ -919,15 +949,15 @@ class ShelterSimulationVisualizer {
     }
   }
 
-  /////////////////////////////////////////////////////////////////
   /**
-   * Enables manual placement of people on the map
+   * Enables or disables manual placement of people on the map
+   * When enabled, users can click on the map to add custom people
+   *
    * @param {boolean} enable - Whether to enable manual placement
    */
-  ////////////////////////////////////////////////////////////////
   enableManualPlacement(enable) {
     if (enable) {
-      // Add a message to the status
+      // Add a message to the status area to guide the user
       const statusElement = document.getElementById("simulation-status");
       if (statusElement) {
         statusElement.textContent =
@@ -940,20 +970,19 @@ class ShelterSimulationVisualizer {
         this.manualPeople = [];
       }
 
-      // Add click handler to the map
-      this.map.on("click", this.handleMapClick, this);
-      this.map.on("contextmenu", this.handleContextClick, this);
+      // Add click handlers to the map
+      this.map.on("click", this.handleMapClick, this); // Left click adds people
+      this.map.on("contextmenu", this.handleContextClick, this); // Right click changes age
     } else {
-      // Remove handlers - fixed to use proper context binding
+      // Remove the handlers when manual placement is disabled
       this.map.off("click", this.handleMapClick, this);
       this.map.off("contextmenu", this.handleContextClick, this);
     }
   }
 
   /**
-   * Clears all manually placed people
-   * Ensures complete clearing of manual people data and markers
-   * and restores the original simulation
+   * Clears all manually people count from the map
+   * Restores the latest simulation if available
    */
   clearManualPeople() {
     console.log("Clearing manual people. Before:", this.manualPeople?.length);
@@ -976,7 +1005,7 @@ class ShelterSimulationVisualizer {
         this.originalSimulationData.assignments
       );
 
-      // IMPORTANT FIX: Make sure current data is reset to original data
+      // IMPORTANT: Reset current data to original data
       // This prevents problems when running with manual people multiple times
       this.currentSimulationData = {
         people: [...this.originalSimulationData.people],
@@ -997,41 +1026,45 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Handle map click to add a person
+   * Handle map click to add a person at that location
+   * Called when the user clicks on the map in manual placement mode
    */
   handleMapClick(e) {
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
+    const lat = e.latlng.lat; // Get latitude from click location
+    const lng = e.latlng.lng; // Get longitude from click location
 
-    // Generate a unique ID for this manual person
-    // Use a timestamp prefix to ensure uniqueness even after clearing
+    // Generate a unique ID for this manual person using timestamp and array length
+    // This ensures uniqueness even after clearing previous manual people
     const id = `manual_${Date.now()}_${this.manualPeople.length}`;
 
-    // Default to adult (35)
+    // Create a new person object (default to adult age 35)
     const person = {
       id: id,
-      age: 35,
+      age: 35, // Default to adult
       latitude: lat,
       longitude: lng,
-      isManual: true,
+      isManual: true, // Mark as manually added
     };
 
+    // Add to the array of manual people
     this.manualPeople.push(person);
 
     // Add marker for the person
-    const icon = this.icons.person;
+    const icon = this.icons.person; // Use adult icon
     const marker = L.marker([lat, lng], {
       icon,
       isManual: true,
       personId: id,
     });
 
+    // Add popup with person information
     marker.bindPopup(`
     <p>Person #${this.manualPeople.length} (Manual)</p>
     <p>Age: ${person.age}</p>
     <p>Status: Unassigned</p>
   `);
 
+    // Add the marker to the people layer
     this.peopleMarkers.addLayer(marker);
 
     // Update the "Run with Manual" button status
@@ -1039,22 +1072,24 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Handle right-click to change age
+   * Handle right-click to change a person's age
+   * Cycles through age groups: adult -> elderly -> child -> adult
    */
   handleContextClick(e) {
-    // Find if we already have a person at this location
+    // Get coordinates of the right-click
     const lat = e.latlng.lat;
     const lng = e.latlng.lng;
 
-    // Check all markers within a small radius
+    // Check all markers within a small radius (about 10 meters)
     let found = false;
     this.peopleMarkers.eachLayer((layer) => {
+      // Skip non-manual markers
       if (!layer.options || !layer.options.isManual) return;
 
       const markerLat = layer.getLatLng().lat;
       const markerLng = layer.getLatLng().lng;
 
-      // If marker is close enough (within ~10 meters)
+      // If marker is close enough to the click point
       if (
         Math.abs(markerLat - lat) < 0.0001 &&
         Math.abs(markerLng - lng) < 0.0001
@@ -1083,7 +1118,7 @@ class ShelterSimulationVisualizer {
             person.age = 8;
           }
 
-          // Update marker
+          // Update marker icon based on new age
           if (person.age >= 70) {
             layer.setIcon(this.icons.elderly);
           } else if (person.age <= 12) {
@@ -1092,7 +1127,7 @@ class ShelterSimulationVisualizer {
             layer.setIcon(this.icons.person);
           }
 
-          // Update popup
+          // Update popup content with new age
           layer.setPopupContent(`
           <p>Person #${personIndex + 1} (Manual)</p>
           <p>Age: ${person.age}</p>
@@ -1104,13 +1139,14 @@ class ShelterSimulationVisualizer {
   }
 
   /**
-   * Update the manual control button status
+   * Updates the manual control button status
+   * Enables the button and shows the count when people are available
    */
   updateManualControlStatus() {
     const manualButton = document.getElementById("run-with-manual");
     if (manualButton && this.manualPeople && this.manualPeople.length > 0) {
       manualButton.textContent = `Run With Manual People (${this.manualPeople.length})`;
-      manualButton.disabled = false;
+      manualButton.disabled = false; // Enable the button
     }
   }
 
@@ -1119,18 +1155,20 @@ class ShelterSimulationVisualizer {
    * Preserves current shelters and only adds the manual people
    */
   runWithManualPeople() {
+    // Check if we have any manual people to add
     if (!this.manualPeople || this.manualPeople.length === 0) {
       alert("Please add some people to the map first");
       return;
     }
 
+    // Update status message
     const statusElement = document.getElementById("simulation-status");
     if (statusElement) {
       statusElement.textContent = "Adding manual people to simulation...";
       statusElement.className = "status-message running";
     }
 
-    // IMPORTANT FIX: Always use the original simulation data as our base
+    // Get the base data from the original simulation
     // This prevents the accumulation of manual people across multiple runs
     const basePeople = this.originalSimulationData
       ? [...this.originalSimulationData.people]
@@ -1153,7 +1191,7 @@ class ShelterSimulationVisualizer {
     // Create a new combined people array with base + all manual people
     const allPeople = [...basePeople];
 
-    // Find the highest ID currently in use
+    // Find the highest ID currently in use to avoid ID conflicts
     let maxId = 0;
     basePeople.forEach((person) => {
       if (typeof person.id === "number" && person.id > maxId) {
@@ -1165,7 +1203,7 @@ class ShelterSimulationVisualizer {
     this.manualPeople.forEach((person, index) => {
       const newPerson = {
         ...person,
-        id: maxId + index + 1,
+        id: maxId + index + 1, // Assign new unique ID
         isManual: true, // Mark as manual for future reference
       };
       allPeople.push(newPerson);
@@ -1174,8 +1212,11 @@ class ShelterSimulationVisualizer {
     // Run server simulation with combined people
     this.runServerSimulationWithCustomData(allPeople, baseShelters);
   }
+
   /**
    * Run server simulation with custom people and shelters
+   * Sends a request to the server with the custom data
+   *
    * @param {Array} customPeople - Array of people objects
    * @param {Array} customShelters - Array of shelter objects
    */
@@ -1246,6 +1287,7 @@ class ShelterSimulationVisualizer {
         }, 3000);
       }
     } catch (error) {
+      // Handle errors
       console.error("Server simulation failed:", error);
       if (statusElement) {
         statusElement.textContent = `Error: ${error.message}`;
@@ -1256,7 +1298,9 @@ class ShelterSimulationVisualizer {
 
   /**
    * Run server simulation with custom people data
-   * Uses your existing server API but with manually placed people
+   * Uses the existing server API but with manually placed people
+   *
+   * @param {Array} customPeople - Array of manually placed people
    */
   async runCustomServerSimulation(customPeople) {
     const statusElement = document.getElementById("simulation-status");
@@ -1295,9 +1339,9 @@ class ShelterSimulationVisualizer {
         };
       });
 
-      // Create request data with better type handling
+      // Create request data with proper type handling
       const requestData = {
-        peopleCount: 0,
+        peopleCount: 0, // Don't generate random people, use our custom ones
         shelterCount: currentShelters.length > 0 ? 0 : shelterCount,
         centerLatitude: 31.2518,
         centerLongitude: 34.7913,
@@ -1331,7 +1375,7 @@ class ShelterSimulationVisualizer {
         }
       );
 
-      // Try to get the response text for better error diagnostics
+      // If the request failed, try to get more detailed error information
       if (!response.ok) {
         let errorDetail = "";
         try {
@@ -1375,218 +1419,29 @@ class ShelterSimulationVisualizer {
         statusElement.textContent = `Error: ${error.message}`;
         statusElement.className = "status-message error";
       }
-
-      // Call the fallback method
-      //this.fallbackCustomSimulation(customPeople);
     }
   }
-
-  /**
-   * Fallback method if the server doesn't support custom people
-   * This will simply display manually placed people without assignments
-   */
-  //   fallbackCustomSimulation(customPeople) {
-  //     const statusElement = document.getElementById("simulation-status");
-
-  //     if (statusElement) {
-  //       statusElement.textContent =
-  //         "Using fallback for manual people (no assignments)";
-  //       statusElement.className = "status-message warning";
-  //     }
-
-  //     // If we have existing simulation data, use it as the base
-  //     let people = [];
-  //     let shelters = [];
-  //     let assignments = {};
-
-  //     if (this.currentSimulationData) {
-  //       // Start with current data
-  //       people = [...this.currentSimulationData.people];
-  //       shelters = [...this.currentSimulationData.shelters];
-  //       assignments = { ...this.currentSimulationData.assignments };
-
-  //       // Add manual people
-  //       customPeople.forEach((person) => {
-  //         // Only add if not already present (by checking coordinates)
-  //         const exists = people.some(
-  //           (p) =>
-  //             Math.abs(p.latitude - person.latitude) < 0.0001 &&
-  //             Math.abs(p.longitude - person.longitude) < 0.0001
-  //         );
-
-  //         if (!exists) {
-  //           // Find the next available ID
-  //           const nextId = Math.max(...people.map((p) => p.id), 0) + 1;
-  //           people.push({
-  //             ...person,
-  //             id: nextId,
-  //           });
-  //         }
-  //       });
-  //     } else {
-  //       // No existing data, just use the manual people and generate shelters
-  //       people = customPeople.map((person, idx) => ({
-  //         ...person,
-  //         id: idx + 1,
-  //       }));
-
-  //       // Generate shelters
-  //       const shelterCount =
-  //         parseInt(document.getElementById("shelter-count").value) || 8;
-  //       shelters = this.generateShelters({
-  //         shelterCount: shelterCount,
-  //         centerLatitude: 31.2518,
-  //         centerLongitude: 34.7913,
-  //         radiusKm: 0.5,
-  //       });
-  //     }
-
-  //     // Visualize just the people and shelters, without assignments
-  //     this.visualizeSimulation(people, shelters, assignments);
-
-  //     // Inform the user
-  //     alert(
-  //       "Manual people placement is working, but assignment is not available in this mode. Please use the server simulation for assignments."
-  //     );
-  //   }
-
-  /**
-   * Run server simulation with custom shelter data
-   */
-  //   async runServerSimulationWithCustomShelters(customShelters) {
-  //     const statusElement = document.getElementById("simulation-status");
-
-  //     try {
-  //       // Get parameters from UI controls
-  //       const peopleCount =
-  //         parseInt(document.getElementById("people-count").value) || 100;
-  //       const radius = parseFloat(document.getElementById("radius").value) || 0.5;
-  //       const priorityEnabled =
-  //         document.getElementById("priority").value === "true";
-
-  //       // Create a modified request that includes our custom shelters
-  //       const requestData = {
-  //         peopleCount: peopleCount,
-  //         shelterCount: 0, // We're providing our own shelters, so don't generate any
-  //         centerLatitude: 31.2518, // Beer Sheva
-  //         centerLongitude: 34.7913, // Beer Sheva
-  //         radiusKm: radius,
-  //         prioritySettings: {
-  //           enableAgePriority: priorityEnabled,
-  //           childMaxAge: 12,
-  //           elderlyMinAge: 70,
-  //         },
-  //         useCustomShelters: true,
-  //         customShelters: customShelters,
-  //       };
-
-  //       // Call the server API with our custom request
-  //       const response = await fetch(
-  //         `https://localhost:${PORT}/api/Simulation/run`,
-  //         {
-  //           method: "POST",
-  //           headers: {
-  //             "Content-Type": "application/json",
-  //           },
-  //           body: JSON.stringify(requestData),
-  //         }
-  //       );
-
-  //       // Handle error responses
-  //       if (!response.ok) {
-  //         throw new Error(
-  //           `Server responded with ${response.status}: ${response.statusText}`
-  //         );
-  //       }
-
-  //       // Parse the successful response
-  //       const data = await response.json();
-
-  //       // Display the results on the map
-  //       this.visualizeSimulation(data.people, data.shelters, data.assignments);
-
-  //       // Update status message
-  //       if (statusElement) {
-  //         statusElement.textContent = "Manual shelter simulation complete";
-  //         statusElement.className = "status-message success";
-
-  //         // Clear the status after a few seconds
-  //         setTimeout(() => {
-  //           statusElement.textContent = "";
-  //           statusElement.className = "status-message";
-  //         }, 3000);
-  //       }
-  //     } catch (error) {
-  //       console.error("Server simulation with custom shelters failed:", error);
-  //       // Fallback to a simpler approach if needed
-  //       this.fallbackCustomShelterSimulation(customShelters);
-  //     }
-  //   }
-
-  /**
-   * Generate shelters for manual simulations
-   */
-  //   generateShelters(requestData) {
-  //     const shelters = [];
-
-  //     // Known Beer Sheva locations for realism
-  //     const knownLocations = [
-  //       { name: "Ben Gurion University", lat: 31.2634, lon: 34.8044 },
-  //       { name: "Beer Sheva Central Station", lat: 31.2434, lon: 34.798 },
-  //       { name: "Grand Canyon Mall", lat: 31.2508, lon: 34.7738 },
-  //       { name: "Soroka Medical Center", lat: 31.2534, lon: 34.8018 },
-  //     ];
-
-  //     // Add known locations first
-  //     for (
-  //       let i = 0;
-  //       i < Math.min(requestData.shelterCount, knownLocations.length);
-  //       i++
-  //     ) {
-  //       const location = knownLocations[i];
-  //       shelters.push({
-  //         id: i + 1,
-  //         name: location.name,
-  //         latitude: location.lat,
-  //         longitude: location.lon,
-  //         capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
-  //       });
-  //     }
-
-  //     // Add remaining random shelters if needed
-  //     for (let i = knownLocations.length; i < requestData.shelterCount; i++) {
-  //       const angle = Math.random() * 2 * Math.PI;
-  //       const distance = (Math.random() * requestData.radiusKm * 0.7) / 111.0;
-
-  //       const latOffset = distance * Math.cos(angle);
-  //       const lonOffset = distance * Math.sin(angle);
-
-  //       shelters.push({
-  //         id: i + 1,
-  //         name: `Shelter ${i + 1}`,
-  //         latitude: requestData.centerLatitude + latOffset,
-  //         longitude: requestData.centerLongitude + lonOffset,
-  //         capacity: Math.floor(Math.random() * 5) + 1, // Capacity between 1 and 5
-  //       });
-  //     }
-
-  //     return shelters;
-  //   }
 }
 
-// Export the class for use in other modules
+// Export the class for use in other modules (if in a module environment)
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ShelterSimulationVisualizer;
 }
 
+//==============================================================
+// Run Server Simulation
+//==============================================================
+
 /**
  * Function to handle server-side simulation
  * Calls a remote API to run the simulation and visualizes the results
+ * This is the main function that runs when users click "Run Simulation"
  */
 async function runServerSimulation() {
   // Ensure we have a valid visualizer
   const visualizer = window.visualizer || initializeVisualizer();
 
+  // Get the status element to show progress messages
   const statusElement = document.getElementById("simulation-status");
 
   if (statusElement) {
@@ -1606,19 +1461,19 @@ async function runServerSimulation() {
 
     // Prepare request payload with simulation parameters
     const requestData = {
-      peopleCount: peopleCount,
-      shelterCount: shelterCount,
-      centerLatitude: 31.2518, // Beer Sheva
-      centerLongitude: 34.7913, // Beer Sheva
-      radiusKm: radius,
+      peopleCount: peopleCount, // Number of people to generate
+      shelterCount: shelterCount, // Number of shelters to generate
+      centerLatitude: 31.2518, // Beer Sheva latitude
+      centerLongitude: 34.7913, // Beer Sheva longitude
+      radiusKm: radius, // Radius to generate within
       prioritySettings: {
-        enableAgePriority: priorityEnabled,
-        childMaxAge: 12,
-        elderlyMinAge: 70,
+        enableAgePriority: priorityEnabled, // Whether to prioritize by age
+        childMaxAge: 12, // Maximum age for child category
+        elderlyMinAge: 70, // Minimum age for elderly category
       },
     };
 
-    // Call the server API
+    // Call the server API to run the simulation
     const response = await fetch(
       `https://localhost:${PORT}/api/Simulation/run`,
       {
@@ -1653,7 +1508,7 @@ async function runServerSimulation() {
       data.assignments
     );
 
-    // Update status message
+    // Update status message to indicate success
     if (statusElement) {
       statusElement.textContent = "Server simulation complete";
       statusElement.className = "status-message success";
@@ -1673,6 +1528,11 @@ async function runServerSimulation() {
     }
   }
 }
+
+//==============================================================
+// Update Server Statistics
+//==============================================================
+
 /**
  * Helper function to update statistics panel with server-provided data
  * Used when running server-side simulations
@@ -1680,7 +1540,7 @@ async function runServerSimulation() {
  * @param {Object} stats - Statistics object from server response
  */
 function updateServerStatistics(stats) {
-  if (!stats) return; // Safety check
+  if (!stats) return; // Safety check - don't proceed without stats data
 
   // Update UI elements with statistics
   const statsTotal = document.getElementById("stats-total");
@@ -1689,7 +1549,7 @@ function updateServerStatistics(stats) {
   const statsAvgDistance = document.getElementById("stats-avg-distance");
   const statsMaxDistance = document.getElementById("stats-max-distance");
 
-  // Update the values in the DOM
+  // Update the values in the DOM elements if they exist
   if (statsTotal)
     statsTotal.textContent = stats.assignedCount + stats.unassignedCount;
   if (statsAssigned) statsAssigned.textContent = stats.assignedCount;
@@ -1700,18 +1560,7 @@ function updateServerStatistics(stats) {
     statsMaxDistance.textContent = stats.maxDistance.toFixed(2);
 }
 
-/**
- * Initialization code for the application
- * Creates the visualizer instance and sets up the application when the DOM is ready
- */
-// document.addEventListener("DOMContentLoaded", function () {
-//   // Create a new ShelterSimulationVisualizer instance targeting the 'map' element
-//   window.visualizer = new ShelterSimulationVisualizer("map");
-
-//   console.log("Shelter simulation visualizer initialized");
-// });
-
-// Export functions for use in other modules
+// Export functions for use in other modules (if in a module environment)
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     runServerSimulation,
