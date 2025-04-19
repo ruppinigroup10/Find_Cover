@@ -1,7 +1,5 @@
 console.log("Using port:", PORT);
 
-// This version supports the new layout with controls outside the map
-
 // Ensure we only have one global instance of the visualizer
 let globalVisualizer = null;
 

@@ -3,10 +3,6 @@
  * These functions add testing capabilities for edge cases
  */
 
-/**
- * Adds an "Extreme Scenarios" panel to the simulation controls
- * This function should be called after the map is initialized
- */
 function addExtremeScenarioControls() {
   // Check if extreme scenarios are already added
   if (document.querySelector(".scenario-heading")) {
