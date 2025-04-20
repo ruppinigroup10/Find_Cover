@@ -487,73 +487,6 @@ public class DBservices
     }
 
     //--------------------------------------------------------------------------------------------------
-    // This method updates users known location data
-    //--------------------------------------------------------------------------------------------------
-    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname, DateTime added_at)
-    {
-        SqlConnection con;
-        SqlCommand cmd;
-        KnownLocation? knownLocation = null;
-        try
-        {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-        Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@location_id", location_id);
-        paramDic.Add("@user_id", user_id);
-        paramDic.Add("@latitude", latitude);
-        paramDic.Add("@longitude", longitude);
-        paramDic.Add("@radius", radius);
-        paramDic.Add("@address", address);
-        paramDic.Add("@location_name", location_name);
-        paramDic.Add("@nickname", nickname);
-        paramDic.Add("@added_at", added_at);
-        //paramDic.Add("@added_at", added_at);
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateKnownLocation", con, paramDic);
-        try
-        {
-            using (SqlDataReader dr = cmd.ExecuteReader())
-            {
-                if (dr.Read())
-                {
-                    knownLocation = new KnownLocation
-                    {
-                        LocationId = Convert.ToInt32(dr["location_id"]),
-                        UserId = Convert.ToInt32(dr["user_id"]),
-                        Latitude = Convert.ToSingle(dr["latitude"]),
-                        Longitude = Convert.ToSingle(dr["longitude"]),
-                        Radius = Convert.ToSingle(dr["radius"]),
-                        Address = dr["address"].ToString() ?? "",
-                        LocationName = dr["location_name"].ToString() ?? "",
-                        Nickname = dr["nickname"].ToString() ?? "",
-                        AddedAt = Convert.ToDateTime(dr["added_at"])
-                    };
-                }
-            }
-            return knownLocation;
-        }
-        catch (SqlException ex)
-        {
-            if (ex.Message.Contains("Invalid ID"))
-            {
-                throw new Exception("Invalid ID");
-            }
-            throw new Exception("Update failed");
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
-                con.Close();
-            }
-        }
-    }
-
-    //--------------------------------------------------------------------------------------------------
     // This method geting users known location data
     //--------------------------------------------------------------------------------------------------
     public KnownLocation? GetKnownLocation(int user_id)
@@ -563,23 +496,23 @@ public class DBservices
         KnownLocation? knownLocation = null;
         try
         {
-            con = connect("myProjDB"); // create the connection
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
         }
         catch (Exception)
         {
             // write to log
-            throw;
+            throw; // במקרה של שגיאה בחיבור, השגיאה נזרקת הלאה
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@user_id", user_id);
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
+        paramDic.Add("@user_id", user_id); // הוספת פרמטר user_id למילון הפרמטרים עבור הפרוצדורה המאוחסנת
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_GetKnownLocation" עם החיבור והפרמטרים
         try
         {
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים - שימוש ב-using מבטיח סגירה אוטומטית של ה-DataReader
             {
-                if (dr.Read())
+                if (dr.Read()) // קריאת שורה אחת מתוצאות השאילתה - מצופה שתחזור לכל היותר שורה אחת עבור משתמש יחיד
                 {
-                    knownLocation = new KnownLocation
+                    knownLocation = new KnownLocation // יצירת אובייקט KnownLocation עם הנתונים שחזרו ממסד הנתונים
                     {
                         UserId = Convert.ToInt32(dr["user_id"]),
                         Latitude = Convert.ToSingle(dr["latitude"]),
@@ -592,39 +525,44 @@ public class DBservices
                     };
                 }
             }
-            return knownLocation;
+            return knownLocation; // החזרת אובייקט KnownLocation 
         }
-        catch (Exception ex)
+        catch (Exception ex) // טיפול בשגיאות כלליות שעלולות להתרחש בזמן ביצוע הפקודה
         {
-            if (ex.Message.Contains("Invalid ID"))
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין - ספציפי לשגיאה אפשרית מהפרוצדורה המאוחסנת
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("User data transfer failed");
+            throw new Exception("User data transfer failed"); // שגיאה כללית במקרה של כשל בהעברת נתוני המשתמש
         }
         finally
         {
             if (con != null)
             {
                 // close the db connection
-                con.Close();
+                con.Close(); // סגירת החיבור למסד הנתונים בבלוק finally כדי להבטיח שהוא תמיד נסגר
             }
         }
     }
-    public KnownLocation? AddKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+
+    //--------------------------------------------------------------------------------------------------
+    // This method updates users known location data
+    //--------------------------------------------------------------------------------------------------
+    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname, DateTime added_at)
     {
         SqlConnection con;
         SqlCommand cmd;
         KnownLocation? knownLocation = null;
         try
         {
-            con = connect("myProjDB");
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
         }
         catch (Exception ex)
         {
-            throw new Exception("Database connection error: " + ex.Message);
+            throw new Exception("Database connection error: " + ex.Message); // טיפול בשגיאת חיבור למסד הנתונים
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@location_id", location_id); // הוספת מזהה המיקום כפרמטר לעדכון
         paramDic.Add("@user_id", user_id);
         paramDic.Add("@latitude", latitude);
         paramDic.Add("@longitude", longitude);
@@ -632,14 +570,16 @@ public class DBservices
         paramDic.Add("@address", address);
         paramDic.Add("@location_name", location_name);
         paramDic.Add("@nickname", nickname);
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddKnownLocation", con, paramDic);
+        paramDic.Add("@added_at", added_at);
+        //paramDic.Add("@added_at", added_at); // שורה כפולה של הוספת added_at - יש למחוק אחת מהן
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateKnownLocation"
         try
         {
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים
             {
-                if (dr.Read())
+                if (dr.Read()) // קריאת שורה אחת מתוצאות העדכון - מצופה שתחזור שורה אחת עם הנתונים המעודכנים
                 {
-                    knownLocation = new KnownLocation
+                    knownLocation = new KnownLocation // יצירת אובייקט KnownLocation עם הנתונים המעודכנים שחזרו ממסד הנתונים
                     {
                         LocationId = Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -649,26 +589,90 @@ public class DBservices
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
                         Nickname = dr["nickname"].ToString() ?? "",
+                        AddedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
             }
-            return knownLocation;
+            return knownLocation; // החזרת אובייקט KnownLocation המעודכן (או null אם העדכון נכשל ולא חזרו נתונים)
         }
-        catch (SqlException ex)
+        catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID"))
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("Update failed");
+            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בעדכון
         }
         finally
         {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            if (con != null && con.State == System.Data.ConnectionState.Open) // בדיקה שהחיבור פתוח לפני סגירה
             {
-                con.Close();
+                con.Close(); // סגירת החיבור למסד הנתונים
+            }
+        }
+    }
+
+    public KnownLocation? AddKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        KnownLocation? knownLocation = null;
+        try
+        {
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message); // טיפול בשגיאת חיבור למסד הנתונים
+        }
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+        paramDic.Add("@latitude", latitude);
+        paramDic.Add("@longitude", longitude);
+        paramDic.Add("@radius", radius);
+        paramDic.Add("@address", address);
+        paramDic.Add("@location_name", location_name);
+        paramDic.Add("@nickname", nickname);
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_AddKnownLocation"
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים
+            {
+                if (dr.Read()) // קריאת שורה אחת מתוצאות ההוספה - מצופה שתחזור שורה אחת עם הנתונים שהוספו
+                {
+                    knownLocation = new KnownLocation // יצירת אובייקט KnownLocation עם הנתונים שהוחזרו ממסד הנתונים
+                    {
+                        LocationId = Convert.ToInt32(dr["location_id"]),
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        Latitude = Convert.ToSingle(dr["latitude"]),
+                        Longitude = Convert.ToSingle(dr["longitude"]),
+                        Radius = Convert.ToSingle(dr["radius"]),
+                        Address = dr["address"].ToString() ?? "",
+                        LocationName = dr["location_name"].ToString() ?? "",
+                        Nickname = dr["nickname"].ToString() ?? ""
+                    };
+                }
+            }
+            return knownLocation; // החזרת אובייקט KnownLocation שהוסף (או null אם ההוספה נכשלה ולא חזרו נתונים)
+        }
+        catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
+        {
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
+            {
+                throw new Exception("Invalid ID");
+            }
+            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open) // בדיקה שהחיבור פתוח לפני סגירה
+            {
+                con.Close(); // סגירת החיבור למסד הנתונים
             }
         }
     }
 
 }
+
+
+

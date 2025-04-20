@@ -150,8 +150,7 @@ public class UserController : ControllerBase
         }
         return BadRequest(new { message = "Invalid ID" });
     }
-
-    // POST api/<UserController>/UpdateUserPreferences
+    // PUT api/<UserController>/UpdateUserPreferences
     [HttpPost("UpdateUserPreferences")]
     public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
     {
@@ -165,6 +164,21 @@ public class UserController : ControllerBase
             });
         }
         return BadRequest(new { message = "Update failed" });
+    }
+    // POST api/<UserController>/AddPreference    
+    [HttpPost("AddPreference")]
+    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)
+    {
+        var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
+        if (newPreference != null)
+        {
+            return Ok(new
+            {
+                message = "Preferences added successfully",
+                preferences = newPreference
+            });
+        }
+        return BadRequest(new { message = "Add failed" });
     }
 
     // GET: api/<UserController>/GetKnownLocation
@@ -182,8 +196,7 @@ public class UserController : ControllerBase
         }
         return BadRequest(new { message = "Invalid ID" });
     }
-
-    // POST api/<UserController>/UpdateKnownLocation
+    // PUT api/<UserController>/UpdateKnownLocation
     [HttpPost("UpdateKnownLocation")]
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
@@ -198,7 +211,21 @@ public class UserController : ControllerBase
         }
         return BadRequest(new { message = "Update failed" });
     }
-
+    // POST api/<UserController>/AddKnownLocation
+    [HttpPost("AddKnownLocation")]
+    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    {
+        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname);
+        if (newKnownLocation != null)
+        {
+            return Ok(new
+            {
+                message = "Known location added successfully",
+                knownLocation = newKnownLocation
+            });
+        }
+        return BadRequest(new { message = "Add failed" });
+    }
     //--------------------------------------------------------------------------------------------------
     // Default controllers
     //--------------------------------------------------------------------------------------------------
@@ -233,36 +260,5 @@ public class UserController : ControllerBase
     [HttpDelete("{id}")]
     public void Delete(int id)
     {
-    }
-
-    // POST api/<UserController>/AddPreference    
-    [HttpPost("AddPreference")]
-    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)
-    {
-        var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
-        if (newPreference != null)
-        {
-            return Ok(new
-            {
-                message = "Preferences added successfully",
-                preferences = newPreference
-            });
-        }
-        return BadRequest(new { message = "Add failed" });
-    }
-    // POST api/<UserController>/AddKnownLocation
-    [HttpPost("AddKnownLocation")]
-    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
-    {
-        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname);
-        if (newKnownLocation != null)
-        {
-            return Ok(new
-            {
-                message = "Known location added successfully",
-                knownLocation = newKnownLocation
-            });
-        }
-        return BadRequest(new { message = "Add failed" });
     }
 }
