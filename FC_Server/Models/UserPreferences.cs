@@ -46,6 +46,7 @@ public class UserPreferences
         this.last_update = lastUpdate;
     }
 
+    //יצירת פונקציה סטטית שבתוכה יש קריאה לפונקציה לא סטטית
     public static UserPreferences? GetUserPreferences(int user_id)
     {
         DBservices dbs = new DBservices();

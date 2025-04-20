@@ -50,6 +50,7 @@ public class KnownLocation
         this.nickname = nickname;
         this.added_at = addedAt;
     }
+    //יצירת פונקציה סטטית שבתוכה יש קריאה לפונקציה לא סטטית
     public static KnownLocation? GetKnownLocation(int user_id)
     {
         DBservices dbs = new DBservices();
@@ -66,3 +67,5 @@ public class KnownLocation
         return dbs.AddKnownLocation(location_id, user_id, latitude, longitude, radius, address, location_name, nickname);
     }
 }
+
+

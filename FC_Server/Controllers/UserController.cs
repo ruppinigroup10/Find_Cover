@@ -135,96 +135,97 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" });
     }
 
+
     // GET: api/<UserController>/GetUserPreferences
     [HttpGet("GetUserPreferences")]
     public IActionResult GetUserPreferences(int user_id)
     {
-        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
+        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id); // קריאה למתודה הסטטית GetUserPreferences במודל UserPreferences
         if (preferences != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות
             {
                 message = "Preferences data transfer successful",
                 preferences = preferences
             });
         }
-        return BadRequest(new { message = "Invalid ID" });
+        return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
-    // PUT api/<UserController>/UpdateUserPreferences
-    [HttpPost("UpdateUserPreferences")]
-    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
+    // PUT: api/<UserController>/UpdateUserPreferences
+    [HttpPost("UpdateUserPreferences")] // שימוש ב-HttpPost עבור עדכון - מקובל יותר מ-HttpPut במקרים מסוימים, אך שקול שימוש ב-HttpPut עבור פעולות עדכון אידמפוטנטיות
+    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences) // קבלת נתוני העדפות מגוף הבקשה
     {
-        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
+        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate); // קריאה למתודה הסטטית UpdateUserPreferences במודל UserPreferences
         if (updatedPreferences != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות המעודכן
             {
                 message = "Preferences updated successfully",
                 preferences = updatedPreferences
             });
         }
-        return BadRequest(new { message = "Update failed" });
+        return BadRequest(new { message = "Update failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
-    // POST api/<UserController>/AddPreference    
-    [HttpPost("AddPreference")]
-    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)
+    // POST: api/<UserController>/AddPreference     
+    [HttpPost("AddPreference")] // שימוש ב-HttpPost עבור הוספה - מתאים לפעולות יצירה
+    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences) // קבלת נתוני העדפות מגוף הבקשה
     {
-        var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
+        var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed); // קריאה למתודה הסטטית AddPreference במודל UserPreferences
         if (newPreference != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות החדש
             {
                 message = "Preferences added successfully",
                 preferences = newPreference
             });
         }
-        return BadRequest(new { message = "Add failed" });
+        return BadRequest(new { message = "Add failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
 
     // GET: api/<UserController>/GetKnownLocation
     [HttpGet("GetKnownLocation")]
     public IActionResult GetKnownLocation(int user_id)
     {
-        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id);
+        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id); // קריאה למתודה הסטטית GetKnownLocation במודל KnownLocation
         if (knownLocation != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע
             {
                 message = "Known location data transfer successful",
                 knownLocation = knownLocation
             });
         }
-        return BadRequest(new { message = "Invalid ID" });
+        return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
-    // PUT api/<UserController>/UpdateKnownLocation
-    [HttpPost("UpdateKnownLocation")]
-    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    // PUT: api/<UserController>/UpdateKnownLocation
+    [HttpPost("UpdateKnownLocation")] // שימוש ב-HttpPost עבור עדכון - שקול שימוש ב-HttpPut
+    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
-        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt);
+        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
         if (updatedKnownLocation != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
             {
                 message = "Known location updated successfully",
                 knownLocation = updatedKnownLocation
             });
         }
-        return BadRequest(new { message = "Update failed" });
+        return BadRequest(new { message = "Update failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
-    // POST api/<UserController>/AddKnownLocation
-    [HttpPost("AddKnownLocation")]
-    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    // POST: api/<UserController>/AddKnownLocation
+    [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
+    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
-        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname);
+        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
         if (newKnownLocation != null)
         {
-            return Ok(new
+            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע החדש
             {
                 message = "Known location added successfully",
                 knownLocation = newKnownLocation
             });
         }
-        return BadRequest(new { message = "Add failed" });
+        return BadRequest(new { message = "Add failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
     //--------------------------------------------------------------------------------------------------
     // Default controllers
@@ -262,3 +263,10 @@ public class UserController : ControllerBase
     {
     }
 }
+
+
+
+
+////////////////////////////////////
+
+

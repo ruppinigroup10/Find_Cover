@@ -317,60 +317,56 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     public UserPreferences? GetUserPreferences(int user_id)
     {
+        SqlConnection con;
+        SqlCommand cmd;
+        UserPreferences? UserPreferences = null;
+
+        try
         {
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
+        }
+        catch (Exception)
+        {
+            // write to log
+            throw; // במקרה של שגיאה בחיבור, השגיאה נזרקת הלאה - מומלץ לטפל ולתעד את השגיאה בצורה מפורטת יותר
+        }
 
-            SqlConnection con;
-            SqlCommand cmd;
-            UserPreferences? UserPreferences = null;
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id); // הוספת פרמטר user_id למילון הפרמטרים עבור הפרוצדורה המאוחסנת
 
-            try
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetPreferences", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_GetPreferences" עם החיבור והפרמטרים
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים - שימוש ב-using מבטיח סגירה אוטומטית של ה-DataReader
             {
-                con = connect("myProjDB"); // create the connection
-            }
-            catch (Exception)
-            {
-                // write to log
-                throw;
-            }
-
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@user_id", user_id);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetPreferences", con, paramDic);
-
-            try
-            {
-                using (SqlDataReader dr = cmd.ExecuteReader())
+                if (dr.Read()) // קריאת שורה אחת מתוצאות השאילתה - מצופה שתחזור לכל היותר שורה אחת עבור משתמש יחיד
                 {
-                    if (dr.Read())
+                    UserPreferences = new UserPreferences // יצירת אובייקט UserPreferences עם הנתונים שחזרו ממסד הנתונים
                     {
-                        UserPreferences = new UserPreferences
-                        {
-                            UserId = Convert.ToInt32(dr["user_id"]),
-                        };
-                    }
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                    };
                 }
-                return UserPreferences;
             }
-            catch (Exception ex)
+            return UserPreferences; // החזרת אובייקט UserPreferences 
+        }
+        catch (Exception ex) // טיפול בשגיאות כלליות שעלולות להתרחש בזמן ביצוע הפקודה
+        {
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין - ספציפי לשגיאה אפשרית מהפרוצדורה המאוחסנת
             {
-                if (ex.Message.Contains("Invalid ID"))
-                {
-                    throw new Exception("Invalid ID");
-                }
-                throw new Exception("User data trensfer failed");
+                throw new Exception("Invalid ID");
             }
-            finally
+            throw new Exception("User data trensfer failed"); // שגיאה כללית במקרה של כשל בהעברת נתוני המשתמש - כדאי לתקן את השגיאת כתיב ל-"transfer"
+        }
+        finally
+        {
+            if (con != null)
             {
-                if (con != null)
-                {
-                    // close the db connection
-                    con.Close();
-                }
+                // close the db connection
+                con.Close(); // סגירת החיבור למסד הנתונים בבלוק finally כדי להבטיח שהוא תמיד נסגר
             }
         }
     }
-
     //--------------------------------------------------------------------------------------------------
     // This method updates users preferences
     //--------------------------------------------------------------------------------------------------
@@ -381,26 +377,27 @@ public class DBservices
         UserPreferences? userPreferences = null;
         try
         {
-            con = connect("myProjDB");
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
         }
         catch (Exception ex)
         {
-            throw new Exception("Database connection error: " + ex.Message);
+            throw new Exception("Database connection error: " + ex.Message); // טיפול בשגיאת חיבור למסד הנתונים
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
         paramDic.Add("@shelter_type", shelter_type);
         paramDic.Add("@num_default_people", num_default_people);
+        // חסרים כאן הפרמטרים accessibility_needed, pets_allowed ו-last_update - יש להוסיף אותם למילון כדי שהעדכון יתבצע כראוי
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateUserPreferences", con, paramDic);
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateUserPreferences", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateUserPreferences"
 
         try
         {
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים
             {
-                if (dr.Read())
+                if (dr.Read()) // קריאת שורה אחת מתוצאות העדכון - מצופה שתחזור שורה אחת עם הנתונים המעודכנים
                 {
-                    userPreferences = new UserPreferences
+                    userPreferences = new UserPreferences // יצירת אובייקט UserPreferences עם הנתונים המעודכנים שחזרו ממסד הנתונים
                     {
                         PreferenceId = Convert.ToInt32(dr["preference_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -412,21 +409,21 @@ public class DBservices
                     };
                 }
             }
-            return userPreferences;
+            return userPreferences; // החזרת אובייקט UserPreferences המעודכן (או null אם העדכון נכשל ולא חזרו נתונים)
         }
-        catch (SqlException ex)
+        catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID"))
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("Update failed");
+            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בעדכון
         }
         finally
         {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            if (con != null && con.State == System.Data.ConnectionState.Open) // בדיקה שהחיבור פתוח לפני סגירה
             {
-                con.Close();
+                con.Close(); // סגירת החיבור למסד הנתונים
             }
         }
     }
@@ -438,24 +435,26 @@ public class DBservices
         UserPreferences? userPreferences = null;
         try
         {
-            con = connect("myProjDB");
+            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
         }
         catch (Exception ex)
         {
-            throw new Exception("Database connection error: " + ex.Message);
+            throw new Exception("Database connection error: " + ex.Message); // טיפול בשגיאת חיבור למסד הנתונים
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
         paramDic.Add("@shelter_type", shelter_type);
         paramDic.Add("@num_default_people", num_default_people);
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddPreference", con, paramDic);
+        // חסרים כאן הפרמטרים accessibility_needed ו-pets_allowed - יש להוסיף אותם למילון כדי שההוספה תתבצע כראוי
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddPreference", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_AddPreference"
         try
         {
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים
             {
-                if (dr.Read())
+                if (dr.Read()) // קריאת שורה אחת מתוצאות ההוספה - מצופה שתחזור שורה אחת עם הנתונים שהוספו
                 {
-                    userPreferences = new UserPreferences
+                    userPreferences = new UserPreferences // יצירת אובייקט UserPreferences עם הנתונים שהוחזרו ממסד הנתונים
                     {
                         PreferenceId = Convert.ToInt32(dr["preference_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -463,25 +462,25 @@ public class DBservices
                         AccessibilityNeeded = Convert.ToBoolean(dr["accessibility_needed"]),
                         NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
                         PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
-                        LastUpdate = Convert.ToDateTime(dr["last_update"])
+                        LastUpdate = Convert.ToDateTime(dr["last_update"]) // שימו לב שייתכן שהפרוצדורה המאוחסנת לא תחזיר את last_update בעת הוספה
                     };
                 }
             }
-            return userPreferences;
+            return userPreferences; // החזרת אובייקט UserPreferences שהוסף (או null אם ההוספה נכשלה ולא חזרו נתונים)
         }
-        catch (SqlException ex)
+        catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID"))
+            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("Update failed");
+            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
         }
         finally
         {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            if (con != null && con.State == System.Data.ConnectionState.Open) // בדיקה שהחיבור פתוח לפני סגירה
             {
-                con.Close();
+                con.Close(); // סגירת החיבור למסד הנתונים
             }
         }
     }
@@ -673,6 +672,4 @@ public class DBservices
     }
 
 }
-
-
 
