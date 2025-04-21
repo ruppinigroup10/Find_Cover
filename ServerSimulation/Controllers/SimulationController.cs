@@ -62,7 +62,8 @@ namespace FindCover.Controllers
                 }
 
                 // STEP 2: DETERMINE SHELTER LOCATIONS
-                // Either use custom shelters provided in the request, or get them from database and/or generate random ones
+                // Either use custom shelters provided in the request, 
+                // or get them from database and/or generate random ones
                 List<ShelterDto> shelters;
                 if (request.UseCustomShelters && request.CustomShelters != null && request.CustomShelters.Any())
                 {
@@ -1166,6 +1167,4 @@ namespace FindCover.Controllers
         public double ShelterUsagePercentage { get; set; } // Percentage of shelter capacity utilized
 
     }
-
-
 }

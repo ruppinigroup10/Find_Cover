@@ -349,9 +349,9 @@ class ShelterSimulationVisualizer {
 
       // Add popup with shelter information that appears when clicked
       marker.bindPopup(`
-      <h3>${shelter.name}</h3>
-      <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
-      <p>Status: <span id="shelter-${shelter.id}-status">Empty</span></p>
+    <h3>${shelter.name}</h3>
+    <p>Capacity: <span id="shelter-${shelter.id}-count">0</span>/${shelter.capacity}</p>
+    <p>Status: <span id="shelter-${shelter.id}-status">Empty</span></p>
     `);
 
       // Add the marker to the shelter layer group
@@ -369,33 +369,26 @@ class ShelterSimulationVisualizer {
       // Extract the shelter ID from the marker's popup content
       const shelterIdMatch =
         marker._popup._content.match(/shelter-(\d+)-count/);
-
       if (shelterIdMatch && shelterIdMatch[1]) {
         const shelterId = parseInt(shelterIdMatch[1]);
 
-        // Find this shelter's current statistics
+        // Find this shelter's stats
         const shelterStat = this.stats.shelterUsage.find(
           (s) => s.id === shelterId
         );
 
         if (shelterStat) {
-          // Find the shelter data to get name and capacity
+          // Update the popup content with current data
           const shelter = this.currentSimulationData.shelters.find(
             (s) => s.id === shelterId
           );
-
           if (shelter) {
-            // Update the popup content with current occupancy data
-            // The status color changes based on how full the shelter is:
-            // - Green: Available (less than 80% full)
-            // - Orange: Almost Full (80% or more but not full)
-            // - Red: Full (at capacity)
             marker.setPopupContent(`
-            <h3>${shelter.name}</h3>
-            <p>Capacity: <span id="shelter-${shelter.id}-count">${
+                  <h3>${shelter.name}</h3>
+                  <p>Capacity: <span id="shelter-${shelter.id}-count">${
               shelterStat.assigned
             }</span>/${shelter.capacity}</p>
-            <p>Status: <span id="shelter-${shelter.id}-status" class="${
+                  <p>Status: <span id="shelter-${shelter.id}-status" class="${
               shelterStat.assigned >= shelter.capacity
                 ? "status-full"
                 : shelterStat.assigned >= shelter.capacity * 0.8
@@ -408,7 +401,7 @@ class ShelterSimulationVisualizer {
                 ? "Almost Full"
                 : "Available"
             }</span></p>
-          `);
+                  `);
           }
         }
       }
