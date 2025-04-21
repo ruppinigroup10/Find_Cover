@@ -152,7 +152,7 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
     // PUT: api/<UserController>/UpdateUserPreferences
-    [HttpPost("UpdateUserPreferences")] // שימוש ב-HttpPost עבור עדכון - מקובל יותר מ-HttpPut במקרים מסוימים, אך שקול שימוש ב-HttpPut עבור פעולות עדכון אידמפוטנטיות
+    [HttpPut("UpdateUserPreferences")] // שימוש ב-HttpPost עבור עדכון - מקובל יותר מ-HttpPut במקרים מסוימים, אך שקול שימוש ב-HttpPut עבור פעולות עדכון אידמפוטנטיות
     public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences) // קבלת נתוני העדפות מגוף הבקשה
     {
         var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate); // קריאה למתודה הסטטית UpdateUserPreferences במודל UserPreferences
@@ -198,7 +198,7 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
     }
     // PUT: api/<UserController>/UpdateKnownLocation
-    [HttpPost("UpdateKnownLocation")] // שימוש ב-HttpPost עבור עדכון - שקול שימוש ב-HttpPut
+    [HttpPut("UpdateKnownLocation")] // שימוש ב-HttpPost עבור עדכון - שקול שימוש ב-HttpPut
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
         var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation

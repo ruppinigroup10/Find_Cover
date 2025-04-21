@@ -38,8 +38,8 @@ namespace FC_Server.Controllers
             }
         }
 
-        // POST api/<ShelterController>/UpdateShelter
-        [HttpPost("UpdateShelter")]
+        // PUT api/<ShelterController>/UpdateShelter
+        [HttpPut("UpdateShelter")]
         public IActionResult UpdateShelter([FromBody] FC_Server.Models.Shelter shelter)
         {
             try
