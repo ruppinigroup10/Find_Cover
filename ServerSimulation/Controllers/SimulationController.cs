@@ -6,6 +6,8 @@ using System.Linq;
 using ServerSimulation.Models;
 using System.Data.SqlClient;
 using Microsoft.AspNetCore.Builder;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 /*
  * This is SimulationController class which is responsible for handling simulation requests.
@@ -84,7 +86,8 @@ namespace FindCover.Controllers
 
                 // STEP 3: DETERMINE OPTIMAL ASSIGNMENTS
                 // Run the assignment algorithm to match people to the closest available shelters
-                var assignments = AssignPeopleToShelters(people, shelters, request.PrioritySettings);
+                // var assignments = AssignPeopleToShelters(people, shelters, request.PrioritySettings); // old algorithm
+                var assignments = AssignPeopleToSheltersOptimal(people, shelters, request.PrioritySettings); // new algorithm
 
                 // STEP 4: HANDLE UNASSIGNED PEOPLE
                 // For people who couldn't be assigned to any shelter, find their nearest shelter for reference
@@ -344,9 +347,9 @@ namespace FindCover.Controllers
             return shelters;
         }
 
-        //===================================
-        // Assign People To Shelters
-        //===================================
+        //================================================================
+        // Assign People To Shelters - Old Algorithm, based on segments
+        //================================================================
 
         /// <summary>
         /// Main algorithm for assigning people to shelters based on distance and priorities
@@ -355,460 +358,617 @@ namespace FindCover.Controllers
         /// <param name="people">List of people to assign</param>
         /// <param name="shelters">List of available shelters</param>
         /// <param name="prioritySettings">Settings for age-based priority (children, elderly)</param>
-        private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
+        // private Dictionary<int, AssignmentDto> AssignPeopleToShelters(
+        //     List<PersonDto> people,
+        //     List<ShelterDto> shelters,
+        //     PrioritySettingsDto prioritySettings)
+        // {
+        //     Console.WriteLine("Starting revised shelter assignment algorithm with 50m segments...");
+
+        //     // STEP 1: DEFINE CONSTANTS
+        //     // Setting time and distance constraints based on real-world running speed
+        //     // In an emergency, people typically have about 1 minute to reach shelter in Beer Sheva = around 600m if running
+        //     const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
+        //     const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
+        //     const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
+
+        //     // Dividing the maximum distance into small segments for processing
+        //     // The segments can be increased, if we want to make the algorithm faster
+        //     const int SEGMENT_SIZE_METERS = 5;
+        //     const int DISTANCE_SEGMENTS = 120; // 600m divided into 5m segments = 120 segments
+        //     const double SEGMENT_SIZE_KM = SEGMENT_SIZE_METERS / 1000.0;
+
+        //     // Log the simulation parameters
+        //     Console.WriteLine($"Time constraint: Maximum distance = {MAX_DISTANCE_KM:F4} km");
+        //     Console.WriteLine($"Using {DISTANCE_SEGMENTS} segments of {SEGMENT_SIZE_METERS}m each");
+
+        //     // STEP 2: CREATE DISTANCE MATRIX
+        //     // Calculate the distance between each person and each shelter
+        //     Console.WriteLine("Building distance matrix...");
+        //     var distanceMatrix = new List<List<AssignmentOption>>();
+
+        //     foreach (var person in people)
+        //     {
+        //         var personDistances = new List<AssignmentOption>();
+
+        //         foreach (var shelter in shelters)
+        //         {
+        //             // Calculate the straight-line distance between this person and shelter
+        //             double distance = CalculateDistance(
+        //                 person.Latitude, person.Longitude,
+        //                 shelter.Latitude, shelter.Longitude);
+
+        //             // Determine if this shelter is reachable within the time constraint
+        //             bool isReachable = distance <= MAX_DISTANCE_KM;
+
+        //             // Add this option to the person's list of potential shelters
+        //             personDistances.Add(new AssignmentOption
+        //             {
+        //                 PersonId = person.Id,
+        //                 ShelterId = shelter.Id,
+        //                 Distance = distance,
+        //                 IsReachable = isReachable,
+        //                 // Calculate vulnerability score for priority assignment if enabled
+        //                 VulnerabilityScore = prioritySettings?.EnableAgePriority == true
+        //                     ? CalculateVulnerabilityScore(person.Age)
+        //                     : 0
+        //             });
+        //         }
+
+        //         // Add this person's distance options to the overall matrix
+        //         distanceMatrix.Add(personDistances);
+        //     }
+
+        //     // STEP 3: CALCULATE TOTAL CAPACITY
+        //     // Determine if there's enough shelter capacity for everyone
+        //     int totalCapacity = shelters.Sum(s => s.Capacity);
+        //     int totalPeople = people.Count;
+
+        //     // Log the total capacity and number of people
+        //     Console.WriteLine($"Total shelter capacity: {totalCapacity}, Total people: {totalPeople}");
+
+        //     // STEP 4: PREPARE WORKING DATA STRUCTURES
+        //     // Dictionary to track remaining capacity of each shelter
+        //     var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
+
+        //     // Initialize assignment tracking
+        //     var assignments = new Dictionary<int, AssignmentDto>();
+        //     var assignedPeople = new HashSet<int>();
+
+        //     // STEP 5: IDENTIFY ONE-SHELTER PEOPLE
+        //     // These are people who can only reach one shelter - they need special handling
+        //     var oneShelterPeople = new List<int>();
+        //     var oneShelterMap = new Dictionary<int, int>(); // Maps person ID to their only shelter option
+
+        //     for (int i = 0; i < people.Count; i++)
+        //     {
+        //         // Get all reachable shelters for this person
+        //         var personOptions = distanceMatrix[i]
+        //             .Where(entry => entry.IsReachable)
+        //             .ToList();
+
+        //         // If they only have one option, record them as a one-shelter person
+        //         if (personOptions.Count == 1)
+        //         {
+        //             int personId = people[i].Id;
+        //             int shelterId = personOptions[0].ShelterId;
+
+        //             oneShelterPeople.Add(personId);
+        //             oneShelterMap[personId] = shelterId;
+        //         }
+        //     }
+
+        //     // Log the number of one-shelter people identified
+        //     Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
+
+        //     // STEP 6: GROUP ASSIGNMENTS BY DISTANCE SEGMENT
+        //     // Create a list of all possible assignments
+        //     var allPossibleAssignments = distanceMatrix
+        //         .SelectMany(x => x)
+        //         .Where(entry => entry.IsReachable)
+        //         .ToList();
+
+        //     // Group assignments by distance segment for processing in order of proximity
+        //     // This will help us process the closest people first
+        //     var segmentAssignments = new List<List<AssignmentOption>>();
+        //     for (int segment = 0; segment < DISTANCE_SEGMENTS; segment++)
+        //     {
+        //         // Calculate the minimum and maximum distance for this segment
+        //         double minDistance = segment * SEGMENT_SIZE_KM;
+        //         double maxDistance = (segment + 1) * SEGMENT_SIZE_KM;
+
+        //         // Find all assignments in this distance segment
+        //         var currentSegment = allPossibleAssignments
+        //             .Where(a => a.Distance >= minDistance && a.Distance < maxDistance)
+        //             .ToList();
+
+        //         // Add this segment to our list of assignments
+        //         segmentAssignments.Add(currentSegment);
+
+        //         // Log the number of assignments in this segment
+        //         Console.WriteLine($"Segment {segment + 1} ({minDistance * 1000:F0}m-{maxDistance * 1000:F0}m): {currentSegment.Count} possible assignments");
+        //     }
+
+        //     // STEP 7: PROCESS EACH DISTANCE SEGMENT IN ORDER
+        //     // Process closest segments first (people closest to shelters get assigned first)
+        //     for (int segment = 0; segment < DISTANCE_SEGMENTS; segment++)
+        //     {
+        //         // Calculate the minimum and maximum distance for this segment
+        //         double minDistance = segment * SEGMENT_SIZE_KM;
+        //         double maxDistance = (segment + 1) * SEGMENT_SIZE_KM;
+
+        //         // Log the current segment being processed
+        //         Console.WriteLine($"Processing segment {segment + 1}: {minDistance * 1000:F0}m to {maxDistance * 1000:F0}m");
+
+        //         // Get the assignments for this segment
+        //         var currentSegment = segmentAssignments[segment];
+        //         if (currentSegment.Count == 0)
+        //             continue; // Skip empty segments
+
+        //         // Count unique people and available shelter capacity in this segment
+        //         var peopleInSegment = currentSegment
+        //             .Select(a => a.PersonId)
+        //             .Distinct()
+        //             .ToList();
+
+        //         // Calculate available capacity in shelters relevant to this segment
+        //         int relevantCapacity = 0;
+        //         var sheltersInSegment = currentSegment
+        //             .Select(a => a.ShelterId)
+        //             .Distinct()
+        //             .ToList();
+
+        //         // Sum the capacity of shelters in this segment
+        //         foreach (var shelterId in sheltersInSegment)
+        //         {
+        //             relevantCapacity += shelterCapacity[shelterId];
+        //         }
+
+        //         // Log the number of people and relevant capacity in this segment
+        //         Console.WriteLine($"Segment has {peopleInSegment.Count} people and {relevantCapacity} relevant capacity");
+
+        //         // Check if all people in this segment can fit in available shelters
+        //         bool allCanFit = peopleInSegment.Count <= relevantCapacity;
+
+        //         if (allCanFit)
+        //         {
+        //             // STEP 7A: IF ALL CAN FIT, ASSIGN BY DISTANCE ONLY
+        //             // When everyone can fit, prioritize by shortest distance
+        //             Console.WriteLine($"All people in segment can fit - assigning without age priority");
+
+        //             // Find best shelter for each person in this segment
+        //             foreach (var personId in peopleInSegment)
+        //             {
+        //                 // Skip if already assigned
+        //                 if (assignedPeople.Contains(personId))
+        //                     continue;
+
+        //                 // Get person index in the list
+        //                 int personIndex = people.FindIndex(p => p.Id == personId);
+
+        //                 // Find closest shelter with capacity for this person in this segment
+        //                 var options = distanceMatrix[personIndex]
+        //                     .Where(entry => entry.IsReachable &&
+        //                            entry.Distance < maxDistance &&
+        //                            entry.Distance >= minDistance &&
+        //                            shelterCapacity[entry.ShelterId] > 0)
+        //                     .OrderBy(entry => entry.Distance) // Sort by closest first
+        //                     .ToList();
+
+        //                 // Log the number of options available for this person
+        //                 if (options.Count > 0)
+        //                 {
+        //                     var bestOption = options[0]; // Get closest shelter
+
+        //                     // Make assignment - checking if person is already assigned
+        //                     if (!assignments.ContainsKey(personId))
+        //                     {
+        //                         assignments[personId] = new AssignmentDto
+        //                         {
+        //                             PersonId = personId,
+        //                             ShelterId = bestOption.ShelterId,
+        //                             Distance = bestOption.Distance
+        //                         };
+
+        //                         // Update tracking - reduce shelter capacity and mark person as assigned
+        //                         shelterCapacity[bestOption.ShelterId]--;
+        //                         assignedPeople.Add(personId);
+
+        //                         // Log the assignment    
+        //                         Console.WriteLine($"Assigned person {personId} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //         else // if not all can fit
+        //         {
+        //             // STEP 7B: IF NOT ALL CAN FIT, USE AGE PRIORITY
+        //             // When capacity is limited, prioritize by vulnerability (age) then distance
+        //             Console.WriteLine($"Not all people can fit in segment - using age priority");
+
+        //             // Sort assignments by vulnerability score (elderly and children first), then by distance
+        //             var prioritizedSegmentAssignments = currentSegment
+        //                 .OrderByDescending(a => prioritySettings?.EnableAgePriority == true ? a.VulnerabilityScore : 0)
+        //                 .ThenBy(a => a.Distance)
+        //                 .ToList();
+
+        //             // Process assignments in priority order
+        //             foreach (var assignment in prioritizedSegmentAssignments)
+        //             {
+        //                 // Skip if this person is already assigned or the shelter is full
+        //                 if (assignedPeople.Contains(assignment.PersonId) || shelterCapacity[assignment.ShelterId] <= 0)
+        //                     continue;
+
+        //                 // Make the assignment
+        //                 assignments[assignment.PersonId] = new AssignmentDto
+        //                 {
+        //                     PersonId = assignment.PersonId,
+        //                     ShelterId = assignment.ShelterId,
+        //                     Distance = assignment.Distance
+        //                 };
+
+        //                 // Update tracking - reduce shelter capacity and mark person as assigned
+        //                 shelterCapacity[assignment.ShelterId]--;
+        //                 assignedPeople.Add(assignment.PersonId);
+
+        //                 // Log the assignment
+        //                 Console.WriteLine($"Assigned person {assignment.PersonId} to shelter {assignment.ShelterId} (priority) (distance: {assignment.Distance * 1000:F0}m)");
+        //             }
+        //         }
+        //     }
+
+        //     // STEP 8: HANDLE ONE-SHELTER-PEOPLE WHO HAVEN'T BEEN ASSIGNED YET
+        //     // These are special cases: people who can only reach one shelter but haven't been assigned yet
+        //     var unassignedOneShelterPeople = oneShelterPeople
+        //         .Where(id => !assignedPeople.Contains(id))
+        //         .ToList();
+
+        //     // Log the number of unassigned one-shelter people
+        //     if (unassignedOneShelterPeople.Count > 0)
+        //     {
+        //         // Log the number of unassigned one-shelter people
+        //         Console.WriteLine($"Processing {unassignedOneShelterPeople.Count} unassigned one-shelter-people");
+
+        //         // Try to assign them to their only shelter option
+        //         foreach (var personId in unassignedOneShelterPeople)
+        //         {
+        //             int shelterId = oneShelterMap[personId];
+
+        //             // STEP 8A: IF SHELTER STILL HAS CAPACITY, ASSIGN DIRECTLY
+        //             if (shelterCapacity[shelterId] > 0)
+        //             {
+        //                 // Find distance for this assignment
+        //                 int personIndex = people.FindIndex(p => p.Id == personId);
+        //                 var option = distanceMatrix[personIndex]
+        //                     .First(o => o.ShelterId == shelterId);
+
+        //                 // Make assignment
+        //                 assignments[personId] = new AssignmentDto
+        //                 {
+        //                     PersonId = personId,
+        //                     ShelterId = shelterId,
+        //                     Distance = option.Distance
+        //                 };
+
+        //                 // Update tracking
+        //                 shelterCapacity[shelterId]--;
+        //                 assignedPeople.Add(personId);
+
+        //                 // Log the assignment
+        //                 Console.WriteLine($"Assigned one-shelter person {personId} to shelter {shelterId} (distance: {option.Distance * 1000:F0}m)");
+        //             }
+        //             else
+        //             {
+        //                 // STEP 8B: IF SHELTER IS FULL, TRY TO REASSIGN SOMEONE ELSE
+        //                 // Get all people assigned to this shelter
+        //                 var peopleInShelter = assignments
+        //                     .Where(a => a.Value.ShelterId == shelterId)
+        //                     .Select(a => a.Key)
+        //                     .ToList();
+
+        //                 // record if we made a reassignment
+        //                 bool reassignmentMade = false;
+
+        //                 // Try to find someone in the shelter who could go elsewhere
+        //                 foreach (var candidateId in peopleInShelter)
+        //                 {
+        //                     // Skip one-shelter people - they can't be moved
+        //                     if (oneShelterPeople.Contains(candidateId))
+        //                         continue;
+
+        //                     // Find alternative shelters for this candidate
+        //                     int candidateIndex = people.FindIndex(p => p.Id == candidateId);
+        //                     var alternatives = distanceMatrix[candidateIndex]
+        //                         .Where(opt => opt.IsReachable &&
+        //                                opt.ShelterId != shelterId &&
+        //                                shelterCapacity[opt.ShelterId] > 0)
+        //                         .OrderBy(opt => opt.Distance)
+        //                         .ToList();
+
+        //                     if (alternatives.Count > 0)
+        //                     {
+        //                         // Found someone who can be reassigned
+        //                         var bestAlternative = alternatives[0];
+
+        //                         // Record current assignment for logging
+        //                         var currentAssignment = assignments[candidateId];
+
+        //                         // Update assignment - move this person to an alternative shelter
+        //                         assignments[candidateId] = new AssignmentDto
+        //                         {
+        //                             PersonId = candidateId,
+        //                             ShelterId = bestAlternative.ShelterId,
+        //                             Distance = bestAlternative.Distance
+        //                         };
+
+        //                         // Update shelter capacities
+        //                         shelterCapacity[shelterId]++;
+        //                         shelterCapacity[bestAlternative.ShelterId]--;
+
+        //                         // Update tracking
+        //                         Console.WriteLine($"Reassigned person {candidateId} from shelter {shelterId} to {bestAlternative.ShelterId} to make room");
+
+        //                         // Now assign the one-shelter person to the shelter they need
+        //                         int personIndex = people.FindIndex(p => p.Id == personId);
+        //                         var option = distanceMatrix[personIndex]
+        //                             .First(o => o.ShelterId == shelterId);
+
+        //                         // Make assignment
+        //                         assignments[personId] = new AssignmentDto
+        //                         {
+        //                             PersonId = personId,
+        //                             ShelterId = shelterId,
+        //                             Distance = option.Distance
+        //                         };
+
+        //                         // Update tracking
+        //                         shelterCapacity[shelterId]--;
+        //                         assignedPeople.Add(personId);
+
+        //                         // Log the assignment
+        //                         Console.WriteLine($"Assigned one-shelter person {personId} to shelter {shelterId} after reassignment (distance: {option.Distance * 1000:F0}m)");
+
+        //                         reassignmentMade = true;
+        //                         break;
+        //                     }
+        //                 }
+
+        //                 // log if no reassignment was possible
+        //                 // if (!reassignmentMade)
+        //                 // {
+        //                 //     Console.WriteLine($"Could not assign one-shelter person {personId} - no reassignment options available");
+        //                 // }
+        //             }
+        //         }
+        //     }
+
+        //     // STEP 9: FINAL CHECK FOR UNASSIGNED PEOPLE
+        //     // Try to assign any remaining people who could still find a shelter
+        //     var remainingPeople = people
+        //         .Where(p => !assignedPeople.Contains(p.Id))
+        //         .ToList();
+
+        //     if (remainingPeople.Count > 0)
+        //     {
+        //         Console.WriteLine($"Final pass - attempting to assign {remainingPeople.Count} remaining people");
+
+        //         foreach (var person in remainingPeople)
+        //         {
+        //             // Find any shelter with remaining capacity within range
+        //             int personIndex = people.IndexOf(person);
+        //             var options = distanceMatrix[personIndex]
+        //                 .Where(entry => entry.IsReachable && shelterCapacity[entry.ShelterId] > 0)
+        //                 .OrderBy(entry => entry.Distance)
+        //                 .ToList();
+
+        //             // If we have options, assign the closest one
+        //             if (options.Count > 0)
+        //             {
+        //                 // Get the best option (closest shelter)
+        //                 var bestOption = options[0];
+        //                 assignments[person.Id] = new AssignmentDto
+        //                 {
+        //                     PersonId = person.Id,
+        //                     ShelterId = bestOption.ShelterId,
+        //                     Distance = bestOption.Distance
+        //                 };
+
+        //                 // Update shelter capacity
+        //                 shelterCapacity[bestOption.ShelterId]--;
+        //                 assignedPeople.Add(person.Id);
+
+        //                 // Log the assignment
+        //                 Console.WriteLine($"Final pass: Assigned person {person.Id} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
+        //             }
+        //         }
+        //     }
+
+        //     // STEP 10: VERIFY NO DUPLICATE ASSIGNMENTS
+        //     // Check for any errors in our assignment process
+        //     var personIds = assignments.Keys.ToList();
+        //     var duplicateCheck = personIds.GroupBy(id => id).Where(g => g.Count() > 1).ToList();
+        //     if (duplicateCheck.Any())
+        //     {
+        //         // Log any duplicate assignments found
+        //         Console.WriteLine($"WARNING: Found {duplicateCheck.Count} duplicate person assignments!");
+        //         foreach (var group in duplicateCheck)
+        //         {
+        //             // Log the person ID and number of assignments
+        //             Console.WriteLine($"Person {group.Key} is assigned multiple times");
+        //         }
+        //     }
+
+        //     // STEP 11: OPTIMIZATION PHASE
+        //     // Try to improve assignments by swapping people between shelters
+        //     Console.WriteLine($"Initial assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
+        //     Console.WriteLine("Starting optimization phase to improve assignments...");
+
+        //     // Only optimize if we have one assigned person or more
+        //     if (assignments.Count > 0)
+        //     {
+        //         assignments = OptimizeAssignments(assignments, people, shelters);
+        //     }
+
+        //     Console.WriteLine($"Final assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
+        //     return assignments;
+        // }
+
+        //==============================================================================
+        // Assign People To Shelters Optimal - New Algorithm, based on Priority Queue
+        //=============================================================================
+
+        /// <summary>
+        /// Main algorithm for assigning people to shelters based on distance and priorities
+        /// The algorithm considers walking speed, time constraints, and may prioritize children and elderly
+        /// </summary>
+        /// <param name="people">List of people to assign</param>
+        /// <param name="shelters">List of available shelters</param>
+        /// <param name="prioritySettings">Settings for age-based priority (children, elderly)</param>
+        // /// <returns>Dictionary of assignments with person ID as key and AssignmentDto as value</returns>
+        private Dictionary<int, AssignmentDto> AssignPeopleToSheltersOptimal(
             List<PersonDto> people,
             List<ShelterDto> shelters,
             PrioritySettingsDto prioritySettings)
         {
-            Console.WriteLine("Starting revised shelter assignment algorithm with 50m segments...");
+            Console.WriteLine("Starting optimal shelter assignment algorithm with priority queue...");
 
             // STEP 1: DEFINE CONSTANTS
-            // Setting time and distance constraints based on real-world running speed
-            // In an emergency, people typically have about 1 minute to reach shelter in Beer Sheva = around 600m if running
             const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
             const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
 
-            // Dividing the maximum distance into small segments for processing
-            // The segments can be increased, if we want to make the algorithm faster
-            const int SEGMENT_SIZE_METERS = 5;
-            const int DISTANCE_SEGMENTS = 120; // 600m divided into 5m segments = 120 segments
-            const double SEGMENT_SIZE_KM = SEGMENT_SIZE_METERS / 1000.0;
+            Console.WriteLine($"Maximum distance constraint: {MAX_DISTANCE_KM:F4} km");
 
-            // Log the simulation parameters
-            Console.WriteLine($"Time constraint: Maximum distance = {MAX_DISTANCE_KM:F4} km");
-            Console.WriteLine($"Using {DISTANCE_SEGMENTS} segments of {SEGMENT_SIZE_METERS}m each");
+            // STEP 2: INITIALIZE TRACKING STRUCTURES
+            var assignments = new Dictionary<int, AssignmentDto>();
+            var assignedPeople = new HashSet<int>();
+            var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
 
-            // STEP 2: CREATE DISTANCE MATRIX
-            // Calculate the distance between each person and each shelter
-            Console.WriteLine("Building distance matrix...");
-            var distanceMatrix = new List<List<AssignmentOption>>();
+            // STEP 3: CREATE PRIORITY QUEUE
+            // Lower priority value = higher priority (processed first)
+            var pq = new PriorityQueue<AssignmentOption, double>();
+
+            // STEP 4: POPULATE PRIORITY QUEUE WITH ALL POSSIBLE ASSIGNMENTS
+            Console.WriteLine("Building priority queue with all person-shelter pairs...");
 
             foreach (var person in people)
             {
-                var personDistances = new List<AssignmentOption>();
-
                 foreach (var shelter in shelters)
                 {
-                    // Calculate the straight-line distance between this person and shelter
+                    // Calculate distance between person and shelter
                     double distance = CalculateDistance(
                         person.Latitude, person.Longitude,
                         shelter.Latitude, shelter.Longitude);
 
-                    // Determine if this shelter is reachable within the time constraint
-                    bool isReachable = distance <= MAX_DISTANCE_KM;
-
-                    // Add this option to the person's list of potential shelters
-                    personDistances.Add(new AssignmentOption
+                    // Only consider shelters within maximum distance
+                    if (distance <= MAX_DISTANCE_KM)
                     {
-                        PersonId = person.Id,
-                        ShelterId = shelter.Id,
-                        Distance = distance,
-                        IsReachable = isReachable,
-                        // Calculate vulnerability score for priority assignment if enabled
-                        VulnerabilityScore = prioritySettings?.EnableAgePriority == true
-                            ? CalculateVulnerabilityScore(person.Age)
-                            : 0
-                    });
-                }
-
-                // Add this person's distance options to the overall matrix
-                distanceMatrix.Add(personDistances);
-            }
-
-            // STEP 3: CALCULATE TOTAL CAPACITY
-            // Determine if there's enough shelter capacity for everyone
-            int totalCapacity = shelters.Sum(s => s.Capacity);
-            int totalPeople = people.Count;
-
-            // Log the total capacity and number of people
-            Console.WriteLine($"Total shelter capacity: {totalCapacity}, Total people: {totalPeople}");
-
-            // STEP 4: PREPARE WORKING DATA STRUCTURES
-            // Dictionary to track remaining capacity of each shelter
-            var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
-
-            // Initialize assignment tracking
-            var assignments = new Dictionary<int, AssignmentDto>();
-            var assignedPeople = new HashSet<int>();
-
-            // STEP 5: IDENTIFY ONE-SHELTER PEOPLE
-            // These are people who can only reach one shelter - they need special handling
-            var oneShelterPeople = new List<int>();
-            var oneShelterMap = new Dictionary<int, int>(); // Maps person ID to their only shelter option
-
-            for (int i = 0; i < people.Count; i++)
-            {
-                // Get all reachable shelters for this person
-                var personOptions = distanceMatrix[i]
-                    .Where(entry => entry.IsReachable)
-                    .ToList();
-
-                // If they only have one option, record them as a one-shelter person
-                if (personOptions.Count == 1)
-                {
-                    int personId = people[i].Id;
-                    int shelterId = personOptions[0].ShelterId;
-
-                    oneShelterPeople.Add(personId);
-                    oneShelterMap[personId] = shelterId;
-                }
-            }
-
-            // Log the number of one-shelter people identified
-            Console.WriteLine($"Identified {oneShelterPeople.Count} people with only one shelter option");
-
-            // STEP 6: GROUP ASSIGNMENTS BY DISTANCE SEGMENT
-            // Create a list of all possible assignments
-            var allPossibleAssignments = distanceMatrix
-                .SelectMany(x => x)
-                .Where(entry => entry.IsReachable)
-                .ToList();
-
-            // Group assignments by distance segment for processing in order of proximity
-            // This will help us process the closest people first
-            var segmentAssignments = new List<List<AssignmentOption>>();
-            for (int segment = 0; segment < DISTANCE_SEGMENTS; segment++)
-            {
-                // Calculate the minimum and maximum distance for this segment
-                double minDistance = segment * SEGMENT_SIZE_KM;
-                double maxDistance = (segment + 1) * SEGMENT_SIZE_KM;
-
-                // Find all assignments in this distance segment
-                var currentSegment = allPossibleAssignments
-                    .Where(a => a.Distance >= minDistance && a.Distance < maxDistance)
-                    .ToList();
-
-                // Add this segment to our list of assignments
-                segmentAssignments.Add(currentSegment);
-
-                // Log the number of assignments in this segment
-                Console.WriteLine($"Segment {segment + 1} ({minDistance * 1000:F0}m-{maxDistance * 1000:F0}m): {currentSegment.Count} possible assignments");
-            }
-
-            // STEP 7: PROCESS EACH DISTANCE SEGMENT IN ORDER
-            // Process closest segments first (people closest to shelters get assigned first)
-            for (int segment = 0; segment < DISTANCE_SEGMENTS; segment++)
-            {
-                // Calculate the minimum and maximum distance for this segment
-                double minDistance = segment * SEGMENT_SIZE_KM;
-                double maxDistance = (segment + 1) * SEGMENT_SIZE_KM;
-
-                // Log the current segment being processed
-                Console.WriteLine($"Processing segment {segment + 1}: {minDistance * 1000:F0}m to {maxDistance * 1000:F0}m");
-
-                // Get the assignments for this segment
-                var currentSegment = segmentAssignments[segment];
-                if (currentSegment.Count == 0)
-                    continue; // Skip empty segments
-
-                // Count unique people and available shelter capacity in this segment
-                var peopleInSegment = currentSegment
-                    .Select(a => a.PersonId)
-                    .Distinct()
-                    .ToList();
-
-                // Calculate available capacity in shelters relevant to this segment
-                int relevantCapacity = 0;
-                var sheltersInSegment = currentSegment
-                    .Select(a => a.ShelterId)
-                    .Distinct()
-                    .ToList();
-
-                // Sum the capacity of shelters in this segment
-                foreach (var shelterId in sheltersInSegment)
-                {
-                    relevantCapacity += shelterCapacity[shelterId];
-                }
-
-                // Log the number of people and relevant capacity in this segment
-                Console.WriteLine($"Segment has {peopleInSegment.Count} people and {relevantCapacity} relevant capacity");
-
-                // Check if all people in this segment can fit in available shelters
-                bool allCanFit = peopleInSegment.Count <= relevantCapacity;
-
-                if (allCanFit)
-                {
-                    // STEP 7A: IF ALL CAN FIT, ASSIGN BY DISTANCE ONLY
-                    // When everyone can fit, prioritize by shortest distance
-                    Console.WriteLine($"All people in segment can fit - assigning without age priority");
-
-                    // Find best shelter for each person in this segment
-                    foreach (var personId in peopleInSegment)
-                    {
-                        // Skip if already assigned
-                        if (assignedPeople.Contains(personId))
-                            continue;
-
-                        // Get person index in the list
-                        int personIndex = people.FindIndex(p => p.Id == personId);
-
-                        // Find closest shelter with capacity for this person in this segment
-                        var options = distanceMatrix[personIndex]
-                            .Where(entry => entry.IsReachable &&
-                                   entry.Distance < maxDistance &&
-                                   entry.Distance >= minDistance &&
-                                   shelterCapacity[entry.ShelterId] > 0)
-                            .OrderBy(entry => entry.Distance) // Sort by closest first
-                            .ToList();
-
-                        // Log the number of options available for this person
-                        if (options.Count > 0)
-                        {
-                            var bestOption = options[0]; // Get closest shelter
-
-                            // Make assignment - checking if person is already assigned
-                            if (!assignments.ContainsKey(personId))
-                            {
-                                assignments[personId] = new AssignmentDto
-                                {
-                                    PersonId = personId,
-                                    ShelterId = bestOption.ShelterId,
-                                    Distance = bestOption.Distance
-                                };
-
-                                // Update tracking - reduce shelter capacity and mark person as assigned
-                                shelterCapacity[bestOption.ShelterId]--;
-                                assignedPeople.Add(personId);
-
-                                // Log the assignment    
-                                Console.WriteLine($"Assigned person {personId} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
-                            }
-                        }
-                    }
-                }
-                else // if not all can fit
-                {
-                    // STEP 7B: IF NOT ALL CAN FIT, USE AGE PRIORITY
-                    // When capacity is limited, prioritize by vulnerability (age) then distance
-                    Console.WriteLine($"Not all people can fit in segment - using age priority");
-
-                    // Sort assignments by vulnerability score (elderly and children first), then by distance
-                    var prioritizedSegmentAssignments = currentSegment
-                        .OrderByDescending(a => prioritySettings?.EnableAgePriority == true ? a.VulnerabilityScore : 0)
-                        .ThenBy(a => a.Distance)
-                        .ToList();
-
-                    // Process assignments in priority order
-                    foreach (var assignment in prioritizedSegmentAssignments)
-                    {
-                        // Skip if this person is already assigned or the shelter is full
-                        if (assignedPeople.Contains(assignment.PersonId) || shelterCapacity[assignment.ShelterId] <= 0)
-                            continue;
-
-                        // Make the assignment
-                        assignments[assignment.PersonId] = new AssignmentDto
-                        {
-                            PersonId = assignment.PersonId,
-                            ShelterId = assignment.ShelterId,
-                            Distance = assignment.Distance
-                        };
-
-                        // Update tracking - reduce shelter capacity and mark person as assigned
-                        shelterCapacity[assignment.ShelterId]--;
-                        assignedPeople.Add(assignment.PersonId);
-
-                        // Log the assignment
-                        Console.WriteLine($"Assigned person {assignment.PersonId} to shelter {assignment.ShelterId} (priority) (distance: {assignment.Distance * 1000:F0}m)");
-                    }
-                }
-            }
-
-            // STEP 8: HANDLE ONE-SHELTER-PEOPLE WHO HAVEN'T BEEN ASSIGNED YET
-            // These are special cases: people who can only reach one shelter but haven't been assigned yet
-            var unassignedOneShelterPeople = oneShelterPeople
-                .Where(id => !assignedPeople.Contains(id))
-                .ToList();
-
-            // Log the number of unassigned one-shelter people
-            if (unassignedOneShelterPeople.Count > 0)
-            {
-                // Log the number of unassigned one-shelter people
-                Console.WriteLine($"Processing {unassignedOneShelterPeople.Count} unassigned one-shelter-people");
-
-                // Try to assign them to their only shelter option
-                foreach (var personId in unassignedOneShelterPeople)
-                {
-                    int shelterId = oneShelterMap[personId];
-
-                    // STEP 8A: IF SHELTER STILL HAS CAPACITY, ASSIGN DIRECTLY
-                    if (shelterCapacity[shelterId] > 0)
-                    {
-                        // Find distance for this assignment
-                        int personIndex = people.FindIndex(p => p.Id == personId);
-                        var option = distanceMatrix[personIndex]
-                            .First(o => o.ShelterId == shelterId);
-
-                        // Make assignment
-                        assignments[personId] = new AssignmentDto
-                        {
-                            PersonId = personId,
-                            ShelterId = shelterId,
-                            Distance = option.Distance
-                        };
-
-                        // Update tracking
-                        shelterCapacity[shelterId]--;
-                        assignedPeople.Add(personId);
-
-                        // Log the assignment
-                        Console.WriteLine($"Assigned one-shelter person {personId} to shelter {shelterId} (distance: {option.Distance * 1000:F0}m)");
-                    }
-                    else
-                    {
-                        // STEP 8B: IF SHELTER IS FULL, TRY TO REASSIGN SOMEONE ELSE
-                        // Get all people assigned to this shelter
-                        var peopleInShelter = assignments
-                            .Where(a => a.Value.ShelterId == shelterId)
-                            .Select(a => a.Key)
-                            .ToList();
-
-                        // record if we made a reassignment
-                        bool reassignmentMade = false;
-
-                        // Try to find someone in the shelter who could go elsewhere
-                        foreach (var candidateId in peopleInShelter)
-                        {
-                            // Skip one-shelter people - they can't be moved
-                            if (oneShelterPeople.Contains(candidateId))
-                                continue;
-
-                            // Find alternative shelters for this candidate
-                            int candidateIndex = people.FindIndex(p => p.Id == candidateId);
-                            var alternatives = distanceMatrix[candidateIndex]
-                                .Where(opt => opt.IsReachable &&
-                                       opt.ShelterId != shelterId &&
-                                       shelterCapacity[opt.ShelterId] > 0)
-                                .OrderBy(opt => opt.Distance)
-                                .ToList();
-
-                            if (alternatives.Count > 0)
-                            {
-                                // Found someone who can be reassigned
-                                var bestAlternative = alternatives[0];
-
-                                // Record current assignment for logging
-                                var currentAssignment = assignments[candidateId];
-
-                                // Update assignment - move this person to an alternative shelter
-                                assignments[candidateId] = new AssignmentDto
-                                {
-                                    PersonId = candidateId,
-                                    ShelterId = bestAlternative.ShelterId,
-                                    Distance = bestAlternative.Distance
-                                };
-
-                                // Update shelter capacities
-                                shelterCapacity[shelterId]++;
-                                shelterCapacity[bestAlternative.ShelterId]--;
-
-                                // Update tracking
-                                Console.WriteLine($"Reassigned person {candidateId} from shelter {shelterId} to {bestAlternative.ShelterId} to make room");
-
-                                // Now assign the one-shelter person to the shelter they need
-                                int personIndex = people.FindIndex(p => p.Id == personId);
-                                var option = distanceMatrix[personIndex]
-                                    .First(o => o.ShelterId == shelterId);
-
-                                // Make assignment
-                                assignments[personId] = new AssignmentDto
-                                {
-                                    PersonId = personId,
-                                    ShelterId = shelterId,
-                                    Distance = option.Distance
-                                };
-
-                                // Update tracking
-                                shelterCapacity[shelterId]--;
-                                assignedPeople.Add(personId);
-
-                                // Log the assignment
-                                Console.WriteLine($"Assigned one-shelter person {personId} to shelter {shelterId} after reassignment (distance: {option.Distance * 1000:F0}m)");
-
-                                reassignmentMade = true;
-                                break;
-                            }
-                        }
-
-                        // log if no reassignment was possible
-                        // if (!reassignmentMade)
-                        // {
-                        //     Console.WriteLine($"Could not assign one-shelter person {personId} - no reassignment options available");
-                        // }
-                    }
-                }
-            }
-
-            // STEP 9: FINAL CHECK FOR UNASSIGNED PEOPLE
-            // Try to assign any remaining people who could still find a shelter
-            var remainingPeople = people
-                .Where(p => !assignedPeople.Contains(p.Id))
-                .ToList();
-
-            if (remainingPeople.Count > 0)
-            {
-                Console.WriteLine($"Final pass - attempting to assign {remainingPeople.Count} remaining people");
-
-                foreach (var person in remainingPeople)
-                {
-                    // Find any shelter with remaining capacity within range
-                    int personIndex = people.IndexOf(person);
-                    var options = distanceMatrix[personIndex]
-                        .Where(entry => entry.IsReachable && shelterCapacity[entry.ShelterId] > 0)
-                        .OrderBy(entry => entry.Distance)
-                        .ToList();
-
-                    // If we have options, assign the closest one
-                    if (options.Count > 0)
-                    {
-                        // Get the best option (closest shelter)
-                        var bestOption = options[0];
-                        assignments[person.Id] = new AssignmentDto
+                        // Create assignment option
+                        var option = new AssignmentOption
                         {
                             PersonId = person.Id,
-                            ShelterId = bestOption.ShelterId,
-                            Distance = bestOption.Distance
+                            ShelterId = shelter.Id,
+                            Distance = distance,
+                            IsReachable = true,
+                            VulnerabilityScore = CalculateVulnerabilityScore(person.Age)
                         };
 
-                        // Update shelter capacity
-                        shelterCapacity[bestOption.ShelterId]--;
-                        assignedPeople.Add(person.Id);
+                        // Calculate priority
+                        double priority = distance;
 
-                        // Log the assignment
-                        Console.WriteLine($"Final pass: Assigned person {person.Id} to shelter {bestOption.ShelterId} (distance: {bestOption.Distance * 1000:F0}m)");
+                        // Adjust priority for vulnerable people if enabled
+                        if (prioritySettings?.EnableAgePriority == true)
+                        {
+                            // Lower priority value = higher priority
+                            // Vulnerable people get a boost (lower priority value)
+                            priority -= option.VulnerabilityScore * 0.01;
+                        }
+
+                        // Add to priority queue
+                        pq.Enqueue(option, priority);
                     }
                 }
             }
 
-            // STEP 10: VERIFY NO DUPLICATE ASSIGNMENTS
-            // Check for any errors in our assignment process
-            var personIds = assignments.Keys.ToList();
-            var duplicateCheck = personIds.GroupBy(id => id).Where(g => g.Count() > 1).ToList();
-            if (duplicateCheck.Any())
+            Console.WriteLine($"Priority queue built with {pq.Count} possible assignments");
+
+            // STEP 5: PROCESS ASSIGNMENTS IN PRIORITY ORDER
+            Console.WriteLine("Processing assignments in priority order...");
+            int processedCount = 0;
+
+            while (pq.Count > 0)
             {
-                // Log any duplicate assignments found
-                Console.WriteLine($"WARNING: Found {duplicateCheck.Count} duplicate person assignments!");
-                foreach (var group in duplicateCheck)
+                // Get the highest priority assignment (shortest distance, adjusted for vulnerability)
+                var option = pq.Dequeue();
+                processedCount++;
+
+                // Skip if person is already assigned
+                if (assignedPeople.Contains(option.PersonId))
+                    continue;
+
+                // Skip if shelter is full
+                if (shelterCapacity[option.ShelterId] <= 0)
+                    continue;
+
+                // Make the assignment
+                assignments[option.PersonId] = new AssignmentDto
                 {
-                    // Log the person ID and number of assignments
-                    Console.WriteLine($"Person {group.Key} is assigned multiple times");
+                    PersonId = option.PersonId,
+                    ShelterId = option.ShelterId,
+                    Distance = option.Distance
+                };
+
+                // Update tracking
+                assignedPeople.Add(option.PersonId);
+                shelterCapacity[option.ShelterId]--;
+
+                // Find the person's age for logging
+                var person = people.First(p => p.Id == option.PersonId);
+                string ageGroup = person.Age >= 70 ? "elderly" : person.Age <= 12 ? "child" : "adult";
+
+                Console.WriteLine($"Assigned person {option.PersonId} ({ageGroup}, age {person.Age}) to shelter {option.ShelterId} (distance: {option.Distance * 1000:F0}m)");
+            }
+
+            // STEP 6: REPORT UNASSIGNED PEOPLE
+            var unassignedPeople = people.Where(p => !assignedPeople.Contains(p.Id)).ToList();
+            if (unassignedPeople.Any())
+            {
+                Console.WriteLine($"\n{unassignedPeople.Count} people could not be assigned:");
+                foreach (var person in unassignedPeople)
+                {
+                    // Find their nearest shelter for reporting
+                    var nearestShelter = shelters
+                        .OrderBy(s => CalculateDistance(person.Latitude, person.Longitude, s.Latitude, s.Longitude))
+                        .FirstOrDefault();
+
+                    if (nearestShelter != null)
+                    {
+                        double distance = CalculateDistance(
+                            person.Latitude, person.Longitude,
+                            nearestShelter.Latitude, nearestShelter.Longitude);
+
+                        Console.WriteLine($"Person {person.Id} (age {person.Age}) - nearest shelter {nearestShelter.Id} at {distance * 1000:F0}m");
+                    }
                 }
             }
 
-            // STEP 11: OPTIMIZATION PHASE
-            // Try to improve assignments by swapping people between shelters
-            Console.WriteLine($"Initial assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
-            Console.WriteLine("Starting optimization phase to improve assignments...");
+            // STEP 7: FINAL STATISTICS
+            Console.WriteLine($"\nAssignment complete:");
+            Console.WriteLine($"- Processed {processedCount} assignment options");
+            Console.WriteLine($"- Assigned {assignments.Count} people");
+            Console.WriteLine($"- Unassigned {people.Count - assignments.Count} people");
 
-            // Only optimize if we have one assigned person or more
+            // STEP 8: OPTIMIZATION PHASE
             if (assignments.Count > 0)
             {
+                Console.WriteLine("\nStarting optimization phase...");
                 assignments = OptimizeAssignments(assignments, people, shelters);
             }
 
-            Console.WriteLine($"Final assignments: {assignments.Count} people assigned, {people.Count - assignments.Count} unassigned");
             return assignments;
         }
+
+
 
         //===================================
         // Optimize Assignments
@@ -827,6 +987,13 @@ namespace FindCover.Controllers
             List<ShelterDto> shelters)
         {
             Console.WriteLine("Starting post-assignment optimization phase...");
+
+            // Add early exit for large datasets, if we need it
+            // if (people.Count * shelters.Count > 10000)
+            // {
+            //     Console.WriteLine("Dataset too large for optimization, skipping...");
+            //     return initialAssignments;
+            // }
 
             // STEP 1: CREATE A WORKING COPY OF ASSIGNMENTS
             // We'll modify this copy throughout the optimization
@@ -859,6 +1026,10 @@ namespace FindCover.Controllers
             int swapCount = 0;
             double totalDistanceImprovement = 0;
 
+            // Maximum iterations limit - for better performance but less %, reduce the number of max iterations
+            int maxIterations = 10;
+            int currentIteration = 0;
+
             // Log the start of the optimization process
             Console.WriteLine("Starting swap optimization iterations...");
 
@@ -866,105 +1037,121 @@ namespace FindCover.Controllers
             do
             {
                 improvementFound = false;
+                currentIteration++;
 
-                // STEP 4A: ITERATE THROUGH ALL POSSIBLE SHELTER PAIRS
-                for (int i = 0; i < shelters.Count; i++)
+                // Use ConcurrentBag to store potential swaps from parallel execution
+                var potentialSwaps = new ConcurrentBag<SwapCandidate>();
+
+                // STEP 4A: ITERATE THROUGH ALL POSSIBLE SHELTER PAIRS - PARALLELIZE
+                Parallel.For(0, shelters.Count, i =>
+        {
+            int shelter1Id = shelters[i].Id;
+
+            // Skip if this shelter has no assigned people
+            if (!shelterAssignments.ContainsKey(shelter1Id) || shelterAssignments[shelter1Id].Count == 0)
+                return;
+
+            for (int j = i + 1; j < shelters.Count; j++)
+            {
+                int shelter2Id = shelters[j].Id;
+
+                // Skip if this shelter has no assigned people
+                if (!shelterAssignments.ContainsKey(shelter2Id) || shelterAssignments[shelter2Id].Count == 0)
+                    continue;
+
+                // Evaluate all possible swaps between these two shelters
+                foreach (int person1Id in shelterAssignments[shelter1Id])
                 {
-                    int shelter1Id = shelters[i].Id;
+                    var person1 = personLookup[person1Id];
+                    double person1CurrentDistance = optimizedAssignments[person1Id].Distance;
 
-                    // Skip if this shelter has no assigned people
-                    if (shelterAssignments[shelter1Id].Count == 0)
-                        continue;
-
-                    for (int j = i + 1; j < shelters.Count; j++)
+                    foreach (int person2Id in shelterAssignments[shelter2Id])
                     {
-                        int shelter2Id = shelters[j].Id;
+                        var person2 = personLookup[person2Id];
+                        double person2CurrentDistance = optimizedAssignments[person2Id].Distance;
 
-                        // Skip if this shelter has no assigned people
-                        if (shelterAssignments[shelter2Id].Count == 0)
-                            continue;
+                        // Calculate potential swap distances
+                        double person1NewDistance = CalculateDistance(
+                            person1.Latitude, person1.Longitude,
+                            shelterLookup[shelter2Id].Latitude, shelterLookup[shelter2Id].Longitude);
 
-                        // STEP 4B: TRY SWAPPING PEOPLE BETWEEN SHELTERS
-                        foreach (int person1Id in shelterAssignments[shelter1Id])
+                        double person2NewDistance = CalculateDistance(
+                            person2.Latitude, person2.Longitude,
+                            shelterLookup[shelter1Id].Latitude, shelterLookup[shelter1Id].Longitude);
+
+                        double currentTotalDistance = person1CurrentDistance + person2CurrentDistance;
+                        double newTotalDistance = person1NewDistance + person2NewDistance;
+                        double improvement = currentTotalDistance - newTotalDistance;
+
+                        // Store swap if it improves total distance
+                        if (improvement > 0.001) // Only consider improvements > 1 meter
                         {
-                            var person1 = personLookup[person1Id];
-                            double person1CurrentDistance = optimizedAssignments[person1Id].Distance;
-
-                            foreach (int person2Id in shelterAssignments[shelter2Id])
+                            potentialSwaps.Add(new SwapCandidate
                             {
-                                var person2 = personLookup[person2Id];
-                                double person2CurrentDistance = optimizedAssignments[person2Id].Distance;
-
-                                // STEP 4C: CALCULATE POTENTIAL SWAP DISTANCES
-                                // Calculate what the distances would be if we swap these two people
-                                double person1NewDistance = CalculateDistance(
-                                    person1.Latitude, person1.Longitude,
-                                    shelterLookup[shelter2Id].Latitude, shelterLookup[shelter2Id].Longitude);
-
-                                double person2NewDistance = CalculateDistance(
-                                    person2.Latitude, person2.Longitude,
-                                    shelterLookup[shelter1Id].Latitude, shelterLookup[shelter1Id].Longitude);
-
-                                // Calculate total current distance and potential new distance
-                                double currentTotalDistance = person1CurrentDistance + person2CurrentDistance;
-                                double newTotalDistance = person1NewDistance + person2NewDistance;
-
-                                // STEP 4D: IF SWAP REDUCES TOTAL DISTANCE, DO IT
-                                if (newTotalDistance < currentTotalDistance)
-                                {
-                                    // Calculate the improvement
-                                    double improvement = currentTotalDistance - newTotalDistance;
-                                    totalDistanceImprovement += improvement;
-
-                                    // Update assignments for both people
-                                    optimizedAssignments[person1Id] = new AssignmentDto
-                                    {
-                                        PersonId = person1Id,
-                                        ShelterId = shelter2Id,
-                                        Distance = person1NewDistance
-                                    };
-
-                                    optimizedAssignments[person2Id] = new AssignmentDto
-                                    {
-                                        PersonId = person2Id,
-                                        ShelterId = shelter1Id,
-                                        Distance = person2NewDistance
-                                    };
-
-                                    // Update our shelter assignment tracking
-                                    shelterAssignments[shelter1Id].Remove(person1Id);
-                                    shelterAssignments[shelter1Id].Add(person2Id);
-                                    shelterAssignments[shelter2Id].Remove(person2Id);
-                                    shelterAssignments[shelter2Id].Add(person1Id);
-
-                                    swapCount++;
-                                    improvementFound = true;
-
-                                    Console.WriteLine($"Swap {swapCount}: Persons {person1Id} and {person2Id} between shelters {shelter1Id} and {shelter2Id}, saving {improvement:F4} km");
-
-                                    // Break out of inner loop once we find an improvement
-                                    break;
-                                }
-                            }
-
-                            // Break out of outer person loop if we found an improvement
-                            if (improvementFound)
-                                break;
+                                Person1Id = person1Id,
+                                Person2Id = person2Id,
+                                Shelter1Id = shelter1Id,
+                                Shelter2Id = shelter2Id,
+                                Person1NewDistance = person1NewDistance,
+                                Person2NewDistance = person2NewDistance,
+                                Improvement = improvement
+                            });
                         }
-
-                        // Break out of shelter loop if we found an improvement
-                        if (improvementFound)
-                            break;
                     }
+                }
+            }
+        });
 
-                    // Break out of outer shelter loop if we found an improvement
-                    if (improvementFound)
-                        break;
+                // Process the best swaps sequentially to avoid conflicts
+                var bestSwaps = potentialSwaps
+                    .OrderByDescending(s => s.Improvement)
+                    .Take(10) // Process top 10 swaps per iteration
+                    .ToList();
+
+                foreach (var swap in bestSwaps)
+                {
+                    // Verify the swap is still valid (people haven't been moved by another swap)
+                    if (optimizedAssignments[swap.Person1Id].ShelterId == swap.Shelter1Id &&
+                        optimizedAssignments[swap.Person2Id].ShelterId == swap.Shelter2Id)
+                    {
+                        // Apply the swap
+                        optimizedAssignments[swap.Person1Id] = new AssignmentDto
+                        {
+                            PersonId = swap.Person1Id,
+                            ShelterId = swap.Shelter2Id,
+                            Distance = swap.Person1NewDistance
+                        };
+
+                        optimizedAssignments[swap.Person2Id] = new AssignmentDto
+                        {
+                            PersonId = swap.Person2Id,
+                            ShelterId = swap.Shelter1Id,
+                            Distance = swap.Person2NewDistance
+                        };
+
+                        // Update shelter assignments
+                        shelterAssignments[swap.Shelter1Id].Remove(swap.Person1Id);
+                        shelterAssignments[swap.Shelter1Id].Add(swap.Person2Id);
+                        shelterAssignments[swap.Shelter2Id].Remove(swap.Person2Id);
+                        shelterAssignments[swap.Shelter2Id].Add(swap.Person1Id);
+
+                        swapCount++;
+                        totalDistanceImprovement += swap.Improvement;
+                        improvementFound = true;
+
+                        Console.WriteLine($"Swap {swapCount}: Persons {swap.Person1Id} and {swap.Person2Id} between shelters {swap.Shelter1Id} and {swap.Shelter2Id}, saving {swap.Improvement:F4} km");
+                    }
                 }
 
-            } while (improvementFound); // Repeat until no more improvements can be made
+                // Check if we should continue
+                if (currentIteration >= maxIterations)
+                {
+                    Console.WriteLine($"Reached maximum iterations ({maxIterations})");
+                    break;
+                }
 
-            // Log the results of the optimization
+            } while (improvementFound);
+
             Console.WriteLine($"Optimization complete: Made {swapCount} swaps, reducing total distance by {totalDistanceImprovement:F4} km");
 
             return optimizedAssignments;
@@ -1166,5 +1353,19 @@ namespace FindCover.Controllers
         public double MinDistance { get; set; } // Minimum distance any person has to travel
         public double ShelterUsagePercentage { get; set; } // Percentage of shelter capacity utilized
 
+    }
+
+    /**
+    * helper class for storing swap candidates
+    **/
+    public class SwapCandidate
+    {
+        public int Person1Id { get; set; }
+        public int Person2Id { get; set; }
+        public int Shelter1Id { get; set; }
+        public int Shelter2Id { get; set; }
+        public double Person1NewDistance { get; set; }
+        public double Person2NewDistance { get; set; }
+        public double Improvement { get; set; }
     }
 }
