@@ -15,7 +15,7 @@ if (true)
 
     //windows
     app.UseSwagger();
-    ..app.UseSwaggerUI();
+    app.UseSwaggerUI();
 
     //mac
     app.UseSwaggerUI(c =>
