@@ -611,7 +611,7 @@ public class DBservices
         }
     }
 
-    public KnownLocation? AddKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+    public KnownLocation? AddKnownLocation(int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -648,7 +648,8 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        Nickname = dr["nickname"].ToString() ?? ""
+                        Nickname = dr["nickname"].ToString() ?? "",
+                        AddedAt = Convert.ToDateTime(dr["created_at"])
                     };
                 }
             }
@@ -660,7 +661,7 @@ public class DBservices
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
+            throw new Exception("add failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
         }
         finally
         {

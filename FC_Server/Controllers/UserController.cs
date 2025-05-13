@@ -216,7 +216,7 @@ public class UserController : ControllerBase
     [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
     public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
-        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
+        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
         if (newKnownLocation != null)
         {
             return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע החדש
