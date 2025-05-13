@@ -24,7 +24,7 @@
         // Constructor without parameters
         public User()
         {
-            this.user_id = 1;
+            this.user_id = 0;
             this.username = "";
             this.password_hash = "";
             this.email = "";
