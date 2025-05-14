@@ -11,6 +11,7 @@
         private string address;
         private int capacity;
         private bool is_accessible;
+        private bool pets_friendly;
         private bool is_active;
         private DateTime created_at;
         private DateTime last_updated;
@@ -25,6 +26,7 @@
         public string Address { get => address; set => address = value; }
         public int Capacity { get => capacity; set => capacity = value; }
         public bool IsAccessible { get => is_accessible; set => is_accessible = value; }
+        public bool PetsFriendly { get => pets_friendly; set => pets_friendly = value; }
         public bool IsActive { get => is_active; set => is_active = value; }
         public DateTime CreatedAt { get => created_at; set => created_at = value; }
         public DateTime LastUpdated { get => last_updated; set => last_updated = value; }
@@ -42,6 +44,7 @@
             this.address = "";
             this.capacity = 0;
             this.is_accessible = false;
+            this.pets_friendly = false;
             this.is_active = true;
             this.created_at = DateTime.Now;
             this.last_updated = DateTime.Now;
@@ -51,7 +54,7 @@
         // Constructor with parameters
         public Shelter(int shelterId, int providerId, string shelterType, string name,
                    float latitude, float longitude, string address, int capacity,
-                   bool isAccessible, bool isActive, DateTime createdAt,
+                   bool isAccessible, bool petsFriendly, bool isActive, DateTime createdAt,
                    DateTime lastUpdated, string additionalInformation)
         {
             this.shelter_id = shelterId;
@@ -63,6 +66,7 @@
             this.address = address;
             this.capacity = capacity;
             this.is_accessible = isAccessible;
+            this.pets_friendly = petsFriendly;
             this.is_active = isActive;
             this.created_at = createdAt;
             this.last_updated = lastUpdated;
@@ -70,10 +74,16 @@
         }
 
         public static Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
-                                string address, int capacity, string additional_information, int provider_id)
+                                            string address, int capacity,
+                                            bool is_accessible, bool pets_friendly,
+                                            string additional_information, int provider_id)
         {
+            shelter_type =  "פרטי";
+            latitude = 31.2518f;
+            longitude = 34.7913f;    
             DBservicesShelter dbs = new DBservicesShelter();
-            return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity, additional_information, provider_id);
+            return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity,
+                                            is_accessible, pets_friendly, additional_information, provider_id);
         }
 
         public static Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,
