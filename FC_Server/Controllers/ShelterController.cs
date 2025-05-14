@@ -35,6 +35,10 @@ namespace FC_Server.Controllers
                 {
                     return BadRequest(new { message = "User added this shelter already" });
                 }
+                if (ex.Message.Contains("User not exist"))
+                {
+                    return BadRequest(new { message = "User not exist" });
+                }
                 throw new Exception("Addition failed");
             }
         }

@@ -115,7 +115,11 @@ public class DBservicesShelter
                 {
                     throw new Exception("User added this shelter already");
                 }
-                throw new Exception("Addition failed");
+            if (ex.Message.Contains("User not exists"))
+            {
+                throw new Exception("User not exists");
+            }
+            throw new Exception("Addition failed");
             }
             finally
             {
