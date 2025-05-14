@@ -53,8 +53,10 @@ public class DBservicesShelter
         // This method adds a shelter
         //--------------------------------------------------------------------------------------------------
         public Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
-                                string address, int capacity, string additional_information, int provider_id)
-        {
+                                            string address, int capacity,
+                                            bool is_accessible, bool pets_friendly,
+                                            string additional_information, int provider_id)
+    {
             SqlConnection con;
             SqlCommand cmd;
             Shelter? shelter = null;
@@ -75,6 +77,8 @@ public class DBservicesShelter
             paramDic.Add("@longitude", longitude);
             paramDic.Add("@address", address);
             paramDic.Add("@capacity", capacity);
+            paramDic.Add("is_accessible", is_accessible);
+            paramDic.Add("pets_friendly", pets_friendly);
             paramDic.Add("@additional_information", additional_information);
             paramDic.Add("@provider_id", provider_id);
 
@@ -98,6 +102,7 @@ public class DBservicesShelter
                             AdditionalInformation = dr["additional_information"].ToString() ?? "",
                             ProviderId = Convert.ToInt32(dr["provider_id"]),
                             IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                            PetsFriendly = Convert.ToBoolean(dr["pets_friendly"]),
                             IsActive = Convert.ToBoolean(dr["is_active"])
                         };
                     }

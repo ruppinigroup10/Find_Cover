@@ -15,8 +15,9 @@ namespace FC_Server.Controllers
         {
             try
             {
-                var newShelter = FC_Server.Models.Shelter.AddShelter(shelter.ShelterType, shelter.Name, shelter.Latitude, shelter.Longitude,
-                                shelter.Address, shelter.Capacity, shelter.AdditionalInformation, shelter.ProviderId);
+                var newShelter = FC_Server.Models.Shelter.AddShelter("", shelter.Name, 0, 0,
+                                shelter.Address, shelter.Capacity, shelter.IsAccessible, shelter.PetsFriendly,
+                                shelter.AdditionalInformation, shelter.ProviderId);
 
                 if (newShelter != null)
                 {
