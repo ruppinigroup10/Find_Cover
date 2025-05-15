@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 //import 'package:url_launcher/url_launcher.dart'; // ייבוא חבילת url_launcher
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'base_page.dart'; // ייבוא BasePage
+import 'base_before_login.dart'; // ייבוא Base_before_login
 import 'Enter.dart'; // ייבוא עמוד ההתחלה
 
 class RegisterPage extends StatefulWidget {
@@ -22,15 +22,24 @@ class _RegisterPageState extends State<RegisterPage> {
   // מפתח לטופס
   final _formKey = GlobalKey<FormState>();
 
+  // משתנה למצב הצגת סיסמה
+  bool _obscurePassword = true;
+
   // פונקציה לשליחת הנתונים לשרת
   Future<void> registerUser() async {
+    print('registerUser called');
     if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
       return; // אם הטופס לא תקין, אל תמשיך
     }
 
     final url = Uri.parse(
       'https://localhost:7203/api/User/Register',
     ); // כתובת ה-API
+    print('Sending registration request to: $url');
+    print(
+      'Payload: username=${nameController.text}, email=${emailController.text}, phoneNumber=${phoneController.text}, passwordHash=${passwordController.text}',
+    );
     try {
       final response = await http.post(
         url,
@@ -42,20 +51,27 @@ class _RegisterPageState extends State<RegisterPage> {
           'passwordHash': passwordController.text,
         }),
       );
-
+      print('Response status: \\${response.statusCode}');
+      print('Response body: \\${response.body}');
       if (response.statusCode == 200) {
         // הצלחה - מעבר לדף הבית
+        print('Registration successful! Navigating to EnterPage.');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('ההרשמה בוצעה בהצלחה!')));
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const EnterPage()),
         );
       } else {
         // שגיאה - הצגת הודעת שגיאה מותאמת
+        print('Registration failed. Status: \\${response.statusCode}');
         final responseData = jsonDecode(response.body);
         String errorMessage = 'שגיאה בהרשמה. נסה שוב.';
         if (responseData['message'] != null) {
           errorMessage = responseData['message'];
         }
+        print('Error message: $errorMessage');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMessage)));
@@ -128,13 +144,32 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'שם המשתמש נדרש';
-                            } else if (!RegExp(
-                              r'^[a-zA-Z]+$',
-                            ).hasMatch(value)) {
-                              return 'שם המשתמש חייב להיות באנגלית בלבד';
-                            } else if (value.length < 3) {
-                              return 'שם המשתמש חייב להכיל לפחות 3 תווים';
+                              return 'שם מלא נדרש';
+                            }
+                            // בדיקה שמכיל לפחות שתי מילים
+                            final words = value.trim().split(RegExp(r'\s+'));
+                            if (words.length < 2) {
+                              return 'נא להכניס שם מלא';
+                            }
+                            // בדיקה שאין מספרים
+                            if (RegExp(r'[0-9]').hasMatch(value)) {
+                              return 'השם חייב להכיל אותיות בלבד';
+                            }
+                            // בדיקה לאותיות בלבד (עברית או אנגלית)
+                            if (!RegExp(r'^[a-zA-Zא-ת\s]+$').hasMatch(value)) {
+                              return 'השם חייב להכיל אותיות בלבד בעברית או באנגלית';
+                            }
+                            // אם באנגלית, כל מילה חייבת להתחיל באות גדולה
+                            if (RegExp(r'^[A-Za-z ]+$').hasMatch(value)) {
+                              for (final word in words) {
+                                if (word.isNotEmpty &&
+                                    word[0] != word[0].toUpperCase()) {
+                                  return 'נא להתחיל באות גדולה';
+                                }
+                              }
+                            }
+                            if (value.length < 3) {
+                              return 'שם מלא חייב להכיל לפחות 3 תווים';
                             }
                             return null;
                           },
@@ -200,7 +235,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         const SizedBox(height: 5),
                         TextFormField(
                           controller: passwordController,
-                          obscureText: true,
+                          obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: 'הכנס סיסמה',
                             filled: true,
@@ -208,6 +243,14 @@ class _RegisterPageState extends State<RegisterPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide: BorderSide.none,
+                            ),
+                            suffixIcon: Checkbox(
+                              value: !_obscurePassword,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  _obscurePassword = !(value ?? false);
+                                });
+                              },
                             ),
                           ),
                           validator: (value) {

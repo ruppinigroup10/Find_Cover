@@ -21,14 +21,16 @@ class BasePage extends StatelessWidget {
               children: <Widget>[
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AddingShelterPage(),
-                        // If you meant AddKnownLocationPage, use:
-                        // builder: (context) => const AddKnownLocationPage(),
+                    final snackBar = const SnackBar(
+                      content: Text(
+                        'כפתור זה יהיה זמין לאחר ההרשמה, בעזרתו תוכל להוסיף מקלט לאפליקציה',
+                        textDirection: TextDirection.rtl,
                       ),
+                      duration: Duration(seconds: 3),
+                      behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.only(bottom: 50, right: 20, left: 20),
                     );
+                    ScaffoldMessenger.of(context).showSnackBar(snackBar);
                   },
                   style: ElevatedButton.styleFrom(
                     shape: const CircleBorder(),

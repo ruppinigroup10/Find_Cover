@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'base_page.dart'; // ייבוא BasePage
 import 'settings.dart'; // ייבוא עמוד ההגדרות
 import 'local_storage_service.dart';
+import 'add_known_location.dart';
 
 class KnownLocationPage extends StatefulWidget {
   const KnownLocationPage({super.key});
@@ -128,7 +129,7 @@ class _KnownLocationPageState extends State<KnownLocationPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const SettingsPage(title: 'הגדרות'),
+                      builder: (context) => const AddKnownLocationPage(),
                     ),
                   );
                 },

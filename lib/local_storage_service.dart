@@ -224,6 +224,8 @@ class LocalStorageService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         final user = responseData['user'];
+        // השמה של user_id לשדה provider_id
+        user['provider_id'] = user['user_id'];
 
         // שמירת נתוני המשתמש בקובץ
         await saveUserDataToFile(user);

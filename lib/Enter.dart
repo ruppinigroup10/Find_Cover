@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'Login.dart'; // ייבוא עמוד ההתחברות
 import 'Register.dart'; // ייבוא עמוד ההרשמה
-import 'base_page.dart'; // ייבוא BasePage
+import 'base_before_login.dart'; // ייבוא Base_before_login
 
 class EnterPage extends StatelessWidget {
   const EnterPage({super.key});
@@ -55,7 +55,9 @@ class EnterPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RegisterPage(),
+                      builder:
+                          (context) =>
+                              RegisterPage(), // הסרתי const כי RegisterPage אינו קונסטרקטור const
                     ), // מעבר לעמוד ההרשמה
                   );
                 },
@@ -71,6 +73,7 @@ class EnterPage extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 30),
             ],
           ),
         ),

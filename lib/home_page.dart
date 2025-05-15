@@ -31,7 +31,7 @@ class _MyHomePageState extends State<MyHomePage> {
       MaterialPageRoute(
         builder:
             (context) =>
-                const AddingShelterPage(), // ניווט לעמוד Adding_shelter
+                AddingShelterPage(), // ניווט לעמוד Adding_shelter ללא const
       ),
     );
   }

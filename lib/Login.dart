@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page.dart'; // ייבוא דף הבית
 import 'register.dart'; // ייבוא עמוד ההרשמה
-import 'base_page.dart'; // ייבוא BasePage
+import 'base_before_login.dart'; // ייבוא Base_before_login
 import 'Enter.dart'; // ייבוא עמוד ההתחלה
 
 class LoginPage extends StatefulWidget {
@@ -18,6 +18,8 @@ class _LoginPage extends State<LoginPage> {
   // Controllers לשדות הטקסט
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
 
   // פונקציה לשליחת הנתונים לשרת (Login)
   Future<void> loginUser() async {
@@ -184,7 +186,7 @@ class _LoginPage extends State<LoginPage> {
                     const SizedBox(height: 5),
                     TextField(
                       controller: passwordController,
-                      obscureText: true,
+                      obscureText: _obscurePassword,
                       textDirection: TextDirection.rtl, // כיוון טקסט RTL
                       decoration: InputDecoration(
                         hintText: 'הכנס סיסמה',
@@ -198,6 +200,14 @@ class _LoginPage extends State<LoginPage> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: Checkbox(
+                          value: !_obscurePassword,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _obscurePassword = !(value ?? false);
+                            });
+                          },
                         ),
                       ),
                     ),

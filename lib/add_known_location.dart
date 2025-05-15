@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'base_page.dart'; // ייבוא BasePage
+import 'known_location.dart'; // ייבוא עמוד אזורים מוכרים
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddKnownLocationPage extends StatelessWidget {
   const AddKnownLocationPage({super.key});
@@ -15,10 +17,27 @@ class AddKnownLocationPage extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 20),
-                Image.asset(
-                  'assets/images/LOGO1.png', // עדכן את הנתיב לתמונה שלך
-                  width: 100,
-                  height: 100,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const KnownLocationPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    Image.asset(
+                      'assets/images/LOGO1.png',
+                      width: 100,
+                      height: 100,
+                    ),
+                    const SizedBox(width: 48),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 const Text(
@@ -45,7 +64,21 @@ class AddKnownLocationPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    final providerIdStr = await _getProviderId();
+                    if (providerIdStr.isEmpty ||
+                        int.tryParse(providerIdStr) == null) {
+                      print('providerId לא תקין: $providerIdStr');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('שגיאה: לא נמצא מזהה משתמש'),
+                        ),
+                      );
+                      return;
+                    }
+                    final providerId = int.parse(providerIdStr);
+                    print('providerId: $providerId');
+
                     // הוסף כאן את הפעולה לשמירת האזור המוכר
                   },
                   style: ElevatedButton.styleFrom(
@@ -88,5 +121,12 @@ class AddKnownLocationPage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<String> _getProviderId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final providerId = prefs.getString('provider_id') ?? '';
+    print('provider_id מהלוקל סטורג\': $providerId');
+    return providerId;
   }
 }
