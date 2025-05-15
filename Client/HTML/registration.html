@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <script src="/JS/registration.js"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>הרשמה</title>
+    <link rel="stylesheet" href="/CSS/registration.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <img src="/images/logo.png" alt="לוגו" class="logo" />
+        <h1>הרשמה</h1>
+      </div>
+      <form class="form">
+        <label for="full-name">* שם מלא</label>
+        <input
+          type="text"
+          id="full-name"
+          name="full-name"
+          placeholder="הכנס שם מלא"
+          required
+        />
+
+        <label for="email">* כתובת מייל</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          placeholder="הכנס כתובת מייל"
+          required
+        />
+
+        <label for="phone">* מספר טלפון</label>
+        <input
+          dir="rtl"
+          type="tel"
+          id="phone"
+          name="phone"
+          placeholder="הכנס מספר טלפון"
+          required
+        />
+
+        <label for="password">* סיסמה</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="הכנס סיסמה"
+          required
+        />
+
+        <label for="confirm-password">* סיסמה בשנית</label>
+        <input
+          type="password"
+          id="confirm-password"
+          name="confirm-password"
+          placeholder="הכנס סיסמה בשנית"
+          required
+        />
+
+        <button type="submit" class="submit-button">הרשמה</button>
+      </form>
+    </div>
+    <div class="custom-footer">
+      <button class="footer-button-i">i</button>
+      <div class="footer-center">
+        <button class="footer-button police">
+          <span>למשטרה</span>
+        </button>
+      </div>
+      <button class="footer-button2">+</button>
+    </div>
+  </body>
+</html>

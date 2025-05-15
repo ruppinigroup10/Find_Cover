@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Find Cover - Shelter Assignment Simulator</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/extreme-scenarios.css" />
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Custom JS -->
+    <script src="/js/port.js" defer></script>
+    <script src="/js/simulation.js" defer></script>
+    <script src="/js/simulation-manager.js" defer></script>
+    <script src="/js/extreme-scenarios.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <h1>Find Cover - Shelter Assignment Simulator</h1>
+    </header>
+
+    <div class="main-container">
+      <!-- Sidebar with controls (outside the map) -->
+      <div class="sidebar">
+        <!-- Simulation Controls -->
+        <div class="control-panel">
+          <h3>Simulation Controls</h3>
+          <div class="control-container">
+            <div class="control-group">
+              <label for="people-count">Number of People:</label>
+              <input
+                type="number"
+                id="people-count"
+                min="10"
+                max="500"
+                value="20"
+              />
+            </div>
+            <div class="control-group">
+              <label for="shelter-count">Additional Random Shelters:</label>
+              <input
+                type="number"
+                id="shelter-count"
+                min="1"
+                max="50"
+                value="10"
+              />
+            </div>
+            <div class="control-group">
+              <label for="radius">Simulation Radius (km):</label>
+              <input
+                type="number"
+                id="radius"
+                min="0.5"
+                max="20"
+                step="0.5"
+                value="0.5"
+              />
+            </div>
+            <div class="control-group">
+              <label for="priority">Priority Assignment:</label>
+              <select id="priority">
+                <option value="true" selected>
+                  Enabled (children & elderly first)
+                </option>
+                <option value="false">Disabled (distance only)</option>
+              </select>
+            </div>
+            <label>
+              <input type="checkbox" id="use-database-shelters" checked />
+              Include real shelters from database
+            </label>
+            <button id="run-simulation" class="control-button">
+              Run Simulation
+            </button>
+            <div id="simulation-status" class="status-message"></div>
+
+            <!-- Manual People Placement -->
+            <div class="custom-controls">
+              <h4>Manual People Placement</h4>
+              <button id="enable-placement" class="control-button">
+                Place People Manually
+              </button>
+              <button id="run-with-manual" class="control-button" disabled>
+                Run With Manual People (0)
+              </button>
+              <button id="clear-manual" class="control-button">
+                Clear Manual People
+              </button>
+              <div class="manual-placement-info">
+                <p>
+                  <small
+                    >Click on map to add people. Right-click to cycle through
+                    age groups.</small
+                  >
+                </p>
+              </div>
+            </div>
+
+            <!-- Extreme Scenarios will be added here by JavaScript -->
+          </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div class="stats-panel">
+          <h3>Simulation Statistics</h3>
+          <div id="stats-container">
+            <p>Total people: <span id="stats-total">0</span></p>
+            <p>Assigned: <span id="stats-assigned">0</span></p>
+            <p>Unassigned: <span id="stats-unassigned">0</span></p>
+            <p>
+              Total shelter capacity: <span id="stats-total-capacity">0</span>
+            </p>
+            <p>Shelter usage: <span id="stats-shelter-usage">0</span>%</p>
+            <p>Avg. distance: <span id="stats-avg-distance">0</span> km</p>
+            <p>Max distance: <span id="stats-max-distance">0</span> km</p>
+          </div>
+          <div id="shelter-stats">
+            <h4>Shelter Usage</h4>
+            <div id="shelter-usage-container"></div>
+          </div>
+          <div id="age-stats">
+            <h4>Assignment by Age Group</h4>
+            <div id="age-stats-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map container -->
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+    </div>
+  </body>
+</html>
