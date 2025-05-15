@@ -71,7 +71,8 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
 
   Future<void> _updateUserData() async {
     try {
-      final userId = 2008; // לדוגמה, ה-ID של המשתמש המחובר
+      final userData = await LocalStorageService.getUserData();
+      final userId = userData['userId'] ?? userData['user_id'];
       final url = Uri.parse('https://localhost:7203/api/User/UpdateUser');
       final requestBody = {
         'userId': userId,
