@@ -72,6 +72,11 @@ class AddKnownLocationPage extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('שגיאה: לא נמצא מזהה משתמש'),
+                          margin: EdgeInsets.only(
+                            bottom: 50,
+                            right: 20,
+                            left: 20,
+                          ),
                         ),
                       );
                       return;
