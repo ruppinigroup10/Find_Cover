@@ -74,9 +74,9 @@ namespace FC_Server.Controllers
 
         // GET: api/<ShelterController> getShelter
         [HttpGet("getShelter")]
-        public IActionResult getShelter(int shelter_id)
+        public IActionResult getShelter(int provider_id)
         {
-            var shelterData = FC_Server.Models.Shelter.getShelter(shelter_id);
+            var shelterData = FC_Server.Models.Shelter.getShelter(provider_id);
 
             if (shelterData != null)
             {
