@@ -74,9 +74,41 @@ namespace FC_Server.Controllers
 
         // GET: api/<ShelterController> getShelter
         [HttpGet("getShelter")]
-        public IActionResult getShelter(int provider_id)
+        public IActionResult getShelter(int shelter_id)
         {
-            var shelterData = FC_Server.Models.Shelter.getShelter(provider_id);
+            var shelterData = FC_Server.Models.Shelter.getShelter(shelter_id);
+
+            if (shelterData != null)
+            {
+                return Ok(new
+                {
+                    message = "User data trensfer successful",
+                    shlter = new
+                    {
+                        shelter_id = shelterData.ShelterId,
+                        provider_id = shelterData.ProviderId,
+                        shelter_type = shelterData.ShelterType,
+                        name = shelterData.Name,
+                        latitude = shelterData.Latitude,
+                        longitude = shelterData.Longitude,
+                        address = shelterData.Address,
+                        capacity = shelterData.Capacity,
+                        is_accessible = shelterData.IsAccessible,
+                        is_active = shelterData.IsActive,
+                        additional_information = shelterData.AdditionalInformation,
+                        created_at = shelterData.CreatedAt,
+                        last_updated = shelterData.LastUpdated
+                    }
+                });
+            }
+            return BadRequest(new { message = "Invalid ID" });
+        }
+
+        // GET: api/<ShelterController> getMyShelter
+        [HttpGet("getMyShelter")]
+        public IActionResult getMyShelter(int provider_id)
+        {
+            var shelterData = FC_Server.Models.Shelter.getMyShelter(provider_id);
 
             if (shelterData != null)
             {
