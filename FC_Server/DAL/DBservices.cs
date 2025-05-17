@@ -519,7 +519,6 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        Nickname = dr["nickname"].ToString() ?? "",
                         AddedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
@@ -547,7 +546,7 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method updates users known location data
     //--------------------------------------------------------------------------------------------------
-    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname, DateTime added_at)
+    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -568,7 +567,6 @@ public class DBservices
         paramDic.Add("@radius", radius);
         paramDic.Add("@address", address);
         paramDic.Add("@location_name", location_name);
-        paramDic.Add("@nickname", nickname);
         paramDic.Add("@added_at", added_at);
         //paramDic.Add("@added_at", added_at); // שורה כפולה של הוספת added_at - יש למחוק אחת מהן
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateKnownLocation"
@@ -587,7 +585,6 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        Nickname = dr["nickname"].ToString() ?? "",
                         AddedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
@@ -611,7 +608,7 @@ public class DBservices
         }
     }
 
-    public KnownLocation? AddKnownLocation(int user_id, float latitude, float longitude, float radius, string address, string location_name, string nickname)
+    public KnownLocation? AddKnownLocation(int user_id, float latitude, float longitude, float radius, string address, string location_name)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -631,7 +628,7 @@ public class DBservices
         paramDic.Add("@radius", radius);
         paramDic.Add("@address", address);
         paramDic.Add("@location_name", location_name);
-        paramDic.Add("@nickname", nickname);
+        
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_AddKnownLocation"
         try
         {
@@ -648,7 +645,6 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        Nickname = dr["nickname"].ToString() ?? "",
                         AddedAt = Convert.ToDateTime(dr["created_at"])
                     };
                 }
@@ -661,6 +657,11 @@ public class DBservices
             {
                 throw new Exception("Invalid ID");
             }
+            if (ex.Message.Contains("User added this known location already")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
+            {
+                throw new Exception("User added this known location already");
+            }
+            Console.WriteLine("SQL Error: " + ex.Message);
             throw new Exception("add failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
         }
         finally

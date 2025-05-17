@@ -201,7 +201,7 @@ public class UserController : ControllerBase
     [HttpPut("UpdateKnownLocation")] // שימוש ב-HttpPost עבור עדכון - שקול שימוש ב-HttpPut
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
-        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname, knownLocation.AddedAt); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
+        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.AddedAt); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
         if (updatedKnownLocation != null)
         {
             return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
@@ -216,16 +216,32 @@ public class UserController : ControllerBase
     [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
     public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
     {
-        var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName, knownLocation.Nickname); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
-        if (newKnownLocation != null)
+        try
         {
-            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע החדש
+            var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
+            if (newKnownLocation != null)
             {
-                message = "Known location added successfully",
-                knownLocation = newKnownLocation
-            });
+                return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע החדש
+                {
+                    message = "Known location added successfully",
+                    knownLocation = newKnownLocation
+                });
+            }
+            return BadRequest(new { message = "Add failed" });
         }
-        return BadRequest(new { message = "Add failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                return BadRequest(new { message = "Invalid ID" });
+            }
+            if (ex.Message.Contains("User added this known location already"))
+            {
+                return BadRequest(new { message = "User added this known location already" });
+            }
+            throw new Exception("Addition failed");
+        }
+        
     }
     //--------------------------------------------------------------------------------------------------
     // Default controllers
