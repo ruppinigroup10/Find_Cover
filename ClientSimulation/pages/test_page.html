@@ -19,6 +19,26 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Custom JS -->
+    <script defer>
+      // Add this at the end of your HTML file
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("DOM loaded, checking structure");
+
+        // Check manual people list container
+        const container = document.getElementById("manual-people-list");
+        console.log("Manual people list container:", container);
+
+        // Add a global click event listener to inspect all clicks
+        document.addEventListener("click", function (e) {
+          console.log("Document click event:", e.target);
+
+          // Check if the click is on a manual person remove button
+          if (e.target.classList.contains("remove-manual-person")) {
+            console.log("Remove button clicked:", e.target.dataset.id);
+          }
+        });
+      });
+    </script>
     <script src="/js/port.js" defer></script>
     <script src="/js/simulation.js" defer></script>
     <script src="/js/simulation-manager.js" defer></script>
@@ -97,6 +117,12 @@
               <button id="clear-manual" class="control-button">
                 Clear Manual People
               </button>
+              <button id="enable-removal" class="control-button">
+                Remove People (Manual & Auto)
+              </button>
+              <button id="run-after-removal" class="control-button">
+                Run Simulation After Removal
+              </button>
               <div class="manual-placement-info">
                 <p>
                   <small
@@ -104,6 +130,13 @@
                     age groups.</small
                   >
                 </p>
+              </div>
+              <div class="manual-people-list-container">
+                <h4>Manually Added People</h4>
+                <div
+                  id="manual-people-list"
+                  style="max-height: 200px; overflow-y: auto"
+                ></div>
               </div>
             </div>
 

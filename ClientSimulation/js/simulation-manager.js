@@ -347,7 +347,14 @@ function setupEventHandlers() {
     enableButton.addEventListener("click", function () {
       const isActive = this.classList.toggle("active");
 
+      // Disable removal mode if it's active
       if (isActive) {
+        const removalButton = document.getElementById("enable-removal");
+        if (removalButton && removalButton.classList.contains("active")) {
+          removalButton.classList.remove("active");
+          enableManualPeopleRemoval(false);
+        }
+
         this.textContent = "Stop Placing People";
         if (window.visualizer) {
           window.visualizer.enableManualPlacement(true);
@@ -388,12 +395,103 @@ function setupEventHandlers() {
     });
   }
 
+  // Add handler for the manual people removal button
+  const removalButton = document.getElementById("enable-removal");
+  if (removalButton) {
+    removalButton.addEventListener("click", function () {
+      const isActive = this.classList.toggle("active");
+
+      // Disable placement mode if it's active
+      if (isActive) {
+        const placementButton = document.getElementById("enable-placement");
+        if (placementButton && placementButton.classList.contains("active")) {
+          placementButton.classList.remove("active");
+          placementButton.textContent = "Place People Manually";
+          if (window.visualizer) {
+            window.visualizer.enableManualPlacement(false);
+          }
+        }
+      }
+
+      // Toggle button text
+      this.textContent = isActive
+        ? "Stop Removing People"
+        : "Remove People (Manual & Auto)";
+
+      // Enable/disable universal removal mode
+      if (window.visualizer) {
+        window.visualizer.enableUniversalRemoval(isActive);
+      }
+    });
+  }
+
+  // handler for the run-after-removal button
+  const runAfterRemovalButton = document.getElementById("run-after-removal");
+  if (runAfterRemovalButton) {
+    runAfterRemovalButton.addEventListener("click", function () {
+      // First, disable removal mode if it's active
+      const removalButton = document.getElementById("enable-removal");
+      if (removalButton && removalButton.classList.contains("active")) {
+        removalButton.classList.remove("active");
+
+        // Disable universal removal mode
+        if (window.visualizer) {
+          window.visualizer.enableUniversalRemoval(false);
+        }
+      }
+
+      // Run the simulation with current people
+      if (window.visualizer) {
+        // Call our new method that uses existing people and shelters
+        window.visualizer.runWithCurrentPeople();
+      }
+    });
+  }
+
   // Initialize extreme scenarios if available
   setTimeout(() => {
     if (typeof addExtremeScenarioControls === "function") {
       addExtremeScenarioControls();
     }
   }, 500);
+}
+
+/**
+ * Enables or disables the removal of manually placed people from the map
+ * When enabled, clicking on a manually added person will remove them
+ *
+ * @param {boolean} enable - Whether to enable removal mode
+ */
+function enableManualPeopleRemoval(enable) {
+  const statusElement = document.getElementById("simulation-status");
+  const removalButton = document.getElementById("enable-removal");
+
+  if (window.visualizer) {
+    window.visualizer.enableManualRemoval(enable);
+
+    if (enable) {
+      if (statusElement) {
+        statusElement.textContent =
+          "Click on manually added people to remove them";
+        statusElement.className = "status-message running";
+      }
+
+      if (removalButton) {
+        removalButton.textContent = "Stop Removing People";
+        removalButton.classList.add("active");
+      }
+    } else {
+      if (statusElement) {
+        statusElement.textContent = "";
+        statusElement.className = "status-message";
+      }
+
+      if (removalButton) {
+        removalButton.textContent = "Remove People Manually";
+        removalButton.classList.remove("active");
+      }
+    }
+  }
 }
 
 // Expose to global scope for debugging
