@@ -224,7 +224,7 @@ public class DBservicesShelter
             }
 
             Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@provider_id", shelter_id);
+            paramDic.Add("@shelter_id", shelter_id);
 
             cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_getShelter", con, paramDic);
 
@@ -244,8 +244,9 @@ public class DBservicesShelter
                             Address = dr["address"].ToString() ?? "",
                             Capacity = Convert.ToInt32(dr["capacity"]),
                             AdditionalInformation = dr["additional_information"].ToString() ?? "",
-                            ProviderId = Convert.ToInt32(dr["provider_id"]),
+                            ProviderId = dr["provider_id"] != DBNull.Value ? Convert.ToInt32(dr["provider_id"]) : 0,
                             IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                            PetsFriendly = Convert.ToBoolean(dr["pets_friendly"]),
                             IsActive = Convert.ToBoolean(dr["is_active"])
                         };
                     }

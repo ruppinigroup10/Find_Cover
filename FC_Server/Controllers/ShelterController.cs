@@ -94,6 +94,7 @@ namespace FC_Server.Controllers
                         address = shelterData.Address,
                         capacity = shelterData.Capacity,
                         is_accessible = shelterData.IsAccessible,
+                        pets_friendly = shelterData.PetsFriendly,
                         is_active = shelterData.IsActive,
                         additional_information = shelterData.AdditionalInformation,
                         created_at = shelterData.CreatedAt,
