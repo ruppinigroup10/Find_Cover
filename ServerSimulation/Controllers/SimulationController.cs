@@ -988,7 +988,7 @@ namespace FindCover.Controllers
         {
             Console.WriteLine("Starting post-assignment optimization phase...");
 
-            // Add early exit for large datasets, if we need it
+            // Add early exit for large datasets, if required
             // if (people.Count * shelters.Count > 10000)
             // {
             //     Console.WriteLine("Dataset too large for optimization, skipping...");
@@ -1020,7 +1020,70 @@ namespace FindCover.Controllers
                 shelterAssignments[shelterId].Add(personId);
             }
 
-            // STEP 4: RUN OPTIMIZATION ITERATIONS
+            // STEP 4: PRIORITIZE ELDERLY OPTIMIZATION FIRST
+            // This is the new step - optimize elderly assignments before general optimization
+            int elderlyOptimizationCount = 0;
+
+            // Find all elderly people who have been assigned
+            var elderlyIds = personLookup.Values
+                .Where(p => p.Age >= 70) // Using 70 as elderly threshold - adjust if you have different definition
+                .Select(p => p.Id)
+                .Where(id => optimizedAssignments.ContainsKey(id))
+                .ToList();
+
+            Console.WriteLine($"Attempting to optimize shelter assignments for {elderlyIds.Count} elderly people...");
+
+            // Try to optimize for each elderly person
+            foreach (var elderlyId in elderlyIds)
+            {
+                var currentAssignment = optimizedAssignments[elderlyId];
+                int currentShelterId = currentAssignment.ShelterId;
+                var elderly = personLookup[elderlyId];
+
+                // Calculate current distance
+                double currentDistance = currentAssignment.Distance;
+
+                // Find all possible better shelters for this elderly person
+                foreach (var shelter in shelters)
+                {
+                    // Skip if it's the same shelter or it's full
+                    if (shelter.Id == currentShelterId ||
+                        shelterAssignments[shelter.Id].Count >= shelter.Capacity)
+                        continue;
+
+                    // Calculate distance to this potential shelter
+                    double newDistance = CalculateDistance(
+                        elderly.Latitude, elderly.Longitude,
+                        shelter.Latitude, shelter.Longitude);
+
+                    // If this shelter is closer, try to assign the elderly person to it
+                    if (newDistance < currentDistance)
+                    {
+                        // Assign elderly to the closer shelter
+                        optimizedAssignments[elderlyId] = new AssignmentDto
+                        {
+                            PersonId = elderlyId,
+                            ShelterId = shelter.Id,
+                            Distance = newDistance
+                        };
+
+                        // Update tracking data
+                        shelterAssignments[currentShelterId].Remove(elderlyId);
+                        shelterAssignments[shelter.Id].Add(elderlyId);
+
+                        elderlyOptimizationCount++;
+                        Console.WriteLine($"Optimized: Elderly person {elderlyId} moved from shelter {currentShelterId} to {shelter.Id}, " +
+                                         $"reducing distance from {currentDistance * 1000:F0}m to {newDistance * 1000:F0}m");
+
+                        // Stop looking for better shelters for this elderly person
+                        break;
+                    }
+                }
+            }
+
+            Console.WriteLine($"Elderly optimization complete: {elderlyOptimizationCount} elderly people relocated to closer shelters");
+
+            // STEP 5: RUN OPTIMIZATION ITERATIONS
             // Track if any improvements were made
             bool improvementFound;
             int swapCount = 0;
@@ -1042,7 +1105,7 @@ namespace FindCover.Controllers
                 // Use ConcurrentBag to store potential swaps from parallel execution
                 var potentialSwaps = new ConcurrentBag<SwapCandidate>();
 
-                // STEP 4A: ITERATE THROUGH ALL POSSIBLE SHELTER PAIRS - PARALLELIZE
+                // STEP 5A: ITERATE THROUGH ALL POSSIBLE SHELTER PAIRS - PARALLELIZE
                 Parallel.For(0, shelters.Count, i =>
         {
             int shelter1Id = shelters[i].Id;
@@ -1082,6 +1145,21 @@ namespace FindCover.Controllers
                         double currentTotalDistance = person1CurrentDistance + person2CurrentDistance;
                         double newTotalDistance = person1NewDistance + person2NewDistance;
                         double improvement = currentTotalDistance - newTotalDistance;
+
+                        bool person1IsElderly = person1.Age >= 70;
+                        bool person2IsElderly = person2.Age >= 70;
+
+                        if (person1IsElderly && person1NewDistance < person1CurrentDistance)
+                        {
+                            // Give extra weight to swaps that benefit elderly people
+                            improvement += (person1CurrentDistance - person1NewDistance) * 0.5;
+                        }
+
+                        if (person2IsElderly && person2NewDistance < person2CurrentDistance)
+                        {
+                            // Give extra weight to swaps that benefit elderly people
+                            improvement += (person2CurrentDistance - person2NewDistance) * 0.5;
+                        }
 
                         // Store swap if it improves total distance
                         if (improvement > 0.001) // Only consider improvements > 1 meter
