@@ -373,7 +373,7 @@ function setupEventHandlers() {
   if (runManualButton) {
     runManualButton.addEventListener("click", function () {
       if (window.visualizer) {
-        window.visualizer.runWithManualPeople();
+        window.visualizer.runUnifiedSimulationUpdate();
       }
     });
   }
@@ -425,7 +425,7 @@ function setupEventHandlers() {
     });
   }
 
-  // handler for the run-after-removal button
+  // Update handler for the run-after-removal button to use unified approach
   const runAfterRemovalButton = document.getElementById("run-after-removal");
   if (runAfterRemovalButton) {
     runAfterRemovalButton.addEventListener("click", function () {
@@ -433,6 +433,7 @@ function setupEventHandlers() {
       const removalButton = document.getElementById("enable-removal");
       if (removalButton && removalButton.classList.contains("active")) {
         removalButton.classList.remove("active");
+        removalButton.textContent = "Remove People (Manual & Auto)";
 
         // Disable universal removal mode
         if (window.visualizer) {
@@ -440,20 +441,15 @@ function setupEventHandlers() {
         }
       }
 
-      // Run the simulation with current people
+      // Run the unified simulation update
       if (window.visualizer) {
-        // Call our new method that uses existing people and shelters
-        window.visualizer.runWithCurrentPeople();
+        window.visualizer.runUnifiedSimulationUpdate();
       }
     });
   }
 
-  // Initialize extreme scenarios if available
-  setTimeout(() => {
-    if (typeof addExtremeScenarioControls === "function") {
-      addExtremeScenarioControls();
-    }
-  }, 500);
+  // Set up the unified update button
+  setupUnifiedUpdateButton();
 }
 
 /**

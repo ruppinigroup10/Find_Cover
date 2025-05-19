@@ -1467,7 +1467,7 @@ class ShelterSimulationVisualizer {
       this.peopleMarkers.getLayers().length
     );
 
-    // Identify markers near the click point with better logging
+    // Identify markers near the click point
     this.peopleMarkers.eachLayer((layer) => {
       const markerLat = layer.getLatLng().lat;
       const markerLng = layer.getLatLng().lng;
@@ -1477,15 +1477,7 @@ class ShelterSimulationVisualizer {
         Math.pow(markerLat - lat, 2) + Math.pow(markerLng - lng, 2)
       );
 
-      // More detailed logging for all markers checked
-      console.log(
-        `Marker at [${markerLat.toFixed(6)}, ${markerLng.toFixed(6)}], ` +
-          `distance: ${(distance * 111000).toFixed(2)}m, ` +
-          `personId: ${layer.options?.personId || "unknown"}, ` +
-          `isManual: ${layer.options?.isManual === true ? "yes" : "no"}`
-      );
-
-      // Check if click is within radius of the marker
+      // If click is within radius of the marker
       if (distance < SEARCH_RADIUS) {
         markersToRemove.push(layer);
         console.log(
@@ -1500,10 +1492,6 @@ class ShelterSimulationVisualizer {
 
     // Process removal if any markers found
     if (markersToRemove.length > 0) {
-      // Track changes to update statistics
-      let manualPeopleRemoved = 0;
-      let regularPeopleRemoved = 0;
-
       // Create a set of IDs of markers that will be removed
       const removedPersonIds = new Set();
 
@@ -1516,30 +1504,14 @@ class ShelterSimulationVisualizer {
         ) {
           // If manual, remove from manual people array
           const personId = marker.options.personId;
-
-          // Find by ID, but handle both string and number IDs
-          const manualIndex = this.manualPeople.findIndex((p) => {
-            if (typeof p.id === "number" && typeof personId === "string") {
-              return p.id === parseInt(personId);
-            } else if (
-              typeof p.id === "string" &&
-              typeof personId === "number"
-            ) {
-              return parseInt(p.id) === personId;
-            } else {
-              return p.id === personId;
-            }
-          });
+          const manualIndex = this.manualPeople.findIndex(
+            (p) => p.id === personId
+          );
 
           if (manualIndex >= 0) {
             this.manualPeople.splice(manualIndex, 1);
-            manualPeopleRemoved++;
             console.log(
               `Removed manual person #${personId} from manualPeople array`
-            );
-          } else {
-            console.log(
-              `Could not find manual person #${personId} in manualPeople array`
             );
           }
         }
@@ -1553,202 +1525,60 @@ class ShelterSimulationVisualizer {
         this.peopleMarkers.removeLayer(marker);
       });
 
-      // Clear all path lines to remove old connections
+      // Clear all path lines since connections may have changed
       this.pathLines.clearLayers();
 
       // Update current simulation data to reflect removals
-      if (this.currentSimulationData) {
-        // Get set of remaining marker IDs for verification
-        const remainingMarkerIds = new Set();
-        this.peopleMarkers.eachLayer((layer) => {
-          if (layer.options && layer.options.personId) {
-            remainingMarkerIds.add(layer.options.personId);
-          }
-        });
-
+      if (this.currentSimulationData && this.currentSimulationData.people) {
         // Filter people array to only include people still on the map
-        if (this.currentSimulationData.people) {
-          this.currentSimulationData.people =
-            this.currentSimulationData.people.filter((p) =>
-              remainingMarkerIds.has(p.id)
-            );
-        }
+        this.currentSimulationData.people =
+          this.currentSimulationData.people.filter(
+            (p) => !removedPersonIds.has(p.id)
+          );
 
         // Filter assignments to only include people still on the map
         if (this.currentSimulationData.assignments) {
           const newAssignments = {};
           for (const personId in this.currentSimulationData.assignments) {
-            // Convert string IDs to numbers if necessary
-            const numericId = parseInt(personId);
-            if (remainingMarkerIds.has(numericId)) {
+            if (!removedPersonIds.has(parseInt(personId))) {
               newAssignments[personId] =
                 this.currentSimulationData.assignments[personId];
             }
           }
           this.currentSimulationData.assignments = newAssignments;
         }
-
-        // Recalculate ALL statistics completely
-        this.stats.totalPeople = this.currentSimulationData.people.length;
-        this.stats.assignedPeople = Object.keys(
-          this.currentSimulationData.assignments
-        ).length;
-        this.stats.unassignedPeople =
-          this.stats.totalPeople - this.stats.assignedPeople;
-
-        // Recalculate average and max distance
-        let totalDistance = 0;
-        let maxDistance = 0;
-
-        for (const personId in this.currentSimulationData.assignments) {
-          const distance =
-            this.currentSimulationData.assignments[personId].distance;
-          totalDistance += distance;
-          if (distance > maxDistance) {
-            maxDistance = distance;
-          }
-        }
-
-        this.stats.averageDistance =
-          this.stats.assignedPeople > 0
-            ? totalDistance / this.stats.assignedPeople
-            : 0;
-        this.stats.maxDistance = maxDistance;
-
-        // Recalculate age group statistics
-        this.stats.ageGroups = {
-          assigned: { elderly: 0, children: 0, adults: 0 },
-          unassigned: { elderly: 0, children: 0, adults: 0 },
-        };
-
-        // Loop through each person to update age statistics
-        this.currentSimulationData.people.forEach((person) => {
-          const isAssigned = this.currentSimulationData.assignments[person.id];
-          const ageCategory =
-            person.age >= 70
-              ? "elderly"
-              : person.age <= 12
-              ? "children"
-              : "adults";
-
-          if (isAssigned) {
-            this.stats.ageGroups.assigned[ageCategory]++;
-          } else {
-            this.stats.ageGroups.unassigned[ageCategory]++;
-          }
-        });
-
-        // Update shelter usage statistics if available
-        if (this.stats.shelterUsage && this.currentSimulationData.shelters) {
-          this.stats.shelterUsage = this.currentSimulationData.shelters.map(
-            (shelter) => {
-              // Count how many people are assigned to this shelter
-              const assignedToThisShelter = Object.values(
-                this.currentSimulationData.assignments
-              ).filter((a) => a.shelterId === shelter.id).length;
-
-              return {
-                id: shelter.id,
-                name: shelter.name,
-                capacity: shelter.capacity,
-                assigned: assignedToThisShelter,
-                percentUsed:
-                  shelter.capacity > 0
-                    ? (assignedToThisShelter / shelter.capacity) * 100
-                    : 0,
-              };
-            }
-          );
-        }
-
-        // Draw new paths for remaining assignments
-        for (const personId in this.currentSimulationData.assignments) {
-          const assignment = this.currentSimulationData.assignments[personId];
-          const person = this.currentSimulationData.people.find(
-            (p) => p.id === parseInt(personId)
-          );
-          const shelter = this.currentSimulationData.shelters.find(
-            (s) => s.id === assignment.shelterId
-          );
-
-          if (person && shelter) {
-            // Draw a line from person to shelter
-            const line = L.polyline(
-              [
-                [person.latitude, person.longitude],
-                [shelter.latitude, shelter.longitude],
-              ],
-              {
-                color: this.getLineColor(person.age),
-                opacity: 0.7,
-                weight: 2,
-              }
-            );
-            this.pathLines.addLayer(line);
-          }
-        }
-
-        // Update the statistics display with all the new calculations
-        this.updateStatisticsDisplay();
       }
 
-      // If any manual people were removed, update the UI
-      if (manualPeopleRemoved > 0) {
-        this.updateManualControlStatus();
-        this.updateManualPeopleList();
+      // Update the manual people list if any manual people were removed
+      this.updateManualPeopleList();
+
+      // Update the buttons to reflect current state
+      this.updateManualControlStatus();
+
+      // Enable and highlight the "Run with Current People" button
+      const runAfterRemovalButton =
+        document.getElementById("run-after-removal");
+      if (runAfterRemovalButton) {
+        runAfterRemovalButton.disabled = false;
+        runAfterRemovalButton.textContent =
+          "Run Simulation With Current People";
+        runAfterRemovalButton.classList.add("flash-attention");
+
+        setTimeout(() => {
+          runAfterRemovalButton.classList.remove("flash-attention");
+        }, 1500);
       }
 
       // Show status message
       const statusElement = document.getElementById("simulation-status");
       if (statusElement) {
-        const message = [];
-        if (manualPeopleRemoved > 0) {
-          message.push(
-            `${manualPeopleRemoved} manual ${
-              manualPeopleRemoved > 1 ? "people" : "person"
-            }`
-          );
-        }
-        if (regularPeopleRemoved > 0) {
-          message.push(
-            `${regularPeopleRemoved} regular ${
-              regularPeopleRemoved > 1 ? "people" : "person"
-            }`
-          );
-        }
-
-        statusElement.textContent = `Removed ${message.join(" and ")}`;
+        statusElement.textContent = `Removed ${markersToRemove.length} ${
+          markersToRemove.length > 1 ? "people" : "person"
+        }. Click "Run Simulation With Current People" to update assignments.`;
         statusElement.className = "status-message success";
-
-        // Reset status after a few seconds
-        setTimeout(() => {
-          if (this.removalModeActive) {
-            statusElement.textContent =
-              "Click on any person to remove them from the map";
-            statusElement.className = "status-message running";
-          } else {
-            statusElement.textContent = "";
-            statusElement.className = "status-message";
-          }
-        }, 2000);
       }
     }
-
-    // Update the run-after-removal button state
-    const runAfterRemovalButton = document.getElementById("run-after-removal");
-    if (runAfterRemovalButton) {
-      // Enable the button and add a clear message
-      runAfterRemovalButton.textContent = "Run Simulation With Current People";
-      runAfterRemovalButton.disabled = false;
-
-      // Add a flash effect to draw attention to the button
-      runAfterRemovalButton.classList.add("flash-attention");
-      setTimeout(() => {
-        runAfterRemovalButton.classList.remove("flash-attention");
-      }, 1500);
-    }
   }
-
   /**
    * Updates the manual control button status
    * Enables the button and shows the count when people are available
@@ -1909,30 +1739,40 @@ class ShelterSimulationVisualizer {
         document.getElementById("priority").value === "true";
       const radius = parseFloat(document.getElementById("radius").value) || 0.5;
 
-      // CRITICAL CHANGE: Instead of using stored people data,
-      // build the people array directly from the markers currently on the map
+      // Build the people array directly from the markers currently on the map
       const currentPeople = [];
+      const currentPeopleIds = new Set(); // Track IDs to prevent duplicates
+
       this.peopleMarkers.eachLayer((marker) => {
         if (marker.getLatLng && marker.options && marker.options.personId) {
           // Find the original person to get the age
+          let personId = marker.options.personId;
+
+          // Skip if we already added this person (prevent duplicates)
+          if (currentPeopleIds.has(personId)) return;
+
+          // Find person data in current simulation
           const originalPerson = this.currentSimulationData.people.find(
-            (p) => p.id === marker.options.personId
+            (p) => p.id === personId
           );
 
           if (originalPerson) {
             // Create a person object from the current marker position
             currentPeople.push({
-              id: marker.options.personId,
+              id: personId,
               age: originalPerson.age,
               latitude: marker.getLatLng().lat,
               longitude: marker.getLatLng().lng,
               isManual: marker.options.isManual === true,
             });
+
+            // Track this ID to prevent duplicates
+            currentPeopleIds.add(personId);
           }
         }
       });
 
-      // Still use the original shelters
+      // Use the original shelters without modification
       const currentShelters = [...this.currentSimulationData.shelters];
 
       console.log(`Running with people from map: ${currentPeople.length}`);
@@ -1978,38 +1818,27 @@ class ShelterSimulationVisualizer {
       // Parse the successful response
       const data = await response.json();
 
-      // IMPORTANT: Also update the manualPeople array to stay in sync
-      // Only keep manual people that are still in the new simulation data
+      // Clean up the manual people array to stay in sync with what's in the new simulation
       if (this.manualPeople && this.manualPeople.length > 0) {
-        const manualIds = this.manualPeople.map((p) => p.id);
-        const newPeopleIds = data.people.map((p) => p.id);
-
-        // Filter to keep only manual people that are in the new data
+        // Keep only manual people that are still in the new people data
+        const newPeopleIds = new Set(data.people.map((p) => p.id));
         this.manualPeople = this.manualPeople.filter((p) =>
-          newPeopleIds.includes(p.id)
+          newPeopleIds.has(p.id)
         );
-
-        // Update manual people with new positions if needed
-        this.manualPeople.forEach((mp) => {
-          const updatedPerson = data.people.find((p) => p.id === mp.id);
-          if (updatedPerson) {
-            mp.latitude = updatedPerson.latitude;
-            mp.longitude = updatedPerson.longitude;
-          }
-        });
 
         console.log(
           `Updated manual people array: ${this.manualPeople.length} remain`
         );
       }
 
-      // Save the updated simulation data
+      // IMPORTANT: Clear all previous visualization data
+      this.clearMap();
+      this.pathLines.clearLayers();
+
+      // Save the new data as the current simulation data
       this.currentSimulationData = data;
 
-      // Clear any existing data
-      this.clearMap();
-
-      // Display the results on the map
+      // Visualize the new simulation results
       this.visualizeSimulation(data.people, data.shelters, data.assignments);
 
       // Update status message
@@ -2024,6 +1853,10 @@ class ShelterSimulationVisualizer {
         }, 3000);
       }
 
+      // Update the manual people list and controls
+      this.updateManualPeopleList();
+      this.updateManualControlStatus();
+
       console.log("=== RUN WITH CURRENT PEOPLE END ===");
     } catch (error) {
       console.error("Error running with current people:", error);
@@ -2033,7 +1866,6 @@ class ShelterSimulationVisualizer {
       }
     }
   }
-
   /**
    * Visualizes server-side simulation with both original people and manually added people
    * Calls server with custom data and processes the response
@@ -2471,6 +2303,221 @@ async function runServerSimulation() {
     }
   }
 }
+
+/**
+ * Unified "Run Updated Simulation" button to handle both additions and removals
+ */
+function setupUnifiedUpdateButton() {
+  // Find or create the button
+  let updateButton = document.getElementById("run-updated-simulation");
+
+  if (!updateButton) {
+    // Create a new button if it doesn't exist
+    updateButton = document.createElement("button");
+    updateButton.id = "run-updated-simulation";
+    updateButton.className = "control-button";
+    updateButton.style.backgroundColor = "#4285F4"; // Google blue
+    updateButton.style.fontWeight = "bold";
+    updateButton.textContent = "Run Updated Simulation";
+
+    // Find where to insert it (after the run-after-removal button)
+    const afterRemovalButton = document.getElementById("run-after-removal");
+    if (afterRemovalButton && afterRemovalButton.parentNode) {
+      afterRemovalButton.parentNode.insertBefore(
+        updateButton,
+        afterRemovalButton.nextSibling
+      );
+    } else {
+      // Fallback insertion into the control container
+      const controlContainer = document.querySelector(".control-container");
+      if (controlContainer) {
+        controlContainer.appendChild(updateButton);
+      }
+    }
+  }
+
+  // Add or update the click handler
+  updateButton.addEventListener("click", function () {
+    // First, disable any active modes
+    const placementButton = document.getElementById("enable-placement");
+    const removalButton = document.getElementById("enable-removal");
+
+    if (placementButton && placementButton.classList.contains("active")) {
+      placementButton.classList.remove("active");
+      placementButton.textContent = "Place People Manually";
+      if (window.visualizer) {
+        window.visualizer.enableManualPlacement(false);
+      }
+    }
+
+    if (removalButton && removalButton.classList.contains("active")) {
+      removalButton.classList.remove("active");
+      if (window.visualizer) {
+        window.visualizer.enableUniversalRemoval(false);
+      }
+    }
+
+    // Run the unified simulation update function
+    if (window.visualizer) {
+      window.visualizer.runUnifiedSimulationUpdate();
+    }
+  });
+
+  return updateButton;
+}
+
+/**
+ * Add the unified simulation update method to the visualizer class
+ */
+ShelterSimulationVisualizer.prototype.runUnifiedSimulationUpdate =
+  async function () {
+    console.log("=== UNIFIED SIMULATION UPDATE START ===");
+    const statusElement = document.getElementById("simulation-status");
+
+    if (statusElement) {
+      statusElement.textContent =
+        "Updating simulation with current configuration...";
+      statusElement.className = "status-message running";
+    }
+
+    try {
+      // Get all current people from the map (both manual and auto)
+      const allCurrentPeople = [];
+      const seenIds = new Set();
+
+      // Get people from markers on the map
+      this.peopleMarkers.eachLayer((marker) => {
+        if (marker.getLatLng && marker.options && marker.options.personId) {
+          const personId = marker.options.personId;
+
+          // Skip duplicates
+          if (seenIds.has(personId)) return;
+          seenIds.add(personId);
+
+          // Find original person data (for age)
+          const originalPerson = this.currentSimulationData?.people?.find(
+            (p) => p.id === personId
+          );
+
+          if (originalPerson) {
+            allCurrentPeople.push({
+              id: personId,
+              age: originalPerson.age,
+              latitude: marker.getLatLng().lat,
+              longitude: marker.getLatLng().lng,
+              isManual: marker.options.isManual === true,
+            });
+          }
+        }
+      });
+
+      // Add any manually added people not yet on the map
+      this.manualPeople.forEach((person) => {
+        if (!seenIds.has(person.id)) {
+          allCurrentPeople.push({ ...person });
+          seenIds.add(person.id);
+        }
+      });
+
+      // Use the current shelters without changes
+      const currentShelters = [...this.currentSimulationData.shelters];
+
+      // Get current simulation parameters
+      const priorityEnabled =
+        document.getElementById("priority").value === "true";
+      const radius = parseFloat(document.getElementById("radius").value) || 0.5;
+
+      console.log(
+        `Running unified update with ${allCurrentPeople.length} people and ${currentShelters.length} shelters`
+      );
+
+      // Create the request with all current data
+      const requestData = {
+        peopleCount: 0,
+        shelterCount: 0,
+        centerLatitude: 31.2518,
+        centerLongitude: 34.7913,
+        radiusKm: radius,
+        prioritySettings: {
+          enableAgePriority: priorityEnabled,
+          childMaxAge: 12,
+          elderlyMinAge: 70,
+        },
+        useCustomPeople: true,
+        customPeople: allCurrentPeople,
+        useCustomShelters: true,
+        customShelters: currentShelters,
+      };
+
+      // Call the server API
+      const response = await fetch(
+        `https://localhost:${PORT}/api/Simulation/run`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Server responded with ${response.status}: ${response.statusText}`
+        );
+      }
+
+      // Process the response
+      const data = await response.json();
+
+      // Clear all existing visualization
+      this.clearMap();
+      this.pathLines.clearLayers();
+
+      // Save the new current simulation data
+      this.currentSimulationData = data;
+
+      // Visualize the new simulation
+      this.visualizeSimulation(data.people, data.shelters, data.assignments);
+
+      // Update the manual people list to stay in sync
+      if (this.manualPeople && this.manualPeople.length > 0) {
+        const newIds = new Set(data.people.map((p) => p.id));
+        this.manualPeople = this.manualPeople.filter((p) => newIds.has(p.id));
+
+        // Mark the correct manual people as manual in the current data
+        const manualIds = new Set(this.manualPeople.map((p) => p.id));
+        data.people.forEach((p) => {
+          if (manualIds.has(p.id)) {
+            p.isManual = true;
+          }
+        });
+      }
+
+      // Update UI elements
+      this.updateManualPeopleList();
+      this.updateManualControlStatus();
+
+      // Show success message
+      if (statusElement) {
+        statusElement.textContent = "Simulation updated successfully";
+        statusElement.className = "status-message success";
+
+        setTimeout(() => {
+          statusElement.textContent = "";
+          statusElement.className = "status-message";
+        }, 3000);
+      }
+
+      console.log("=== UNIFIED SIMULATION UPDATE END ===");
+    } catch (error) {
+      console.error("Error updating simulation:", error);
+      if (statusElement) {
+        statusElement.textContent = `Error: ${error.message}`;
+        statusElement.className = "status-message error";
+      }
+    }
+  };
 
 //==============================================================
 // Update Server Statistics
