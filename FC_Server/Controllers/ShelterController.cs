@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FC_Server.Models;
+using Microsoft.AspNetCore.Mvc;
 using System.Net;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -109,33 +110,35 @@ namespace FC_Server.Controllers
         [HttpGet("getMyShelter")]
         public IActionResult getMyShelter(int provider_id)
         {
-            var shelterData = FC_Server.Models.Shelter.getMyShelter(provider_id);
+            List<Shelter> sheltersData = FC_Server.Models.Shelter.getMyShelters(provider_id);
 
-            if (shelterData != null)
+            if (sheltersData != null && sheltersData.Count > 0)
             {
                 return Ok(new
                 {
-                    message = "User data trensfer successful",
-                    shlter = new
+                    message = "User data transfer successful",
+                    shelters = sheltersData.Select(shelter => new
                     {
-                        shelter_id = shelterData.ShelterId,
-                        provider_id = shelterData.ProviderId,
-                        shelter_type = shelterData.ShelterType,
-                        name = shelterData.Name,
-                        latitude = shelterData.Latitude,
-                        longitude = shelterData.Longitude,
-                        address = shelterData.Address,
-                        capacity = shelterData.Capacity,
-                        is_accessible = shelterData.IsAccessible,
-                        is_active = shelterData.IsActive,
-                        additional_information = shelterData.AdditionalInformation,
-                        created_at = shelterData.CreatedAt,
-                        last_updated = shelterData.LastUpdated
-                    }
+                        shelter_id = shelter.ShelterId,
+                        provider_id = shelter.ProviderId,
+                        shelter_type = shelter.ShelterType,
+                        name = shelter.Name,
+                        latitude = shelter.Latitude,
+                        longitude = shelter.Longitude,
+                        address = shelter.Address,
+                        capacity = shelter.Capacity,
+                        is_accessible = shelter.IsAccessible,
+                        is_active = shelter.IsActive,
+                        additional_information = shelter.AdditionalInformation,
+                        created_at = shelter.CreatedAt,
+                        last_updated = shelter.LastUpdated
+                    })
                 });
             }
+
             return BadRequest(new { message = "Invalid ID" });
         }
+
 
         // POST api/<ShelterController>/shelterActiveStatus
         [HttpPost("shelterActiveStatus")]
