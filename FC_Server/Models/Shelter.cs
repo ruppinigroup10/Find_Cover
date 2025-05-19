@@ -98,11 +98,12 @@
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.getShelter(shelter_id);
         }
-        public static Shelter? getMyShelter(int provider_id)
+        public static List<Shelter> getMyShelters(int provider_id)
         {
             DBservicesShelter dbs = new DBservicesShelter();
-            return dbs.getMyShelter(provider_id);
+            return dbs.getMyShelters(provider_id);
         }
+
         public static Shelter? shelterActiveStatus(int shelter_id, bool status)
         {
             DBservicesShelter dbs = new DBservicesShelter();

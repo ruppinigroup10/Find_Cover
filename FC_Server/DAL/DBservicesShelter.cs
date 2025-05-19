@@ -271,12 +271,11 @@ public class DBservicesShelter
             }
         }
 
-    public Shelter? getMyShelter(int provider_id)
+    public List<Shelter> getMyShelters(int provider_id)
     {
-
         SqlConnection con;
         SqlCommand cmd;
-        Shelter? shelter = null;
+        List<Shelter> shelters = new List<Shelter>();
 
         try
         {
@@ -284,7 +283,6 @@ public class DBservicesShelter
         }
         catch (Exception)
         {
-            // write to log
             throw;
         }
 
@@ -297,9 +295,9 @@ public class DBservicesShelter
         {
             using (SqlDataReader dr = cmd.ExecuteReader())
             {
-                if (dr.Read())
+                while (dr.Read())
                 {
-                    shelter = new Shelter
+                    Shelter shelter = new Shelter
                     {
                         ShelterId = Convert.ToInt32(dr["shelter_id"]),
                         ShelterType = dr["shelter_type"].ToString() ?? "",
@@ -313,9 +311,12 @@ public class DBservicesShelter
                         IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
                         IsActive = Convert.ToBoolean(dr["is_active"])
                     };
+
+                    shelters.Add(shelter);
                 }
             }
-            return shelter;
+
+            return shelters;
         }
         catch (Exception ex)
         {
@@ -329,7 +330,6 @@ public class DBservicesShelter
         {
             if (con != null)
             {
-                // close the db connection
                 con.Close();
             }
         }
