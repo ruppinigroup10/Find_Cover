@@ -428,7 +428,7 @@ public class DBservices
         }
     }
 
-    public UserPreferences? AddPreference(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
+    public UserPreferences? AddPreference(int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -443,11 +443,12 @@ public class DBservices
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
-        paramDic.Add("@shelter_type", shelter_type);
+        paramDic.Add("@preferred_shelter_type", shelter_type);
+        paramDic.Add("@accessible_needed", accessibility_needed);
         paramDic.Add("@num_default_people", num_default_people);
-        // חסרים כאן הפרמטרים accessibility_needed ו-pets_allowed - יש להוסיף אותם למילון כדי שההוספה תתבצע כראוי
+        paramDic.Add("@pets_allowed", pets_allowed);
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddPreference", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_AddPreference"
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddUserPreference", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_AddPreference"
         try
         {
             using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים
@@ -458,11 +459,11 @@ public class DBservices
                     {
                         PreferenceId = Convert.ToInt32(dr["preference_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        AccessibilityNeeded = Convert.ToBoolean(dr["accessibility_needed"]),
+                        ShelterType = dr["preferred_shelter_type"].ToString() ?? "",
+                        AccessibilityNeeded = Convert.ToBoolean(dr["accessible_needed"]),
                         NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
                         PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
-                        LastUpdate = Convert.ToDateTime(dr["last_update"]) // שימו לב שייתכן שהפרוצדורה המאוחסנת לא תחזיר את last_update בעת הוספה
+                        LastUpdate = Convert.ToDateTime(dr["last_updated"]) // שימו לב שייתכן שהפרוצדורה המאוחסנת לא תחזיר את last_update בעת הוספה
                     };
                 }
             }
@@ -470,11 +471,15 @@ public class DBservices
         }
         catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
+            if (ex.Message.Contains("Invalid ID"))
             {
                 throw new Exception("Invalid ID");
             }
-            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בהוספה - כדאי לשנות את הודעת השגיאה ל-"Add failed"
+            if (ex.Message.Contains("User added Preference already"))
+            {
+                throw new Exception("User added Preference already");
+            }
+            throw new Exception("Add failed");
         }
         finally
         {
@@ -546,7 +551,7 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method updates users known location data
     //--------------------------------------------------------------------------------------------------
-    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
+    public KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -567,7 +572,7 @@ public class DBservices
         paramDic.Add("@radius", radius);
         paramDic.Add("@address", address);
         paramDic.Add("@location_name", location_name);
-        paramDic.Add("@added_at", added_at);
+       
         //paramDic.Add("@added_at", added_at); // שורה כפולה של הוספת added_at - יש למחוק אחת מהן
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateKnownLocation"
         try
@@ -593,11 +598,11 @@ public class DBservices
         }
         catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
-            {
+            if (ex.Message.Contains("Invalid ID"))
                 throw new Exception("Invalid ID");
-            }
-            throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בעדכון
+            if (ex.Message.Contains("Location not found"))
+                throw new Exception("Location not found for this user");
+            throw new Exception("Update failed");
         }
         finally
         {

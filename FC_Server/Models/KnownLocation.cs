@@ -52,16 +52,19 @@ public class KnownLocation
         DBservices dbs = new DBservices();
         return dbs.GetKnownLocation(user_id);
     }
-    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
+    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
     {
+        latitude = 31.2518f;
+        longitude = 34.7913f;
+        radius = 100;
         DBservices dbs = new DBservices();
-        return dbs.UpdateKnownLocation(location_id, user_id, latitude, longitude, radius, address, location_name, added_at);
+        return dbs.UpdateKnownLocation(location_id, user_id, latitude, longitude, radius, address, location_name);
     }
     public static KnownLocation? AddKnownLocation(int user_id, float latitude, float longitude, float radius, string address, string location_name)
     {
         latitude = 31.2518f;
         longitude = 34.7913f;
-        radius = 300;
+        radius = 100;
         DBservices dbs = new DBservices();
         return dbs.AddKnownLocation(user_id, latitude, longitude, radius, address, location_name);
     }
