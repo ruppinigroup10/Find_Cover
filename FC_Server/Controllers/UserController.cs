@@ -199,8 +199,8 @@ public class UserController : ControllerBase
         }
     }
 
-    // GET: api/<UserController>/GetKnownLocations  
-    [HttpGet("GetKnownLocations")]
+    // GET: api/<UserController>/GetKnownLocation  
+    [HttpGet("GetKnownLocation")]
     public IActionResult GetKnownLocation(int location_id)
     {
         var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(location_id);
@@ -210,7 +210,17 @@ public class UserController : ControllerBase
             return Ok(new
             {
                 message = "Known location data transfer successful",
-                knownLocation = knownLocation
+                knownLocation = new
+                { 
+                    location_id = knownLocation.LocationId,
+                    user_id = knownLocation.UserId,
+                    latitude = knownLocation.Latitude,
+                    longitude = knownLocation.Longitude,
+                    radius = knownLocation.Radius,
+                    address = knownLocation.Address,
+                    location_name = knownLocation.LocationName,
+                    created_at = knownLocation.CreatedAt
+                }
             });
         }
         return BadRequest(new { message = "Invalid ID" });

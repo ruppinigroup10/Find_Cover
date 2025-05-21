@@ -514,7 +514,7 @@ public class DBservices
                 {
                     knownLocation = new KnownLocation // Correctly initialize the object
                     {
-                        LocationId = Convert.ToInt32(dr["location_id"]),
+                        LocationId= Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
                         Latitude = Convert.ToSingle(dr["latitude"]),
                         Longitude = Convert.ToSingle(dr["longitude"]),
