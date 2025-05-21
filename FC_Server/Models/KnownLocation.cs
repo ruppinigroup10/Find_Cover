@@ -57,6 +57,7 @@ public class KnownLocation
 <<<<<<< Updated upstream
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
 =======
+>>>>>>> Stashed changes
 
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
 >>>>>>> Stashed changes
