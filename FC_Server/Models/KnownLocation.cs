@@ -56,6 +56,12 @@ public class KnownLocation
         return dbs.GetMyKnownLocations(user_id);
     }
     public static KnownLocation? GetKnownLocations(int location_id)
+    public static List<KnownLocation> GetKnownLocations(int user_id)
+    {
+        DBservices dbs = new DBservices();
+        return dbs.GetKnownLocations(user_id);
+    }
+    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
     {
         DBservices dbs = new DBservices();
         return dbs.GetKnownLocations(location_id);

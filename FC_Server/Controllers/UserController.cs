@@ -205,6 +205,11 @@ public class UserController : ControllerBase
         var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocations(location_id); // שים לב לשם החדש
 
         if (knownLocation != null)
+    public IActionResult GetKnownLocations(int user_id)
+    {
+        var knownLocations = FC_Server.Models.KnownLocation.GetKnownLocations(user_id); // שים לב לשם החדש
+
+        if (knownLocations != null && knownLocations.Count > 0)
         {
             return Ok(new
             {
@@ -224,6 +229,33 @@ public class UserController : ControllerBase
         var knownLocations = FC_Server.Models.KnownLocation.GetMyKnownLocations(user_id); // שים לב לשם החדש
 
         if (knownLocations != null && knownLocations.Count > 0)
+                knownLocations = knownLocations
+            });
+        }
+
+        return BadRequest(new { message = "No known locations found for this user" });
+    }
+
+    [HttpPut("UpdateKnownLocation")]
+    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
+    {
+        if (knownLocation.CreatedAt == null)
+        {
+            return BadRequest(new { message = "CreatedAt cannot be null" });
+        }
+
+        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(
+            knownLocation.LocationId,
+            knownLocation.UserId,
+            knownLocation.Latitude,
+            knownLocation.Longitude,
+            knownLocation.Radius,
+            knownLocation.Address,
+            knownLocation.LocationName,
+            knownLocation.CreatedAt.Value // Use .Value to convert DateTime? to DateTime
+        );
+
+        if (updatedKnownLocation != null)
         {
             return Ok(new
             {
@@ -281,6 +313,8 @@ public class UserController : ControllerBase
         }
     }
 
+        return BadRequest(new { message = "Update failed" });
+    }
     // POST: api/<UserController>/AddKnownLocation
     [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
     public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה

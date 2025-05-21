@@ -510,6 +510,28 @@ public class DBservices
         paramDic.Add("@location_id", location_id);
 
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocations", con, paramDic);
+    //--------------------------------------------------------------------------------------------------
+    // This method geting users known location data
+    //--------------------------------------------------------------------------------------------------
+    public List<KnownLocation> GetKnownLocations(int user_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        List<KnownLocation> knownLocations = new List<KnownLocation>();
+
+        try
+        {
+            con = connect("myProjDB"); // יצירת החיבור למסד הנתונים
+        }
+        catch (Exception)
+        {
+            throw; // במקרה של שגיאה בחיבור
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
 
         try
         {
@@ -518,6 +540,9 @@ public class DBservices
                 if (dr.Read()) // Read a single row
                 {
                     knownLocation = new KnownLocation
+                while (dr.Read()) // שים לב: שונה מ־if ל־while כדי לעבור על כל השורות
+                {
+                    KnownLocation location = new KnownLocation
                     {
                         LocationId = Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -529,9 +554,13 @@ public class DBservices
                         CreatedAt = dr["created_at"] != DBNull.Value
                             ? Convert.ToDateTime(dr["created_at"])
                             : null
+    ? Convert.ToDateTime(dr["created_at"])
+    : null
                     };
+                    knownLocations.Add(location); // הוספת המיקום לרשימה
                 }
             }
+            return knownLocations; // החזרת כל המיקומים שנמצאו
         }
         catch (Exception ex)
         {
@@ -653,6 +682,7 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
+                        CreatedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
             }
