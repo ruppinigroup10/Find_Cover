@@ -200,9 +200,28 @@ public class UserController : ControllerBase
 
     // GET: api/<UserController>/GetKnownLocations
     [HttpGet("GetKnownLocations")]
-    public IActionResult GetKnownLocations(int user_id)
+    public IActionResult GetKnownLocations(int location_id)
     {
-        var knownLocations = FC_Server.Models.KnownLocation.GetKnownLocations(user_id); // שים לב לשם החדש
+        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocations(location_id); // שים לב לשם החדש
+
+        if (knownLocation != null)
+        {
+            return Ok(new
+            {
+                message = "Known locations data transfer successful",
+                knownLocations = knownLocation
+            });
+        }
+
+        return BadRequest(new { message = "No known locations found for this location_id" });
+    }
+
+
+    // GET: api/<UserController>/GetMyKnownLocations
+    [HttpGet("GetMyKnownLocations")]
+    public IActionResult GetMyKnownLocations(int user_id)
+    {
+        var knownLocations = FC_Server.Models.KnownLocation.GetMyKnownLocations(user_id); // שים לב לשם החדש
 
         if (knownLocations != null && knownLocations.Count > 0)
         {
@@ -216,41 +235,29 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "No known locations found for this user" });
     }
 
+    // PUT: api/<UserController>/UpdateKnownLocations
     [HttpPut("UpdateKnownLocation")]
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
         try
         {
-            var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
+            if (knownLocation.CreatedAt == null)
+            {
+                return BadRequest(new { message = "CreatedAt cannot be null" });
+            }
+
+            var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(
+                knownLocation.LocationId,
+                knownLocation.UserId,
+                knownLocation.Latitude,
+                knownLocation.Longitude,
+                knownLocation.Radius,
+                knownLocation.Address,
+                knownLocation.LocationName
+               // Use .Value to convert DateTime? to DateTime  
+            );
+
             if (updatedKnownLocation != null)
-=======
-=======
->>>>>>> Stashed changes
-        if (knownLocation.CreatedAt == null)
-        {
-            return BadRequest(new { message = "CreatedAt cannot be null" });
-        }
-
-        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(
-            knownLocation.LocationId,
-            knownLocation.UserId,
-            knownLocation.Latitude,
-            knownLocation.Longitude,
-            knownLocation.Radius,
-            knownLocation.Address,
-            knownLocation.LocationName,
-            knownLocation.CreatedAt.Value // Use .Value to convert DateTime? to DateTime
-        );
-
-        if (updatedKnownLocation != null)
-        {
-            return Ok(new
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
             {
                 return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
                 {
@@ -260,7 +267,6 @@ public class UserController : ControllerBase
             }
             return BadRequest(new { message = "Update failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
         }
-<<<<<<< Updated upstream
         catch (Exception ex)
         {
             if (ex.Message.Contains("Invalid ID"))
@@ -273,15 +279,6 @@ public class UserController : ControllerBase
             }
             return BadRequest(new { message = "Update failed" });
         }
-<<<<<<< Updated upstream
-=======
-
-        return BadRequest(new { message = "Update failed" });
->>>>>>> Stashed changes
-=======
-
-        return BadRequest(new { message = "Update failed" });
->>>>>>> Stashed changes
     }
 
     // POST: api/<UserController>/AddKnownLocation

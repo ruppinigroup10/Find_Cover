@@ -490,10 +490,67 @@ public class DBservices
         }
     }
 
+
+    public KnownLocation? GetKnownLocations(int location_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        KnownLocation? knownLocation = null;
+
+        try
+        {
+            con = connect("myProjDB"); // Create the connection to the database
+        }
+        catch (Exception)
+        {
+            throw; // Rethrow the exception if connection fails
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@location_id", location_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocations", con, paramDic);
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read()) // Read a single row
+                {
+                    knownLocation = new KnownLocation
+                    {
+                        LocationId = Convert.ToInt32(dr["location_id"]),
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        Latitude = Convert.ToSingle(dr["latitude"]),
+                        Longitude = Convert.ToSingle(dr["longitude"]),
+                        Radius = Convert.ToSingle(dr["radius"]),
+                        Address = dr["address"].ToString() ?? "",
+                        LocationName = dr["location_name"].ToString() ?? "",
+                        CreatedAt = dr["created_at"] != DBNull.Value
+                            ? Convert.ToDateTime(dr["created_at"])
+                            : null
+                    };
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("User data transfer failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null)
+            {
+                con.Close(); // Ensure the connection is closed
+            }
+        }
+
+        return knownLocation; // Return the KnownLocation object or null
+    }
     //--------------------------------------------------------------------------------------------------
     // This method geting users known location data
     //--------------------------------------------------------------------------------------------------
-    public List<KnownLocation> GetKnownLocations(int user_id)
+    public List<KnownLocation> GetMyKnownLocations(int user_id)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -511,7 +568,7 @@ public class DBservices
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetMyKnownLocations", con, paramDic);
 
         try
         {
@@ -578,8 +635,8 @@ public class DBservices
         paramDic.Add("@radius", radius);
         paramDic.Add("@address", address);
         paramDic.Add("@location_name", location_name);
+        
        
-        //paramDic.Add("@added_at", added_at); // שורה כפולה של הוספת added_at - יש למחוק אחת מהן
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateKnownLocation"
         try
         {
@@ -596,7 +653,6 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        CreatedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
             }

@@ -39,6 +39,7 @@ public class KnownLocation
                      float radius, string address, string locationName,
                      DateTime? addedAt)  // ✅ כעת תואם לשדה המחלקה
     {
+        this.location_id = LocationId;
         this.user_id = userId;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -49,20 +50,18 @@ public class KnownLocation
     }
 
     //יצירת פונקציה סטטית שבתוכה יש קריאה לפונקציה לא סטטית
-    public static List<KnownLocation> GetKnownLocations(int user_id)
+    public static List<KnownLocation> GetMyKnownLocations(int user_id)
     {
         DBservices dbs = new DBservices();
-        return dbs.GetKnownLocations(user_id);
+        return dbs.GetMyKnownLocations(user_id);
     }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
-=======
-=======
->>>>>>> Stashed changes
+    public static KnownLocation? GetKnownLocations(int location_id)
+    {
+        DBservices dbs = new DBservices();
+        return dbs.GetKnownLocations(location_id);
+    }
 
-    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
->>>>>>> Stashed changes
+    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
     {
         latitude = 31.2518f;
         longitude = 34.7913f;
