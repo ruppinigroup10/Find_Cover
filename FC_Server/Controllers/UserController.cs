@@ -220,10 +220,12 @@ public class UserController : ControllerBase
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         try
         {
             var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
             if (updatedKnownLocation != null)
+=======
 =======
 >>>>>>> Stashed changes
         if (knownLocation.CreatedAt == null)
@@ -247,6 +249,7 @@ public class UserController : ControllerBase
             return Ok(new
 <<<<<<< Updated upstream
 >>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
             {
                 return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
@@ -271,6 +274,8 @@ public class UserController : ControllerBase
             return BadRequest(new { message = "Update failed" });
         }
 <<<<<<< Updated upstream
+=======
+
         return BadRequest(new { message = "Update failed" });
 >>>>>>> Stashed changes
 =======

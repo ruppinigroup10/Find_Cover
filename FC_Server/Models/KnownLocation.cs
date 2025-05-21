@@ -55,7 +55,9 @@ public class KnownLocation
         return dbs.GetKnownLocations(user_id);
     }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
+=======
 =======
 >>>>>>> Stashed changes
 
