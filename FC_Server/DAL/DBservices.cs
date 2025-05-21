@@ -493,60 +493,66 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method geting users known location data
     //--------------------------------------------------------------------------------------------------
-    public KnownLocation? GetKnownLocation(int user_id)
+    public List<KnownLocation> GetKnownLocations(int user_id)
     {
         SqlConnection con;
         SqlCommand cmd;
-        KnownLocation? knownLocation = null;
+        List<KnownLocation> knownLocations = new List<KnownLocation>();
+
         try
         {
-            con = connect("myProjDB"); // יוצר ומחזיר חיבור למסד הנתונים
+            con = connect("myProjDB"); // יצירת החיבור למסד הנתונים
         }
         catch (Exception)
         {
-            // write to log
-            throw; // במקרה של שגיאה בחיבור, השגיאה נזרקת הלאה
+            throw; // במקרה של שגיאה בחיבור
         }
+
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@user_id", user_id); // הוספת פרמטר user_id למילון הפרמטרים עבור הפרוצדורה המאוחסנת
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_GetKnownLocation" עם החיבור והפרמטרים
+        paramDic.Add("@user_id", user_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
+
         try
         {
-            using (SqlDataReader dr = cmd.ExecuteReader()) // ביצוע הפקודה וקבלת קורא נתונים - שימוש ב-using מבטיח סגירה אוטומטית של ה-DataReader
+            using (SqlDataReader dr = cmd.ExecuteReader())
             {
-                if (dr.Read()) // קריאת שורה אחת מתוצאות השאילתה - מצופה שתחזור לכל היותר שורה אחת עבור משתמש יחיד
+                while (dr.Read()) // שים לב: שונה מ־if ל־while כדי לעבור על כל השורות
                 {
-                    knownLocation = new KnownLocation // יצירת אובייקט KnownLocation עם הנתונים שחזרו ממסד הנתונים
+                    KnownLocation location = new KnownLocation
                     {
+                        LocationId = Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
                         Latitude = Convert.ToSingle(dr["latitude"]),
                         Longitude = Convert.ToSingle(dr["longitude"]),
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        AddedAt = Convert.ToDateTime(dr["added_at"])
+                        CreatedAt = dr["created_at"] != DBNull.Value
+    ? Convert.ToDateTime(dr["created_at"])
+    : null
+
                     };
+
+                    knownLocations.Add(location); // הוספת המיקום לרשימה
                 }
             }
-            return knownLocation; // החזרת אובייקט KnownLocation 
+
+            return knownLocations; // החזרת כל המיקומים שנמצאו
         }
-        catch (Exception ex) // טיפול בשגיאות כלליות שעלולות להתרחש בזמן ביצוע הפקודה
+        catch (Exception ex)
         {
-            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין - ספציפי לשגיאה אפשרית מהפרוצדורה המאוחסנת
-            {
-                throw new Exception("Invalid ID");
-            }
-            throw new Exception("User data transfer failed"); // שגיאה כללית במקרה של כשל בהעברת נתוני המשתמש
+            throw new Exception("User data transfer failed: " + ex.Message);
         }
         finally
         {
             if (con != null)
             {
-                // close the db connection
-                con.Close(); // סגירת החיבור למסד הנתונים בבלוק finally כדי להבטיח שהוא תמיד נסגר
+                con.Close();
             }
         }
     }
+
 
     //--------------------------------------------------------------------------------------------------
     // This method updates users known location data
@@ -590,7 +596,7 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        AddedAt = Convert.ToDateTime(dr["added_at"])
+                        CreatedAt = Convert.ToDateTime(dr["added_at"])
                     };
                 }
             }
@@ -650,7 +656,7 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
-                        AddedAt = Convert.ToDateTime(dr["created_at"])
+                        CreatedAt = Convert.ToDateTime(dr["created_at"])
                     };
                 }
             }

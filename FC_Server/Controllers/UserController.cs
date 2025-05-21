@@ -198,29 +198,53 @@ public class UserController : ControllerBase
         }
     }
 
-    // GET: api/<UserController>/GetKnownLocation
-    [HttpGet("GetKnownLocation")]
-    public IActionResult GetKnownLocation(int user_id)
+    // GET: api/<UserController>/GetKnownLocations
+    [HttpGet("GetKnownLocations")]
+    public IActionResult GetKnownLocations(int user_id)
     {
-        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(user_id); // קריאה למתודה הסטטית GetKnownLocation במודל KnownLocation
-        if (knownLocation != null)
+        var knownLocations = FC_Server.Models.KnownLocation.GetKnownLocations(user_id); // שים לב לשם החדש
+
+        if (knownLocations != null && knownLocations.Count > 0)
         {
-            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע
+            return Ok(new
             {
-                message = "Known location data transfer successful",
-                knownLocation = knownLocation
+                message = "Known locations data transfer successful",
+                knownLocations = knownLocations
             });
         }
-        return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+
+        return BadRequest(new { message = "No known locations found for this user" });
     }
-    // PUT: api/<UserController>/UpdateKnownLocation
-    [HttpPut("UpdateKnownLocation")] // שימוש ב-HttpPost עבור עדכון - שקול שימוש ב-HttpPut
-    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
+
+    [HttpPut("UpdateKnownLocation")]
+    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
+<<<<<<< Updated upstream
         try
         {
             var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(knownLocation.LocationId, knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName); // קריאה למתודה הסטטית UpdateKnownLocation במודל KnownLocation
             if (updatedKnownLocation != null)
+=======
+        if (knownLocation.CreatedAt == null)
+        {
+            return BadRequest(new { message = "CreatedAt cannot be null" });
+        }
+
+        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(
+            knownLocation.LocationId,
+            knownLocation.UserId,
+            knownLocation.Latitude,
+            knownLocation.Longitude,
+            knownLocation.Radius,
+            knownLocation.Address,
+            knownLocation.LocationName,
+            knownLocation.CreatedAt.Value // Use .Value to convert DateTime? to DateTime
+        );
+
+        if (updatedKnownLocation != null)
+        {
+            return Ok(new
+>>>>>>> Stashed changes
             {
                 return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
                 {
@@ -242,7 +266,13 @@ public class UserController : ControllerBase
             }
             return BadRequest(new { message = "Update failed" });
         }
+<<<<<<< Updated upstream
+=======
+
+        return BadRequest(new { message = "Update failed" });
+>>>>>>> Stashed changes
     }
+
     // POST: api/<UserController>/AddKnownLocation
     [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
     public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה

@@ -9,7 +9,7 @@ public class KnownLocation
     private float radius;
     private string address;
     private string location_name;
-    private DateTime added_at;
+    private DateTime? added_at;
 
     public int LocationId { get => location_id; set => location_id = value; }
     public int UserId { get => user_id; set => user_id = value; }
@@ -18,12 +18,14 @@ public class KnownLocation
     public float Radius { get => radius; set => radius = value; }
     public string Address { get => address; set => address = value; }
     public string LocationName { get => location_name; set => location_name = value; }
-    public DateTime AddedAt { get => added_at; set => added_at = value; }
+    public DateTime? CreatedAt { get => added_at; set => added_at = value; }
+
+
+
 
     // Constructor without parameters
     public KnownLocation()
     {
-        this.location_id = 1;
         this.user_id = 0;
         this.latitude = 0f;
         this.longitude = 0f;
@@ -34,10 +36,9 @@ public class KnownLocation
     }
     // Constructor with parameters
     public KnownLocation(int locationId, int userId, float latitude, float longitude,
-                         float radius, string address, string locationName,
-                         DateTime addedAt)
+                     float radius, string address, string locationName,
+                     DateTime? addedAt)  // ✅ כעת תואם לשדה המחלקה
     {
-        this.location_id = locationId;
         this.user_id = userId;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -46,13 +47,19 @@ public class KnownLocation
         this.location_name = locationName;
         this.added_at = addedAt;
     }
+
     //יצירת פונקציה סטטית שבתוכה יש קריאה לפונקציה לא סטטית
-    public static KnownLocation? GetKnownLocation(int user_id)
+    public static List<KnownLocation> GetKnownLocations(int user_id)
     {
         DBservices dbs = new DBservices();
-        return dbs.GetKnownLocation(user_id);
+        return dbs.GetKnownLocations(user_id);
     }
+<<<<<<< Updated upstream
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)
+=======
+
+    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
+>>>>>>> Stashed changes
     {
         latitude = 31.2518f;
         longitude = 34.7913f;
