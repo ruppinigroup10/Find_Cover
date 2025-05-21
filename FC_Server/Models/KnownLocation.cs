@@ -26,6 +26,7 @@ public class KnownLocation
     // Constructor without parameters
     public KnownLocation()
     {
+        
         this.user_id = 0;
         this.latitude = 0f;
         this.longitude = 0f;
@@ -39,10 +40,7 @@ public class KnownLocation
                      float radius, string address, string locationName,
                      DateTime? addedAt)  // ✅ כעת תואם לשדה המחלקה
     {
-<<<<<<< Updated upstream
         this.location_id = LocationId;
-=======
->>>>>>> Stashed changes
         this.user_id = userId;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -53,25 +51,16 @@ public class KnownLocation
     }
 
     //יצירת פונקציה סטטית שבתוכה יש קריאה לפונקציה לא סטטית
-<<<<<<< Updated upstream
     public static List<KnownLocation> GetMyKnownLocations(int user_id)
     {
         DBservices dbs = new DBservices();
         return dbs.GetMyKnownLocations(user_id);
     }
-    public static KnownLocation? GetKnownLocations(int location_id)
-=======
-    public static List<KnownLocation> GetKnownLocations(int user_id)
+  
+    public static KnownLocation? GetKnownLocation(int user_id)
     {
         DBservices dbs = new DBservices();
-        return dbs.GetKnownLocations(user_id);
-    }
-
-    public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name, DateTime added_at)
->>>>>>> Stashed changes
-    {
-        DBservices dbs = new DBservices();
-        return dbs.GetKnownLocations(location_id);
+        return dbs.GetKnownLocation(user_id);
     }
 
     public static KnownLocation? UpdateKnownLocation(int location_id, int user_id, float latitude, float longitude, float radius, string address, string location_name)

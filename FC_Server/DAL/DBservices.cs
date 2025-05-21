@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Data.SqlClient;
+﻿using System.Data.SqlClient;
 using System.Data;
 using System.Text;
 using FC_Server.Models;
-using System.Net.NetworkInformation;
-using System.Net;
 
 /// <summary>
 /// DBServices is a class created by me to provides some DataBase Services
@@ -490,13 +484,14 @@ public class DBservices
         }
     }
 
-<<<<<<< Updated upstream
-
-    public KnownLocation? GetKnownLocations(int location_id)
+    //--------------------------------------------------------------------------------------------------
+    // This method geting users known location data
+    //--------------------------------------------------------------------------------------------------
+    public KnownLocation? GetKnownLocation(int location_id)
     {
         SqlConnection con;
         SqlCommand cmd;
-        KnownLocation? knownLocation = null;
+        KnownLocation? knownLocation = null; // Initialize as null
 
         try
         {
@@ -504,51 +499,20 @@ public class DBservices
         }
         catch (Exception)
         {
-            throw; // Rethrow the exception if connection fails
+            throw; // Handle connection errors
         }
 
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@location_id", location_id);
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocations", con, paramDic);
-=======
-    //--------------------------------------------------------------------------------------------------
-    // This method geting users known location data
-    //--------------------------------------------------------------------------------------------------
-    public List<KnownLocation> GetKnownLocations(int user_id)
-    {
-        SqlConnection con;
-        SqlCommand cmd;
-        List<KnownLocation> knownLocations = new List<KnownLocation>();
-
-        try
-        {
-            con = connect("myProjDB"); // יצירת החיבור למסד הנתונים
-        }
-        catch (Exception)
-        {
-            throw; // במקרה של שגיאה בחיבור
-        }
-
-        Dictionary<string, object> paramDic = new Dictionary<string, object>();
-        paramDic.Add("@user_id", user_id);
-
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
->>>>>>> Stashed changes
-
         try
         {
             using (SqlDataReader dr = cmd.ExecuteReader())
             {
-<<<<<<< Updated upstream
                 if (dr.Read()) // Read a single row
                 {
-                    knownLocation = new KnownLocation
-=======
-                while (dr.Read()) // שים לב: שונה מ־if ל־while כדי לעבור על כל השורות
-                {
-                    KnownLocation location = new KnownLocation
->>>>>>> Stashed changes
+                    knownLocation = new KnownLocation // Correctly initialize the object
                     {
                         LocationId = Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -558,24 +522,12 @@ public class DBservices
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
                         CreatedAt = dr["created_at"] != DBNull.Value
-<<<<<<< Updated upstream
                             ? Convert.ToDateTime(dr["created_at"])
                             : null
-=======
-    ? Convert.ToDateTime(dr["created_at"])
-    : null
-
->>>>>>> Stashed changes
                     };
-
-                    knownLocations.Add(location); // הוספת המיקום לרשימה
                 }
             }
-<<<<<<< Updated upstream
-=======
-
-            return knownLocations; // החזרת כל המיקומים שנמצאו
->>>>>>> Stashed changes
+            return knownLocation; // Return the KnownLocation object or null
         }
         catch (Exception ex)
         {
@@ -585,13 +537,11 @@ public class DBservices
         {
             if (con != null)
             {
-<<<<<<< Updated upstream
                 con.Close(); // Ensure the connection is closed
             }
         }
-
-        return knownLocation; // Return the KnownLocation object or null
     }
+
     //--------------------------------------------------------------------------------------------------
     // This method geting users known location data
     //--------------------------------------------------------------------------------------------------
@@ -650,8 +600,6 @@ public class DBservices
         {
             if (con != null)
             {
-=======
->>>>>>> Stashed changes
                 con.Close();
             }
         }
@@ -699,11 +647,8 @@ public class DBservices
                         Longitude = Convert.ToSingle(dr["longitude"]),
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
-                        LocationName = dr["location_name"].ToString() ?? "",
-<<<<<<< Updated upstream
-=======
-                        CreatedAt = Convert.ToDateTime(dr["added_at"])
->>>>>>> Stashed changes
+                        LocationName = dr["location_name"].ToString() ?? ""
+
                     };
                 }
             }

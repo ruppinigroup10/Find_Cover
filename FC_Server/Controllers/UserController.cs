@@ -10,7 +10,7 @@ namespace FC_Server.Controllers;
 [ApiController]
 public class UserController : ControllerBase
 {
-    // POST api/<UserController>/Register
+    // POST api/<UserController>/Register  
     [HttpPost("Register")]
     public IActionResult Register([FromBody] User user)
     {
@@ -42,7 +42,7 @@ public class UserController : ControllerBase
         }
     }
 
-    // PUT api/<UserController>/UpdateUser
+    // PUT api/<UserController>/UpdateUser  
     [HttpPut("UpdateUser")]
     public IActionResult UpdateUser([FromBody] User user)
     {
@@ -74,7 +74,7 @@ public class UserController : ControllerBase
         }
     }
 
-    //Post api/<UserController>/Login
+    //Post api/<UserController>/Login  
     [HttpPost("Login")]
     public IActionResult Login([FromBody] User user)
     {
@@ -110,7 +110,7 @@ public class UserController : ControllerBase
         }
     }
 
-    // GET: api/<UsersController> getUser
+    // GET: api/<UsersController> getUser  
     [HttpGet("getUser")]
     public IActionResult getUser(int user_id)
     {
@@ -120,7 +120,7 @@ public class UserController : ControllerBase
         {
             return Ok(new
             {
-                message = "User data trensfer successful",
+                message = "User data transfer successful",
                 user = new
                 {
                     user_id = userData.UserId,
@@ -135,53 +135,54 @@ public class UserController : ControllerBase
         return BadRequest(new { message = "Invalid ID" });
     }
 
-
-    // GET: api/<UserController>/GetUserPreferences
+    // GET: api/<UserController>/GetUserPreferences  
     [HttpGet("GetUserPreferences")]
     public IActionResult GetUserPreferences(int user_id)
     {
-        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id); // קריאה למתודה הסטטית GetUserPreferences במודל UserPreferences
+        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
         if (preferences != null)
         {
-            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות
+            return Ok(new
             {
                 message = "Preferences data transfer successful",
                 preferences = preferences
             });
         }
-        return BadRequest(new { message = "Invalid ID" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+        return BadRequest(new { message = "Invalid ID" });
     }
-    // PUT: api/<UserController>/UpdateUserPreferences
-    [HttpPut("UpdateUserPreferences")] // שימוש ב-HttpPost עבור עדכון - מקובל יותר מ-HttpPut במקרים מסוימים, אך שקול שימוש ב-HttpPut עבור פעולות עדכון אידמפוטנטיות
-    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences) // קבלת נתוני העדפות מגוף הבקשה
+
+    // PUT: api/<UserController>/UpdateUserPreferences  
+    [HttpPut("UpdateUserPreferences")]
+    public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
     {
-        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate); // קריאה למתודה הסטטית UpdateUserPreferences במודל UserPreferences
+        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
         if (updatedPreferences != null)
         {
-            return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות המעודכן
+            return Ok(new
             {
                 message = "Preferences updated successfully",
                 preferences = updatedPreferences
             });
         }
-        return BadRequest(new { message = "Update failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+        return BadRequest(new { message = "Update failed" });
     }
-    // POST: api/<UserController>/AddPreference     
-    [HttpPost("AddPreference")] // שימוש ב-HttpPost עבור הוספה - מתאים לפעולות יצירה
-    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences) // קבלת נתוני העדפות מגוף הבקשה
+
+    // POST: api/<UserController>/AddPreference  
+    [HttpPost("AddPreference")]
+    public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)
     {
         try
         {
-            var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed); // קריאה למתודה הסטטית AddPreference במודל UserPreferences
+            var newPreference = FC_Server.Models.UserPreferences.AddPreference(preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
             if (newPreference != null)
             {
-                return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט ההעדפות החדש
+                return Ok(new
                 {
                     message = "Preferences added successfully",
                     preferences = newPreference
                 });
             }
-            return BadRequest(new { message = "Add failed 1" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+            return BadRequest(new { message = "Add failed" });
         }
         catch (Exception ex)
         {
@@ -198,70 +199,30 @@ public class UserController : ControllerBase
         }
     }
 
-    // GET: api/<UserController>/GetKnownLocations
+    // GET: api/<UserController>/GetKnownLocations  
     [HttpGet("GetKnownLocations")]
-<<<<<<< Updated upstream
-    public IActionResult GetKnownLocations(int location_id)
+    public IActionResult GetKnownLocation(int location_id)
     {
-        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocations(location_id); // שים לב לשם החדש
+        var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocation(location_id);
 
         if (knownLocation != null)
-=======
-    public IActionResult GetKnownLocations(int user_id)
-    {
-        var knownLocations = FC_Server.Models.KnownLocation.GetKnownLocations(user_id); // שים לב לשם החדש
-
-        if (knownLocations != null && knownLocations.Count > 0)
->>>>>>> Stashed changes
         {
             return Ok(new
             {
-                message = "Known locations data transfer successful",
-<<<<<<< Updated upstream
-                knownLocations = knownLocation
+                message = "Known location data transfer successful",
+                knownLocation = knownLocation
             });
         }
-
-        return BadRequest(new { message = "No known locations found for this location_id" });
+        return BadRequest(new { message = "Invalid ID" });
     }
 
-
-    // GET: api/<UserController>/GetMyKnownLocations
+    // GET: api/<UserController>/GetMyKnownLocations  
     [HttpGet("GetMyKnownLocations")]
     public IActionResult GetMyKnownLocations(int user_id)
     {
-        var knownLocations = FC_Server.Models.KnownLocation.GetMyKnownLocations(user_id); // שים לב לשם החדש
+        var knownLocations = FC_Server.Models.KnownLocation.GetMyKnownLocations(user_id);
 
         if (knownLocations != null && knownLocations.Count > 0)
-=======
-                knownLocations = knownLocations
-            });
-        }
-
-        return BadRequest(new { message = "No known locations found for this user" });
-    }
-
-    [HttpPut("UpdateKnownLocation")]
-    public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
-    {
-        if (knownLocation.CreatedAt == null)
-        {
-            return BadRequest(new { message = "CreatedAt cannot be null" });
-        }
-
-        var updatedKnownLocation = FC_Server.Models.KnownLocation.UpdateKnownLocation(
-            knownLocation.LocationId,
-            knownLocation.UserId,
-            knownLocation.Latitude,
-            knownLocation.Longitude,
-            knownLocation.Radius,
-            knownLocation.Address,
-            knownLocation.LocationName,
-            knownLocation.CreatedAt.Value // Use .Value to convert DateTime? to DateTime
-        );
-
-        if (updatedKnownLocation != null)
->>>>>>> Stashed changes
         {
             return Ok(new
             {
@@ -270,11 +231,10 @@ public class UserController : ControllerBase
             });
         }
 
-<<<<<<< Updated upstream
         return BadRequest(new { message = "No known locations found for this user" });
     }
 
-    // PUT: api/<UserController>/UpdateKnownLocations
+    // PUT: api/<UserController>/UpdateKnownLocation  
     [HttpPut("UpdateKnownLocation")]
     public IActionResult UpdateKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
@@ -293,18 +253,17 @@ public class UserController : ControllerBase
                 knownLocation.Radius,
                 knownLocation.Address,
                 knownLocation.LocationName
-               // Use .Value to convert DateTime? to DateTime  
             );
 
             if (updatedKnownLocation != null)
             {
-                return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע המעודכן
+                return Ok(new
                 {
                     message = "Known location updated successfully",
                     knownLocation = updatedKnownLocation
                 });
             }
-            return BadRequest(new { message = "Update failed" }); // החזרת תגובת HTTP 400 BadRequest עם הודעת שגיאה
+            return BadRequest(new { message = "Update failed" });
         }
         catch (Exception ex)
         {
@@ -320,21 +279,16 @@ public class UserController : ControllerBase
         }
     }
 
-=======
-        return BadRequest(new { message = "Update failed" });
-    }
-
->>>>>>> Stashed changes
-    // POST: api/<UserController>/AddKnownLocation
-    [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
-    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
+    // POST: api/<UserController>/AddKnownLocation  
+    [HttpPost("AddKnownLocation")]
+    public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation)
     {
         try
         {
-            var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName); // קריאה למתודה הסטטית AddKnownLocation במודל KnownLocation
+            var newKnownLocation = FC_Server.Models.KnownLocation.AddKnownLocation(knownLocation.UserId, knownLocation.Latitude, knownLocation.Longitude, knownLocation.Radius, knownLocation.Address, knownLocation.LocationName);
             if (newKnownLocation != null)
             {
-                return Ok(new // החזרת תגובת HTTP 200 OK עם הודעה ואובייקט המיקום הידוע החדש
+                return Ok(new
                 {
                     message = "Known location added successfully",
                     knownLocation = newKnownLocation
@@ -352,44 +306,36 @@ public class UserController : ControllerBase
             {
                 return BadRequest(new { message = "User added this known location already" });
             }
-            throw new Exception("Addition failed");
+            return BadRequest(new { message = "Addition failed" });
         }
-        
     }
-    //--------------------------------------------------------------------------------------------------
-    // Default controllers
-    //--------------------------------------------------------------------------------------------------
 
-    // GET: api/<UserController>
+    // Default controllers  
     [HttpGet]
     public IEnumerable<string> Get()
     {
         return new string[] { "value1", "value2" };
     }
 
-    // GET api/<UserController>/5
     [HttpGet("{id}")]
     public string Get(int id)
     {
         return "value";
     }
 
-    // POST api/<UserController>
     [HttpPost]
     public void Post([FromBody] string value)
     {
     }
 
-    // PUT api/<UserController>/5
     [HttpPut("{id}")]
     public void Put(int id, [FromBody] string value)
     {
     }
 
-    // DELETE api/<UserController>/5
     [HttpDelete("{id}")]
     public void Delete(int id)
     {
-    }
+    }  
 }
 
