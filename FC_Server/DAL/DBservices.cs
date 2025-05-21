@@ -490,6 +490,7 @@ public class DBservices
         }
     }
 
+<<<<<<< Updated upstream
 
     public KnownLocation? GetKnownLocations(int location_id)
     {
@@ -510,6 +511,7 @@ public class DBservices
         paramDic.Add("@location_id", location_id);
 
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocations", con, paramDic);
+=======
     //--------------------------------------------------------------------------------------------------
     // This method geting users known location data
     //--------------------------------------------------------------------------------------------------
@@ -532,17 +534,21 @@ public class DBservices
         paramDic.Add("@user_id", user_id);
 
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetKnownLocation", con, paramDic);
+>>>>>>> Stashed changes
 
         try
         {
             using (SqlDataReader dr = cmd.ExecuteReader())
             {
+<<<<<<< Updated upstream
                 if (dr.Read()) // Read a single row
                 {
                     knownLocation = new KnownLocation
+=======
                 while (dr.Read()) // שים לב: שונה מ־if ל־while כדי לעבור על כל השורות
                 {
                     KnownLocation location = new KnownLocation
+>>>>>>> Stashed changes
                     {
                         LocationId = Convert.ToInt32(dr["location_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
@@ -552,15 +558,24 @@ public class DBservices
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
                         CreatedAt = dr["created_at"] != DBNull.Value
+<<<<<<< Updated upstream
                             ? Convert.ToDateTime(dr["created_at"])
                             : null
+=======
     ? Convert.ToDateTime(dr["created_at"])
     : null
+
+>>>>>>> Stashed changes
                     };
+
                     knownLocations.Add(location); // הוספת המיקום לרשימה
                 }
             }
+<<<<<<< Updated upstream
+=======
+
             return knownLocations; // החזרת כל המיקומים שנמצאו
+>>>>>>> Stashed changes
         }
         catch (Exception ex)
         {
@@ -570,6 +585,7 @@ public class DBservices
         {
             if (con != null)
             {
+<<<<<<< Updated upstream
                 con.Close(); // Ensure the connection is closed
             }
         }
@@ -634,6 +650,8 @@ public class DBservices
         {
             if (con != null)
             {
+=======
+>>>>>>> Stashed changes
                 con.Close();
             }
         }
@@ -682,7 +700,10 @@ public class DBservices
                         Radius = Convert.ToSingle(dr["radius"]),
                         Address = dr["address"].ToString() ?? "",
                         LocationName = dr["location_name"].ToString() ?? "",
+<<<<<<< Updated upstream
+=======
                         CreatedAt = Convert.ToDateTime(dr["added_at"])
+>>>>>>> Stashed changes
                     };
                 }
             }

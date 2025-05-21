@@ -200,20 +200,24 @@ public class UserController : ControllerBase
 
     // GET: api/<UserController>/GetKnownLocations
     [HttpGet("GetKnownLocations")]
+<<<<<<< Updated upstream
     public IActionResult GetKnownLocations(int location_id)
     {
         var knownLocation = FC_Server.Models.KnownLocation.GetKnownLocations(location_id); // שים לב לשם החדש
 
         if (knownLocation != null)
+=======
     public IActionResult GetKnownLocations(int user_id)
     {
         var knownLocations = FC_Server.Models.KnownLocation.GetKnownLocations(user_id); // שים לב לשם החדש
 
         if (knownLocations != null && knownLocations.Count > 0)
+>>>>>>> Stashed changes
         {
             return Ok(new
             {
                 message = "Known locations data transfer successful",
+<<<<<<< Updated upstream
                 knownLocations = knownLocation
             });
         }
@@ -229,6 +233,7 @@ public class UserController : ControllerBase
         var knownLocations = FC_Server.Models.KnownLocation.GetMyKnownLocations(user_id); // שים לב לשם החדש
 
         if (knownLocations != null && knownLocations.Count > 0)
+=======
                 knownLocations = knownLocations
             });
         }
@@ -256,6 +261,7 @@ public class UserController : ControllerBase
         );
 
         if (updatedKnownLocation != null)
+>>>>>>> Stashed changes
         {
             return Ok(new
             {
@@ -264,6 +270,7 @@ public class UserController : ControllerBase
             });
         }
 
+<<<<<<< Updated upstream
         return BadRequest(new { message = "No known locations found for this user" });
     }
 
@@ -313,8 +320,11 @@ public class UserController : ControllerBase
         }
     }
 
+=======
         return BadRequest(new { message = "Update failed" });
     }
+
+>>>>>>> Stashed changes
     // POST: api/<UserController>/AddKnownLocation
     [HttpPost("AddKnownLocation")] // שימוש ב-HttpPost עבור הוספה
     public IActionResult AddKnownLocation([FromBody] FC_Server.Models.KnownLocation knownLocation) // קבלת נתוני מיקום ידוע מגוף הבקשה
