@@ -51,7 +51,7 @@ namespace FC_Server.Controllers
             try
             {
                 var newShelter = FC_Server.Models.Shelter.UpdateShelter(shelter.ShelterId, shelter.ShelterType, shelter.Name, shelter.Latitude, shelter.Longitude,
-                                shelter.Address, shelter.Capacity, shelter.AdditionalInformation, shelter.ProviderId, shelter.PetsFriendly);
+                                shelter.Address, shelter.Capacity, shelter.AdditionalInformation, shelter.ProviderId, shelter.PetsFriendly, shelter.IsAccessible);
 
                 if (newShelter != null)
                 {

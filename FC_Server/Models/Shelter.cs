@@ -87,10 +87,10 @@
         }
 
         public static Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,
-                                string address, int capacity, string additional_information, int provider_id, bool pets_friendly)
+                                string address, int capacity, string additional_information, int provider_id, bool pets_friendly, bool is_accessible)
         {
             DBservicesShelter dbs = new DBservicesShelter();
-            return dbs.UpdateShelter(shelter_id, shelter_type, name, latitude, longitude, address, capacity, additional_information, provider_id, pets_friendly);
+            return dbs.UpdateShelter(shelter_id, shelter_type, name, latitude, longitude, address, capacity, additional_information, provider_id, pets_friendly, is_accessible);
         }
 
         public static Shelter? getShelter(int shelter_id)

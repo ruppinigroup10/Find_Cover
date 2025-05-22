@@ -134,7 +134,7 @@ public class DBservicesShelter
         // This method updates a shelter
         //--------------------------------------------------------------------------------------------------
         public Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,
-                                string address, int capacity, string additional_information, int provider_id, bool pets_friendly)
+                                string address, int capacity, string additional_information, int provider_id, bool pets_friendly, bool is_accessible)
         {
             SqlConnection con;
             SqlCommand cmd;
@@ -158,7 +158,8 @@ public class DBservicesShelter
             paramDic.Add("@address", address);
             paramDic.Add("@capacity", capacity);
             paramDic.Add("@additional_information", additional_information);
-        paramDic.Add("@pets_friendly", pets_friendly);
+            paramDic.Add("@pets_friendly", pets_friendly);
+            paramDic.Add("is_accessible", is_accessible);
             paramDic.Add("@provider_id", provider_id);
 
             cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateShelter", con, paramDic);
