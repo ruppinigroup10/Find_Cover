@@ -103,8 +103,9 @@ async function runServerSimulation() {
 
     const data = await response.json();
 
-    // Clear existing data
+    // Clear existing data including manual people
     visualizer.clearMap();
+    visualizer.clearManualPeople();
 
     // Save original data for future reference
     visualizer.originalSimulationData = {
@@ -262,18 +263,45 @@ function updateAgeGroupStats(people, stats, assignments) {
 }
 
 /**
- * Initialization code for the application
- * Creates the visualizer instance and sets up the application when the DOM is ready
+ * Update the manual button state
  */
-document.addEventListener("DOMContentLoaded", function () {
-  // Initialize the map
-  window.visualizer = initializeVisualizer();
+function updateManualButtonState() {
+  const manualButton = document.getElementById("run-with-manual");
+  if (!manualButton) return;
 
-  // Set up event handlers for UI controls
-  setupEventHandlers();
+  const manualCount = window.visualizer?.manualPeople?.length || 0;
 
-  console.log("FindCover application initialized");
-});
+  if (manualCount > 0) {
+    manualButton.textContent = `Run With Manual People (${manualCount})`;
+    manualButton.disabled = false;
+  } else {
+    manualButton.textContent = "Run With Manual People (0)";
+    manualButton.disabled = true;
+  }
+}
+
+/**
+ * Disable all active modes (placement and removal)
+ */
+function disableActiveModes() {
+  const placementButton = document.getElementById("enable-placement");
+  if (placementButton?.classList.contains("active")) {
+    placementButton.classList.remove("active");
+    placementButton.textContent = "Place People Manually";
+    if (window.visualizer) {
+      window.visualizer.enableManualPlacement(false);
+    }
+  }
+
+  const removalButton = document.getElementById("enable-removal");
+  if (removalButton?.classList.contains("active")) {
+    removalButton.classList.remove("active");
+    removalButton.textContent = "Remove People (Manual & Auto)";
+    if (window.visualizer) {
+      window.visualizer.enableUniversalRemoval(false);
+    }
+  }
+}
 
 /**
  * Set up event handlers for all UI controls
@@ -317,11 +345,23 @@ function setupEventHandlers() {
         if (window.visualizer) {
           window.visualizer.enableManualPlacement(false);
         }
+
+        // Reset distance mode checkbox
+        const distanceCheckbox = document.getElementById(
+          "enable-distance-mode"
+        );
+        const distanceOptions = document.getElementById("distance-options");
+        if (distanceCheckbox) {
+          distanceCheckbox.checked = false;
+          if (distanceOptions) {
+            distanceOptions.style.display = "none";
+          }
+        }
       }
     });
   }
 
-  // Run with manual people - KEEP THIS WORKING
+  // Run with manual people
   const runManualButton = document.getElementById("run-with-manual");
   if (runManualButton) {
     runManualButton.addEventListener("click", function () {
@@ -343,21 +383,6 @@ function setupEventHandlers() {
         updateManualButtonState();
       }
     });
-  }
-
-  function updateManualButtonState() {
-    const manualButton = document.getElementById("run-with-manual");
-    if (!manualButton) return;
-
-    const manualCount = window.visualizer?.manualPeople?.length || 0;
-
-    if (manualCount > 0) {
-      manualButton.textContent = `Run With Manual People (${manualCount})`;
-      manualButton.disabled = false;
-    } else {
-      manualButton.textContent = "Run With Manual People (0)";
-      manualButton.disabled = true;
-    }
   }
 
   // People removal toggle
@@ -388,7 +413,7 @@ function setupEventHandlers() {
     });
   }
 
-  // Run after removal - KEEP THIS WORKING
+  // Run after removal
   const runAfterRemovalButton = document.getElementById("run-after-removal");
   if (runAfterRemovalButton) {
     runAfterRemovalButton.addEventListener("click", function () {
@@ -402,63 +427,19 @@ function setupEventHandlers() {
   }
 }
 
-function disableActiveModes() {
-  const placementButton = document.getElementById("enable-placement");
-  if (placementButton?.classList.contains("active")) {
-    placementButton.classList.remove("active");
-    placementButton.textContent = "Place People Manually";
-    if (window.visualizer) {
-      window.visualizer.enableManualPlacement(false);
-    }
-  }
-
-  const removalButton = document.getElementById("enable-removal");
-  if (removalButton?.classList.contains("active")) {
-    removalButton.classList.remove("active");
-    removalButton.textContent = "Remove People (Manual & Auto)";
-    if (window.visualizer) {
-      window.visualizer.enableUniversalRemoval(false);
-    }
-  }
-}
-
 /**
- * Enables or disables the removal of manually placed people from the map
- * When enabled, clicking on a manually added person will remove them
- *
- * @param {boolean} enable - Whether to enable removal mode
+ * Initialization code for the application
+ * Creates the visualizer instance and sets up the application when the DOM is ready
  */
-function enableManualPeopleRemoval(enable) {
-  const statusElement = document.getElementById("simulation-status");
-  const removalButton = document.getElementById("enable-removal");
+document.addEventListener("DOMContentLoaded", function () {
+  // Initialize the map
+  window.visualizer = initializeVisualizer();
 
-  if (window.visualizer) {
-    window.visualizer.enableManualRemoval(enable);
+  // Set up event handlers for UI controls
+  setupEventHandlers();
 
-    if (enable) {
-      if (statusElement) {
-        statusElement.textContent =
-          "Click on manually added people to remove them";
-        statusElement.className = "status-message running";
-      }
-
-      if (removalButton) {
-        removalButton.textContent = "Stop Removing People";
-        removalButton.classList.add("active");
-      }
-    } else {
-      if (statusElement) {
-        statusElement.textContent = "";
-        statusElement.className = "status-message";
-      }
-
-      if (removalButton) {
-        removalButton.textContent = "Remove People Manually";
-        removalButton.classList.remove("active");
-      }
-    }
-  }
-}
+  console.log("FindCover application initialized");
+});
 
 // Expose to global scope for debugging
 window.debugFindCover = function () {
@@ -472,4 +453,5 @@ window.debugFindCover = function () {
     "Current simulation data:",
     window.visualizer?.currentSimulationData
   );
+  console.log("Manual people:", window.visualizer?.manualPeople);
 };

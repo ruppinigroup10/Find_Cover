@@ -898,6 +898,7 @@ class ShelterSimulationVisualizer {
    */
   enableManualPlacement(enable) {
     this.placementModeActive = enable;
+    this.distancePlacementMode = false;
 
     if (enable) {
       const statusElement = document.getElementById("simulation-status");
@@ -915,10 +916,16 @@ class ShelterSimulationVisualizer {
       // Add event listeners
       this.map.on("click", this.handleMapClick, this);
       this.map.on("contextmenu", this.handleRightClick, this);
+
+      // Check if distance mode is enabled
+      this.setupDistancePlacement();
     } else {
       // Remove event listeners
       this.map.off("click", this.handleMapClick, this);
       this.map.off("contextmenu", this.handleRightClick, this);
+
+      // Disable distance placement
+      this.disableShelterSelection();
 
       // Clear status message
       const statusElement = document.getElementById("simulation-status");
@@ -927,6 +934,236 @@ class ShelterSimulationVisualizer {
         statusElement.className = "status-message";
       }
     }
+  }
+
+  /**
+   * Setup distance placement mode
+   */
+  setupDistancePlacement() {
+    const distanceCheckbox = document.getElementById("enable-distance-mode");
+    const distanceOptions = document.getElementById("distance-options");
+
+    if (distanceCheckbox) {
+      // Remove any existing listeners
+      distanceCheckbox.onchange = null;
+
+      // Add new listener
+      distanceCheckbox.onchange = () => {
+        this.distancePlacementMode = distanceCheckbox.checked;
+        if (distanceOptions) {
+          distanceOptions.style.display = distanceCheckbox.checked
+            ? "block"
+            : "none";
+        }
+
+        if (this.distancePlacementMode) {
+          this.enableShelterSelection();
+          const statusElement = document.getElementById("simulation-status");
+          if (statusElement) {
+            statusElement.textContent =
+              "Distance mode ON: Click on a shelter to place person at set distance";
+            statusElement.className = "status-message running";
+          }
+        } else {
+          this.disableShelterSelection();
+          const statusElement = document.getElementById("simulation-status");
+          if (statusElement) {
+            statusElement.textContent =
+              "Click on the map to add people. Right-click to change age.";
+            statusElement.className = "status-message running";
+          }
+        }
+      };
+    }
+  }
+
+  /**
+   * Enable shelter selection for distance-based placement
+   */
+  enableShelterSelection() {
+    this.shelterMarkers.eachLayer((marker) => {
+      marker.on("click", this.handleShelterClick, this);
+      // Add visual feedback
+      if (marker._icon) {
+        marker._icon.style.cursor = "crosshair";
+        marker._icon.classList.add("shelter-selectable");
+      }
+    });
+  }
+
+  /**
+   * Disable shelter selection
+   */
+  disableShelterSelection() {
+    this.shelterMarkers.eachLayer((marker) => {
+      marker.off("click", this.handleShelterClick, this);
+      // Remove visual feedback
+      if (marker._icon) {
+        marker._icon.style.cursor = "";
+        marker._icon.classList.remove("shelter-selectable");
+      }
+    });
+  }
+
+  /**
+   * Handle shelter click for distance-based placement
+   */
+  handleShelterClick(e) {
+    if (!this.placementModeActive || !this.distancePlacementMode) return;
+
+    // Prevent event from bubbling to map
+    L.DomEvent.stopPropagation(e);
+
+    const shelterLatLng = e.target.getLatLng();
+    const shelterId = this.findShelterIdByPosition(shelterLatLng);
+
+    if (!shelterId) return;
+
+    const shelter = this.currentSimulationData.shelters.find(
+      (s) => s.id === shelterId
+    );
+    if (!shelter) return;
+
+    // Get values from UI
+    const distance =
+      parseFloat(document.getElementById("placement-distance")?.value) || 0.5;
+    const age = parseInt(document.getElementById("placement-age")?.value) || 35;
+
+    // Random direction
+    const direction = Math.floor(Math.random() * 360);
+
+    // Place the person
+    this.placePersonAtDistance(shelter, distance, direction, age);
+  }
+
+  /**
+   * Find shelter ID by its position
+   */
+  findShelterIdByPosition(latLng) {
+    for (let shelter of this.currentSimulationData.shelters) {
+      if (
+        Math.abs(shelter.latitude - latLng.lat) < 0.0001 &&
+        Math.abs(shelter.longitude - latLng.lng) < 0.0001
+      ) {
+        return shelter.id;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Place a person at a specific distance from a shelter
+   */
+  placePersonAtDistance(shelter, distanceKm, directionDegrees, age) {
+    // Convert direction to radians
+    const directionRad = (directionDegrees * Math.PI) / 180;
+
+    // Calculate the new position
+    // Earth's radius in km
+    const R = 6371;
+
+    // Convert distance to angular distance
+    const angularDistance = distanceKm / R;
+
+    // Convert shelter position to radians
+    const lat1Rad = (shelter.latitude * Math.PI) / 180;
+    const lon1Rad = (shelter.longitude * Math.PI) / 180;
+
+    // Calculate new position using spherical coordinates
+    const lat2Rad = Math.asin(
+      Math.sin(lat1Rad) * Math.cos(angularDistance) +
+        Math.cos(lat1Rad) * Math.sin(angularDistance) * Math.cos(directionRad)
+    );
+
+    const lon2Rad =
+      lon1Rad +
+      Math.atan2(
+        Math.sin(directionRad) * Math.sin(angularDistance) * Math.cos(lat1Rad),
+        Math.cos(angularDistance) - Math.sin(lat1Rad) * Math.sin(lat2Rad)
+      );
+
+    // Convert back to degrees
+    const lat2 = (lat2Rad * 180) / Math.PI;
+    const lon2 = (lon2Rad * 180) / Math.PI;
+
+    // Create the person at the calculated position
+    const id = this.nextManualPersonId++;
+
+    const person = {
+      id: id,
+      age: age,
+      latitude: lat2,
+      longitude: lon2,
+      isManual: true,
+      placedFromShelterId: shelter.id,
+      placedDistance: distanceKm,
+    };
+
+    // Add to manual people array
+    this.manualPeople.push(person);
+
+    // Create marker
+    const icon = this.icons.manualPerson;
+    const marker = L.marker([lat2, lon2], {
+      icon,
+      isManual: true,
+      personId: id,
+      interactive: true,
+      zIndexOffset: 1000,
+    });
+
+    // Add enhanced popup
+    marker.bindPopup(`
+      <p>Person #${id} (Manual)</p>
+      <p>Age: ${person.age}</p>
+      <p>Placed ${distanceKm}km from Shelter ${shelter.id}</p>
+      <p>Direction: ${directionDegrees}°</p>
+      <p>Status: Not yet assigned</p>
+    `);
+
+    // Add the marker to the people layer
+    this.peopleMarkers.addLayer(marker);
+
+    // Draw a helper line showing the distance
+    const helperLine = L.polyline(
+      [
+        [shelter.latitude, shelter.longitude],
+        [lat2, lon2],
+      ],
+      {
+        color: "#9370DB",
+        weight: 1,
+        opacity: 0.5,
+        dashArray: "3, 6",
+      }
+    );
+    this.pathLines.addLayer(helperLine);
+
+    // Remove helper line after 3 seconds
+    setTimeout(() => {
+      this.pathLines.removeLayer(helperLine);
+    }, 3000);
+
+    // Update UI
+    this.updateManualControlStatus();
+    this.updateManualPeopleList();
+
+    // Show success message
+    const statusElement = document.getElementById("simulation-status");
+    if (statusElement) {
+      statusElement.textContent = `Placed person ${id} at ${distanceKm}km from Shelter ${shelter.id}`;
+      statusElement.className = "status-message success";
+
+      setTimeout(() => {
+        statusElement.textContent =
+          "Distance mode ON: Click on a shelter to place person at set distance";
+        statusElement.className = "status-message running";
+      }, 2000);
+    }
+
+    console.log(
+      `Placed person ${id} at ${distanceKm}km from shelter ${shelter.id}`
+    );
   }
 
   /**
@@ -967,6 +1204,27 @@ class ShelterSimulationVisualizer {
    */
   handleMapClick(e) {
     if (!this.placementModeActive) return;
+
+    // Check if click is on empty area (not on a shelter)
+    const clickPoint = e.latlng;
+    let clickedOnShelter = false;
+
+    this.shelterMarkers.eachLayer((marker) => {
+      const shelterLatLng = marker.getLatLng();
+      const distance = this.calculateAirDistance(
+        clickPoint.lat,
+        clickPoint.lng,
+        shelterLatLng.lat,
+        shelterLatLng.lng
+      );
+      if (distance < 0.01) {
+        // Very close to shelter marker
+        clickedOnShelter = true;
+      }
+    });
+
+    // If clicked on shelter, let the shelter handler deal with it
+    if (clickedOnShelter) return;
 
     console.log("=== MANUAL ADD START ===");
     console.log("Manual people before add:", this.manualPeople?.length || 0);

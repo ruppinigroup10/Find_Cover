@@ -117,6 +117,56 @@
               <button id="clear-manual" class="control-button">
                 Clear Manual People
               </button>
+              <div
+                class="distance-placement-controls"
+                style="
+                  margin-top: 15px;
+                  padding: 10px;
+                  background: #f0f0f0;
+                  border-radius: 4px;
+                "
+              >
+                <h5 style="margin: 0 0 10px 0">Distance-Based Placement</h5>
+                <div style="margin-bottom: 8px">
+                  <label style="display: block; margin-bottom: 5px">
+                    <input
+                      type="checkbox"
+                      id="enable-distance-mode"
+                      style="margin-right: 5px"
+                    />
+                    Enable distance placement mode
+                  </label>
+                </div>
+                <div id="distance-options" style="display: none">
+                  <div style="margin-bottom: 8px">
+                    <label style="display: block">
+                      Distance (km):
+                      <input
+                        type="number"
+                        id="placement-distance"
+                        min="0.1"
+                        max="2"
+                        step="0.1"
+                        value="0.5"
+                        style="width: 60px; margin-left: 5px"
+                      />
+                    </label>
+                  </div>
+                  <div style="margin-bottom: 8px">
+                    <label style="display: block">
+                      Age:
+                      <select id="placement-age" style="margin-left: 5px">
+                        <option value="8">Child (8)</option>
+                        <option value="35" selected>Adult (35)</option>
+                        <option value="75">Elderly (75)</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div style="font-size: 12px; color: #666">
+                    Click on a shelter to place person at set distance
+                  </div>
+                </div>
+              </div>
               <button id="enable-removal" class="control-button">
                 Remove People (Manual & Auto)
               </button>
