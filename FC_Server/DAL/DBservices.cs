@@ -364,7 +364,7 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method updates users preferences
     //--------------------------------------------------------------------------------------------------
-    public UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed, DateTime last_update)
+    public UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -379,11 +379,14 @@ public class DBservices
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
-        paramDic.Add("@shelter_type", shelter_type);
+        paramDic.Add("@preference_id", preference_id);
+        paramDic.Add("@preferred_shelter_type", shelter_type);
+        paramDic.Add("@accessible_needed", accessibility_needed);
         paramDic.Add("@num_default_people", num_default_people);
+        paramDic.Add("@pets_allowed", pets_allowed);
         // חסרים כאן הפרמטרים accessibility_needed, pets_allowed ו-last_update - יש להוסיף אותם למילון כדי שהעדכון יתבצע כראוי
 
-        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateUserPreferences", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateUserPreferences"
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdatePreferences", con, paramDic); // יצירת פקודה עבור הפרוצדורה המאוחסנת "FC_SP_UpdateUserPreferences"
 
         try
         {
@@ -395,11 +398,11 @@ public class DBservices
                     {
                         PreferenceId = Convert.ToInt32(dr["preference_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        AccessibilityNeeded = Convert.ToBoolean(dr["accessibility_needed"]),
+                        ShelterType = dr["preferred_shelter_type"].ToString() ?? "",
+                        AccessibilityNeeded = Convert.ToBoolean(dr["accessible_needed"]),
                         NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
                         PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
-                        LastUpdate = Convert.ToDateTime(dr["last_update"])
+                        LastUpdate = Convert.ToDateTime(dr["last_updated"])
                     };
                 }
             }
@@ -407,9 +410,13 @@ public class DBservices
         }
         catch (SqlException ex) // טיפול בשגיאות SQL ספציפיות
         {
-            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
+            if (ex.Message.Contains("User not found")) // בדיקה אם השגיאה נובעת מ-ID לא תקין
             {
-                throw new Exception("Invalid ID");
+                throw new Exception("User not found");
+            }
+            if (ex.Message.Contains("preference not found for this user"))
+            {
+                throw new Exception("preference not found for this user");
             }
             throw new Exception("Update failed"); // שגיאה כללית במקרה של כשל בעדכון
         }

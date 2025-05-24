@@ -155,16 +155,33 @@ public class UserController : ControllerBase
     [HttpPut("UpdateUserPreferences")]
     public IActionResult UpdateUserPreferences([FromBody] FC_Server.Models.UserPreferences preferences)
     {
-        var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed, preferences.LastUpdate);
-        if (updatedPreferences != null)
+        try
         {
-            return Ok(new
+            var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
+            if (updatedPreferences != null)
             {
-                message = "Preferences updated successfully",
-                preferences = updatedPreferences
-            });
+                return Ok(new
+                {
+                    message = "Preferences added successfully",
+                    preferences = updatedPreferences
+                });
+            }
+            return BadRequest(new { message = "Add failed" });
         }
-        return BadRequest(new { message = "Update failed" });
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("User not found"))
+            {
+                return BadRequest(new { message = "User not found" });
+            }
+            if (ex.Message.Contains("preference not found for this user"))
+            {
+                return BadRequest(new { message = "preference not found for this user" });
+            }
+
+            return BadRequest(new { message = "update failed" });
+        }
+
     }
 
     // POST: api/<UserController>/AddPreference  
