@@ -364,7 +364,9 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method updates users preferences
     //--------------------------------------------------------------------------------------------------
-    public UserPreferences? UpdateUserPreferences(int preference_id, int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
+    public UserPreferences? UpdateUserPreferences(
+        //int preference_id,
+        int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -379,7 +381,7 @@ public class DBservices
         }
         Dictionary<string, object> paramDic = new Dictionary<string, object>();
         paramDic.Add("@user_id", user_id);
-        paramDic.Add("@preference_id", preference_id);
+        //paramDic.Add("@preference_id", preference_id);
         paramDic.Add("@preferred_shelter_type", shelter_type);
         paramDic.Add("@accessible_needed", accessibility_needed);
         paramDic.Add("@num_default_people", num_default_people);

@@ -157,7 +157,9 @@ public class UserController : ControllerBase
     {
         try
         {
-            var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(preferences.PreferenceId, preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
+            var updatedPreferences = FC_Server.Models.UserPreferences.UpdateUserPreferences(
+                //preferences.PreferenceId,
+                preferences.UserId, preferences.ShelterType, preferences.AccessibilityNeeded, preferences.NumDefaultPeople, preferences.PetsAllowed);
             if (updatedPreferences != null)
             {
                 return Ok(new
