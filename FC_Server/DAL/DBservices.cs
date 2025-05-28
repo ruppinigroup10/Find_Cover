@@ -338,7 +338,13 @@ public class DBservices
                 {
                     UserPreferences = new UserPreferences // יצירת אובייקט UserPreferences עם הנתונים שחזרו ממסד הנתונים
                     {
+                        PreferenceId = Convert.ToInt32(dr["preference_id"]),
                         UserId = Convert.ToInt32(dr["user_id"]),
+                        ShelterType = dr["preferred_shelter_type"].ToString() ?? "",
+                        AccessibilityNeeded = Convert.ToBoolean(dr["accessible_needed"]),
+                        NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
+                        PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
+                        LastUpdate = Convert.ToDateTime(dr["last_updated"])
                     };
                 }
             }
@@ -346,7 +352,11 @@ public class DBservices
         }
         catch (Exception ex) // טיפול בשגיאות כלליות שעלולות להתרחש בזמן ביצוע הפקודה
         {
-            if (ex.Message.Contains("Invalid ID")) // בדיקה אם השגיאה נובעת מ-ID לא תקין - ספציפי לשגיאה אפשרית מהפרוצדורה המאוחסנת
+            if (ex.Message.Contains("No preferences found for this user")) 
+            {
+                throw new Exception("No preferences found for this user");
+            }
+            if (ex.Message.Contains("Invalid ID")) 
             {
                 throw new Exception("Invalid ID");
             }

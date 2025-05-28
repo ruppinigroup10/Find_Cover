@@ -139,16 +139,33 @@ public class UserController : ControllerBase
     [HttpGet("GetUserPreferences")]
     public IActionResult GetUserPreferences(int user_id)
     {
-        var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
-        if (preferences != null)
+        try
         {
-            return Ok(new
+            var preferences = FC_Server.Models.UserPreferences.GetUserPreferences(user_id);
+
+            if (preferences != null)
             {
-                message = "Preferences data transfer successful",
-                preferences = preferences
-            });
+                return Ok(new
+                {
+                    message = "Preferences data transfer successful",
+                    preferences = preferences
+                });
+            }
+
+            return BadRequest(new { message = "No preferences found" });
         }
-        return BadRequest(new { message = "Invalid ID" });
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("No preferences found for this user"))
+            {
+                return BadRequest(new { message = "No preferences found for this user" });
+            }
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                return BadRequest(new { message = "Invalid ID" });
+            }
+            return BadRequest(new { message = "Failed to retrieve preferences" });
+        }
     }
 
     // PUT: api/<UserController>/UpdateUserPreferences  
