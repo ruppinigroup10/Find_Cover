@@ -17,6 +17,7 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@elfalem/leaflet-curve@0.9.2/leaflet.curve.min.js"></script>
 
     <!-- Custom JS -->
     <script defer>
@@ -37,12 +38,31 @@
             console.log("Remove button clicked:", e.target.dataset.id);
           }
         });
+        setTimeout(() => {
+          const walkingButton = document.getElementById(
+            "run-simulation-walking"
+          );
+          if (walkingButton) {
+            walkingButton.addEventListener("click", function () {
+              if (
+                typeof runServerSimulationWithWalkingDistances === "function"
+              ) {
+                runServerSimulationWithWalkingDistances();
+              } else {
+                console.error(
+                  "runServerSimulationWithWalkingDistances is not defined"
+                );
+              }
+            });
+          }
+        }, 100);
       });
     </script>
     <script src="/js/port.js" defer></script>
     <script src="/js/simulation.js" defer></script>
     <script src="/js/simulation-manager.js" defer></script>
     <script src="/js/extreme-scenarios.js" defer></script>
+    <script src="/js/google-maps-client.js" defer></script>
   </head>
   <body>
     <header>
@@ -63,7 +83,7 @@
                 id="people-count"
                 min="10"
                 max="500"
-                value="20"
+                value="1"
               />
             </div>
             <div class="control-group">
@@ -73,7 +93,7 @@
                 id="shelter-count"
                 min="1"
                 max="50"
-                value="10"
+                value="1"
               />
             </div>
             <div class="control-group">
@@ -97,11 +117,14 @@
               </select>
             </div>
             <label>
-              <input type="checkbox" id="use-database-shelters" checked />
+              <input type="checkbox" id="use-database-shelters" />
               Include real shelters from database
             </label>
             <button id="run-simulation" class="control-button">
               Run Simulation
+            </button>
+            <button id="run-simulation-walking" class="control-button">
+              Run Simulation (Walking Distance)
             </button>
             <div id="simulation-status" class="status-message"></div>
 

@@ -1,9 +1,17 @@
+using ServerSimulation.DAL;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Register Google Maps service with HttpClient
+builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>();
+
+// Add logging
+builder.Services.AddLogging();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

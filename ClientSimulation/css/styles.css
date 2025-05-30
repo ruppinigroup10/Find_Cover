@@ -418,3 +418,21 @@ header h1 {
   color: #155724;
   border: 1px solid #c3e6cb;
 }
+
+/* walking routes */
+.walking-route {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Animation to walking routes */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.walking-route.animated {
+  stroke-dasharray: 10, 5;
+  animation: dash 1s linear infinite;
+}

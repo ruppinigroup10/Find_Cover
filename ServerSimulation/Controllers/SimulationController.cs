@@ -8,6 +8,8 @@ using System.Data.SqlClient;
 using Microsoft.AspNetCore.Builder;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using ServerSimulation.Models.DTOs;
+using ServerSimulation.DAL;
 
 /*
  * This is SimulationController class which is responsible for handling simulation requests.
@@ -25,6 +27,15 @@ namespace FindCover.Controllers
         // The static readonly modifier ensures that the same random number generator is used throughout the controller's lifetime, 
         // which is more efficient than creating a new random generator each time it's needed.
         private static readonly Random _random = new Random();
+        private readonly IGoogleMapsService _googleMapsService;  // ADD THIS
+        private readonly ILogger<SimulationController> _logger;  // ADD THIS
+
+
+        public SimulationController(IGoogleMapsService googleMapsService, ILogger<SimulationController> logger)
+        {
+            _googleMapsService = googleMapsService;
+            _logger = logger;
+        }
 
         //===================================
         // Simulation start here
@@ -1236,6 +1247,303 @@ namespace FindCover.Controllers
         }
 
 
+        // In SimulationController.cs - ADD this method after your existing RunSimulation method
+
+        [HttpPost("run-with-walking-distances")]
+        public async Task<ActionResult<SimulationResponseDto>> RunSimulationWithWalkingDistances([FromBody] SimulationRequestDto request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid simulation request data");
+                }
+
+                // Set the center coordinates for the simulation
+                double centerLat = 31.2518;
+                double centerLon = 34.7913;
+
+                // STEP 1: Generate or use custom people and shelters (same as before)
+                List<PersonDto> people;
+                if (request.UseCustomPeople && request.CustomPeople != null && request.CustomPeople.Any())
+                {
+                    people = request.CustomPeople;
+                }
+                else
+                {
+                    people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
+                }
+
+                List<ShelterDto> shelters;
+                if (request.UseCustomShelters && request.CustomShelters != null && request.CustomShelters.Any())
+                {
+                    shelters = request.CustomShelters;
+                }
+                else
+                {
+                    shelters = GenerateShelters(
+                        request.ShelterCount,
+                        centerLat,
+                        centerLon,
+                        request.RadiusKm,
+                        request.ZeroCapacityShelters,
+                        request.UseDatabaseShelters);
+                }
+
+                // STEP 2: Get walking distances from Google Maps
+                _logger.LogInformation("Fetching walking distances from Google Maps...");
+                var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(people, shelters);
+
+                // STEP 3: Run assignment algorithm with walking distances
+                var assignments = await AssignPeopleToSheltersWithWalkingDistance(
+                    people,
+                    shelters,
+                    request.PrioritySettings,
+                    walkingDistances);
+
+                // STEP 3.5: Get actual walking routes (ADD THIS SECTION)
+                _logger.LogInformation("Fetching walking routes from Google Maps...");
+                var routes = await _googleMapsService.GetRoutesForPeople(people, shelters, assignments);
+
+                // Update assignments with route information
+                foreach (var assignment in assignments)
+                {
+                    var routeKey = $"{assignment.Key}-{assignment.Value.ShelterId}";
+                    if (routes.ContainsKey(routeKey) && routes[routeKey].Routes?.Any() == true)
+                    {
+                        var route = routes[routeKey].Routes.First();
+                        if (!string.IsNullOrEmpty(route.OverviewPolyline))
+                        {
+                            assignment.Value.RoutePolyline = route.OverviewPolyline;
+                            _logger.LogInformation($"Added route polyline for person {assignment.Key} to shelter {assignment.Value.ShelterId}");
+                        }
+                    }
+                }
+
+                // STEP 4: Handle unassigned people (same as before but with walking distances)
+                var unassignedPeople = people.Where(p => !assignments.ContainsKey(p.Id)).ToList();
+                foreach (var person in unassignedPeople)
+                {
+                    ShelterDto nearestShelter = null;
+                    double nearestDistance = double.MaxValue;
+
+                    foreach (var shelter in shelters)
+                    {
+                        // Try to use walking distance first
+                        var walkingDist = walkingDistances.ContainsKey(person.Id.ToString()) &&
+                                         walkingDistances[person.Id.ToString()].ContainsKey(shelter.Id.ToString())
+                            ? walkingDistances[person.Id.ToString()][shelter.Id.ToString()]
+                            : -1;
+
+                        // Fall back to air distance if walking distance not available
+                        double distance = walkingDist > 0 ? walkingDist : CalculateDistance(
+                            person.Latitude, person.Longitude,
+                            shelter.Latitude, shelter.Longitude);
+
+                        if (distance < nearestDistance)
+                        {
+                            nearestDistance = distance;
+                            nearestShelter = shelter;
+                        }
+                    }
+
+                    if (nearestShelter != null)
+                    {
+                        person.NearestShelterId = nearestShelter.Id;
+                        person.NearestShelterDistance = nearestDistance;
+                    }
+                }
+
+                // STEP 5: Calculate statistics
+                var assignedCount = assignments.Count;
+                var averageDistance = assignments.Values.Count > 0 ? assignments.Values.Average(a => a.Distance) : 0;
+                var maxDistance = assignments.Values.Count > 0 ? assignments.Values.Max(a => a.Distance) : 0;
+
+                // STEP 6: Prepare response
+                var response = new SimulationResponseDto
+                {
+                    People = people,
+                    Shelters = shelters,
+                    Assignments = assignments,
+                    Statistics = new SimulationStatisticsDto
+                    {
+                        ExecutionTimeMs = 0,
+                        AssignedCount = assignedCount,
+                        UnassignedCount = people.Count - assignedCount,
+                        AssignmentPercentage = people.Count > 0 ? (double)assignedCount / people.Count : 0,
+                        TotalShelterCapacity = shelters.Sum(s => s.Capacity),
+                        ShelterUsagePercentage = shelters.Sum(s => s.Capacity) > 0
+                            ? (double)assignedCount / shelters.Sum(s => s.Capacity) * 100
+                            : 0,
+                        AverageDistance = averageDistance,
+                        MaxDistance = maxDistance,
+                        MinDistance = assignments.Values.Count > 0 ? assignments.Values.Min(a => a.Distance) : 0
+                    }
+                };
+
+                foreach (var assignment in assignments)
+                {
+                    _logger.LogInformation($"Final assignment: Person {assignment.Key} -> Shelter {assignment.Value.ShelterId}, Distance: {assignment.Value.Distance}km, IsWalkingDistance: {assignment.Value.IsWalkingDistance}");
+                }
+
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in RunSimulationWithWalkingDistances");
+                return StatusCode(500, $"An error occurred while running the simulation: {ex.Message}");
+            }
+        }
+
+        // Also ADD this helper method to SimulationController.cs
+        private async Task<Dictionary<int, AssignmentDto>> AssignPeopleToSheltersWithWalkingDistance(
+            List<PersonDto> people,
+            List<ShelterDto> shelters,
+            PrioritySettingsDto prioritySettings,
+            Dictionary<string, Dictionary<string, double>> walkingDistances)
+        {
+            _logger.LogInformation("Starting shelter assignment with walking distances...");
+
+            // LOG THE WALKING DISTANCES TO SEE WHAT YOU'RE GETTING
+            int validDistances = 0;
+            int invalidDistances = 0;
+
+            foreach (var personEntry in walkingDistances)
+            {
+                foreach (var shelterEntry in personEntry.Value)
+                {
+                    if (shelterEntry.Value > 0)
+                    {
+                        validDistances++;
+                        _logger.LogInformation($"Valid distance: Person {personEntry.Key} to Shelter {shelterEntry.Key} = {shelterEntry.Value} km");
+                    }
+                    else
+                    {
+                        invalidDistances++;
+                        _logger.LogWarning($"Invalid distance: Person {personEntry.Key} to Shelter {shelterEntry.Key} = {shelterEntry.Value}");
+                    }
+                }
+            }
+
+            _logger.LogInformation($"Walking distances summary: {validDistances} valid, {invalidDistances} invalid");
+
+
+            // Constants for walking time constraints
+            const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
+            const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
+            const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
+
+            // Initialize tracking structures
+            var assignments = new Dictionary<int, AssignmentDto>();
+            var assignedPeople = new HashSet<int>();
+            var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
+
+            foreach (var shelter in shelters)
+            {
+                _logger.LogInformation($"Shelter {shelter.Id} has capacity {shelter.Capacity}");
+            }
+
+            // Create priority queue
+            var pq = new PriorityQueue<AssignmentOption, double>();
+
+            // Populate priority queue with walking distances
+            foreach (var person in people)
+            {
+                foreach (var shelter in shelters)
+                {
+                    double distance;
+
+                    // Try to get walking distance from pre-calculated data
+                    if (walkingDistances.ContainsKey(person.Id.ToString()) &&
+                        walkingDistances[person.Id.ToString()].ContainsKey(shelter.Id.ToString()))
+                    {
+                        distance = walkingDistances[person.Id.ToString()][shelter.Id.ToString()];
+
+                        // Skip if no route available (indicated by -1)
+                        if (distance < 0)
+                            continue;
+                    }
+                    else
+                    {
+                        // Fall back to air distance calculation
+                        distance = CalculateDistance(
+                            person.Latitude, person.Longitude,
+                            shelter.Latitude, shelter.Longitude);
+                    }
+
+                    // Only consider shelters within maximum walking distance
+                    if (distance <= MAX_DISTANCE_KM)
+                    {
+                        var option = new AssignmentOption
+                        {
+                            PersonId = person.Id,
+                            ShelterId = shelter.Id,
+                            Distance = distance,
+                            IsReachable = true,
+                            VulnerabilityScore = CalculateVulnerabilityScore(person.Age)
+                        };
+
+                        // Calculate priority
+                        double priority = distance;
+
+                        // Adjust priority for vulnerable people if enabled
+                        if (prioritySettings?.EnableAgePriority == true)
+                        {
+                            priority -= option.VulnerabilityScore * 0.01;
+                        }
+
+                        pq.Enqueue(option, priority);
+                    }
+                }
+            }
+
+            _logger.LogInformation($"Priority queue built with {pq.Count} possible assignments using walking distances");
+
+            // Process assignments in priority order
+            int processedCount = 0;
+            while (pq.Count > 0)
+            {
+                var option = pq.Dequeue();
+                processedCount++;
+
+                if (assignedPeople.Contains(option.PersonId))
+                    continue;
+
+                if (shelterCapacity[option.ShelterId] <= 0)
+                    continue;
+
+                // Make the assignment
+                assignments[option.PersonId] = new AssignmentDto
+                {
+                    PersonId = option.PersonId,
+                    ShelterId = option.ShelterId,
+                    Distance = option.Distance,
+                    IsWalkingDistance = true
+                };
+
+                _logger.LogInformation($"Assignment made: Person {option.PersonId} -> Shelter {option.ShelterId}, Total assignments: {assignments.Count}");
+
+                assignedPeople.Add(option.PersonId);
+                shelterCapacity[option.ShelterId]--;
+
+                var person = people.First(p => p.Id == option.PersonId);
+                string ageGroup = person.Age >= 70 ? "elderly" : person.Age <= 12 ? "child" : "adult";
+
+                _logger.LogInformation($"Assigned person {option.PersonId} ({ageGroup}, age {person.Age}) to shelter {option.ShelterId} (walking distance: {option.Distance * 1000:F0}m)");
+            }
+
+            _logger.LogInformation($"Assignment complete: {assignments.Count} assigned, {people.Count - assignments.Count} unassigned");
+
+            _logger.LogInformation($"Returning {assignments.Count} assignments");
+            foreach (var kvp in assignments)
+            {
+                _logger.LogInformation($"Assignment: Person {kvp.Key} -> Shelter {kvp.Value.ShelterId} at {kvp.Value.Distance}km");
+            }
+
+            return assignments;
+        }
+
         //===================================
         // Extras and Helpers
         //===================================
@@ -1366,43 +1674,7 @@ namespace FindCover.Controllers
         public SimulationStatisticsDto Statistics { get; set; } // Statistics about the simulation results
     }
 
-    /**
-     * PersonDto - Represents a person in the simulation
-     * Includes their location and age
-     */
-    public class PersonDto
-    {
-        public int Id { get; set; } // Unique identifier for this person
-        public int Age { get; set; } // Age of the person (affects priority)
-        public double Latitude { get; set; } // Latitude coordinate
-        public double Longitude { get; set; } // Longitude coordinate
-        public int? NearestShelterId { get; set; } // ID of the nearest shelter (even if not assigned)
-        public double? NearestShelterDistance { get; set; } // Distance to the nearest shelter
-    }
 
-    /**
-     * ShelterDto - Represents a shelter in the simulation
-     * Includes location and capacity information
-     */
-    public class ShelterDto
-    {
-        public int Id { get; set; } // Unique identifier for this shelter
-        public string Name { get; set; } // Name or description of the shelter
-        public double Latitude { get; set; } // Latitude coordinate
-        public double Longitude { get; set; } // Longitude coordinate
-        public int Capacity { get; set; } // How many people this shelter can hold
-    }
-
-    /**
-     * AssignmentDto - Represents the assignment of a person to a shelter
-     * Includes the distance between them
-     */
-    public class AssignmentDto
-    {
-        public int PersonId { get; set; } // ID of the assigned person
-        public int ShelterId { get; set; } // ID of the shelter they're assigned to
-        public double Distance { get; set; } // Distance between the person and shelter in kilometers
-    }
 
     /**
      * PrioritySettingsDto - Settings for prioritizing vulnerable populations

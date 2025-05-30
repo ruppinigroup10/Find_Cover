@@ -220,6 +220,45 @@ class ShelterSimulationVisualizer {
     };
   }
 
+  // DecodePolyline METHOD:
+  decodePolyline(encoded) {
+    const points = [];
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < encoded.length) {
+      let shift = 0;
+      let result = 0;
+      let byte;
+
+      do {
+        byte = encoded.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+
+      const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+
+      do {
+        byte = encoded.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+
+      const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+      lng += dlng;
+
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+
+    return points;
+  }
+
   /**
    * Clears all map data and resets statistics
    * Called before visualizing a new simulation to start fresh
@@ -521,30 +560,67 @@ class ShelterSimulationVisualizer {
             }
           }
 
+          // check before drawing the path
+          console.log("Assignment data:", assignment);
+          console.log("Is walking distance?", assignment.isWalkingDistance);
+          console.log("Distance:", assignment.distance);
+
+          if (assignments[person.id]) {
+            console.log(
+              "Assignment for person",
+              person.id,
+              ":",
+              assignments[person.id]
+            );
+          }
           // Draw the path from person to shelter
           // If a calculated route is available, use that
-          if (assignment.route && assignment.route.coordinates) {
-            const routeLine = L.polyline(assignment.route.coordinates, {
-              color: this.getLineColor(person.age, person.isManual), // Color based on age and manual status
-              opacity: 0.7,
-              weight: 3,
-              dashArray: person.isManual ? "5, 5" : null, // Dashed line for manual people
+          if (assignment.routePolyline) {
+            // We have an actual route from Google Directions!
+            console.log("Drawing actual walking route");
+
+            const decodedPath = this.decodePolyline(assignment.routePolyline);
+
+            const routeLine = L.polyline(decodedPath, {
+              color: this.getLineColor(person.age, person.isManual),
+              opacity: 0.8,
+              weight: 4,
+              smoothFactor: 1,
+              className: "walking-route actual-route",
             });
+
             this.pathLines.addLayer(routeLine);
-          } else {
-            // If no detailed route is available, draw a simple straight line
+          } else if (assignment.isWalkingDistance) {
+            // Fallback to simple curved line if no route available
             const line = L.polyline(
               [
-                [person.latitude, person.longitude], // From person
-                [shelter.latitude, shelter.longitude], // To shelter
+                [person.latitude, person.longitude],
+                [shelter.latitude, shelter.longitude],
+              ],
+              {
+                color: this.getLineColor(person.age, person.isManual),
+                opacity: 0.7,
+                weight: 3,
+                className: "walking-route",
+              }
+            );
+
+            this.pathLines.addLayer(line);
+          } else {
+            // Regular straight line for air distance
+            const line = L.polyline(
+              [
+                [person.latitude, person.longitude],
+                [shelter.latitude, shelter.longitude],
               ],
               {
                 color: this.getLineColor(person.age, person.isManual),
                 opacity: 0.7,
                 weight: 2,
-                dashArray: person.isManual ? "5, 5" : null, // Dashed line for manual people
+                dashArray: person.isManual ? "5, 5" : null,
               }
             );
+
             this.pathLines.addLayer(line);
           }
 
