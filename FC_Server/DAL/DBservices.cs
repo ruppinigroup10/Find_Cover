@@ -755,5 +755,48 @@ public class DBservices
         }
     }
 
+    public bool DeleteKnownLocation(int location_id, int user_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@location_id", location_id);
+        paramDic.Add("@user_id", user_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_DeleteKnownLocation", con, paramDic);
+
+        try
+        {
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+                throw new Exception("Invalid ID");
+            if (ex.Message.Contains("Location not found"))
+                throw new Exception("Location not found for this user");
+            throw new Exception("Delete failed");
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
+
 }
 

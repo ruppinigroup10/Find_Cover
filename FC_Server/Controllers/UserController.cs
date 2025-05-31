@@ -356,6 +356,29 @@ public class UserController : ControllerBase
         }
     }
 
+    [HttpDelete("DeleteKnownLocation")]
+    public IActionResult DeleteKnownLocation(int location_id, int user_id)
+    {
+        try
+        {
+            bool result = FC_Server.Models.KnownLocation.DeleteKnownLocation(location_id, user_id);
+            if (result)
+            {
+                return Ok(new { message = "Known location deleted successfully" });
+            }
+            return BadRequest(new { message = "Delete failed" });
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+                return BadRequest(new { message = "Invalid ID" });
+            if (ex.Message.Contains("Location not found"))
+                return BadRequest(new { message = "Location not found for this user" });
+
+            return BadRequest(new { message = "Delete failed" });
+        }
+    }
+
     // Default controllers  
     [HttpGet]
     public IEnumerable<string> Get()

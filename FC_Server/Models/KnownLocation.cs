@@ -76,6 +76,12 @@ public class KnownLocation
         DBservices dbs = new DBservices();
         return dbs.AddKnownLocation(user_id, latitude, longitude, radius, address, location_name);
     }
+
+    public static bool DeleteKnownLocation(int location_id, int user_id)
+    {
+        DBservices dbs = new DBservices();
+        return dbs.DeleteKnownLocation(location_id, user_id);
+    }
 }
 
 
