@@ -203,6 +203,35 @@ public class UserController : ControllerBase
 
     }
 
+    // PUT: api/User/ResetUserPreferences?user_id=5
+    [HttpPut("ResetUserPreferences")]
+    public IActionResult ResetUserPreferences(int user_id)
+    {
+        try
+        {
+            var resetPrefs = FC_Server.Models.UserPreferences.ResetUserPreferences(user_id);
+            if (resetPrefs != null)
+            {
+                return Ok(new
+                {
+                    message = "User preferences reset to default successfully",
+                    preferences = resetPrefs
+                });
+            }
+
+            return BadRequest(new { message = "Reset failed" });
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("User not found"))
+                return BadRequest(new { message = "User not found" });
+            if (ex.Message.Contains("Preferences not found"))
+                return BadRequest(new { message = "Preferences not found for this user" });
+
+            return BadRequest(new { message = "Reset failed" });
+        }
+    }
+
     // POST: api/<UserController>/AddPreference  
     [HttpPost("AddPreference")]
     public IActionResult AddPreference([FromBody] FC_Server.Models.UserPreferences preferences)

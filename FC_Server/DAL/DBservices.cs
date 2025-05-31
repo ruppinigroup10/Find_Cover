@@ -441,6 +441,65 @@ public class DBservices
         }
     }
 
+    public UserPreferences? ResetUserPreferences(int user_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        UserPreferences? preferences = null;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_ResetPreferences", con, paramDic);
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    preferences = new UserPreferences
+                    {
+                        PreferenceId = Convert.ToInt32(dr["preference_id"]),
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        ShelterType = dr["preferred_shelter_type"].ToString() ?? "",
+                        AccessibilityNeeded = Convert.ToBoolean(dr["accessible_needed"]),
+                        NumDefaultPeople = Convert.ToInt32(dr["num_default_people"]),
+                        PetsAllowed = Convert.ToBoolean(dr["pets_allowed"]),
+                        LastUpdate = Convert.ToDateTime(dr["last_updated"])
+                    };
+                }
+            }
+            return preferences;
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Message.Contains("User not found"))
+                throw new Exception("User not found");
+            if (ex.Message.Contains("Preferences not found"))
+                throw new Exception("Preferences not found for this user");
+
+            throw new Exception("Reset failed");
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
+
     public UserPreferences? AddPreference(int user_id, string shelter_type, bool accessibility_needed, int num_default_people, bool pets_allowed)
     {
         SqlConnection con;
