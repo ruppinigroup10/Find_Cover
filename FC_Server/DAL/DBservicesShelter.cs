@@ -406,4 +406,50 @@ public class DBservicesShelter
             }
         }
     }
+
+
+    public void DeleteShelter(int shelter_id, int provider_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@shelter_id", shelter_id);
+        paramDic.Add("@provider_id", provider_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_DeleteShelter", con, paramDic);
+
+        try
+        {
+            cmd.ExecuteNonQuery();  // כי לא מצפים לתוצאה
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Message.Contains("Shelter not found"))
+            {
+                throw new Exception("Shelter not found");
+            }
+
+            if (ex.Message.Contains("Shelter not owned by this user"))
+            {
+                throw new Exception("Shelter not owned by this user");
+            }
+
+            throw new Exception("Deletion failed");
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+                con.Close();
+        }
+    }
 }

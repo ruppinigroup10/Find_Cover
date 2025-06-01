@@ -168,6 +168,30 @@ namespace FC_Server.Controllers
             }
         }
 
+        [HttpDelete("DeleteShelter")]
+        public IActionResult DeleteShelter(int shelter_id, int provider_id)
+        {
+            try
+            {
+                Shelter.DeleteShelter(shelter_id, provider_id);
+                return Ok(new { message = "Shelter deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("Shelter not found"))
+                {
+                    return BadRequest(new { message = "Shelter not found" });
+                }
+
+                if (ex.Message.Contains("Shelter not owned by this user"))
+                {
+                    return BadRequest(new { message = "Shelter not owned by this user" });
+                }
+
+                return BadRequest(new { message = "Deletion failed" });
+            }
+        }
+
         //--------------------------------------------------------------------------------------------------
         // Default controllers
         //--------------------------------------------------------------------------------------------------

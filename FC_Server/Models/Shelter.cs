@@ -109,5 +109,11 @@
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.shelterActiveStatus(shelter_id, status);
         }
+
+        public static void DeleteShelter(int shelter_id, int provider_id)
+        {
+            DBservicesShelter dbs = new DBservicesShelter();
+            dbs.DeleteShelter(shelter_id, provider_id);
+        }
     }
 }
