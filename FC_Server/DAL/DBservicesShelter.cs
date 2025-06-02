@@ -438,7 +438,10 @@ public class DBservicesShelter
             {
                 throw new Exception("Shelter not found");
             }
-
+            if (ex.Message.Contains("User not found"))
+            {
+                throw new Exception("User not found");
+            }
             if (ex.Message.Contains("Shelter not owned by this user"))
             {
                 throw new Exception("Shelter not owned by this user");

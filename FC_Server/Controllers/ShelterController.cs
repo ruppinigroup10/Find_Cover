@@ -182,7 +182,10 @@ namespace FC_Server.Controllers
                 {
                     return BadRequest(new { message = "Shelter not found" });
                 }
-
+                if (ex.Message.Contains("User not found"))
+                {
+                    return BadRequest(new { message = "User not found" });
+                }
                 if (ex.Message.Contains("Shelter not owned by this user"))
                 {
                     return BadRequest(new { message = "Shelter not owned by this user" });
