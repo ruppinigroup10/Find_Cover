@@ -436,3 +436,53 @@ header h1 {
   stroke-dasharray: 10, 5;
   animation: dash 1s linear infinite;
 }
+
+/* Enhanced button for walking distances */
+#run-manual-walking {
+  background-color: #27ae60;
+  border: none;
+  margin-top: 5px;
+  position: relative;
+  overflow: hidden;
+}
+
+#run-manual-walking:hover {
+  background-color: #229954;
+}
+
+#run-manual-walking:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+#run-manual-walking.loading {
+  color: transparent;
+}
+
+#run-manual-walking.loading::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Enhanced route visualization for manual people */
+.walking-route.manual-route {
+  stroke: #9370db;
+  stroke-width: 5;
+  stroke-opacity: 0.8;
+}
