@@ -7,7 +7,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // Register Google Maps service with HttpClient
-builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>();
+builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5); // Increase to 5 minutes for testing
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    MaxConnectionsPerServer = 10, // Allow more concurrent connections
+    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true // For dev only
+});
 
 // Add logging
 builder.Services.AddLogging();

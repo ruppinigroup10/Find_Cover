@@ -122,6 +122,9 @@ namespace ServerSimulation.DAL
                 {
                     var batch = uncachedPairs.Skip(i).Take(maxElementsPerRequest).ToList();
 
+                    // Progress logging
+                    _logger.LogInformation($"Processing batch {i / maxElementsPerRequest + 1} of {(uncachedPairs.Count + maxElementsPerRequest - 1) / maxElementsPerRequest}: {batch.Count} pairs");
+
                     // Create unique origins and destinations for this batch
                     var batchOrigins = batch.Select(b => b.origin).Distinct(new LocationPointComparer()).ToList();
                     var batchDestinations = batch.Select(b => b.destination).Distinct(new LocationPointComparer()).ToList();
@@ -143,59 +146,113 @@ namespace ServerSimulation.DAL
                     else if (request.AvoidTolls)
                         queryParams["avoid"] = "tolls";
 
-                    // Make API call
-                    var url = BuildUrl(DISTANCE_MATRIX_URL, queryParams);
-                    _logger.LogInformation($"Calling Google Distance Matrix API for batch {i / maxElementsPerRequest + 1}");
+                    // Retry logic for network issues
+                    int retryCount = 0;
+                    const int maxRetries = 3;
+                    bool success = false;
 
-                    var apiResponse = await _httpClient.GetAsync(url);
-                    apiResponse.EnsureSuccessStatusCode();
-
-                    var json = await apiResponse.Content.ReadAsStringAsync();
-                    var apiResult = ParseDistanceMatrixResponse(json);
-
-                    if (!apiResult.Success)
+                    while (retryCount < maxRetries && !success)
                     {
-                        _logger.LogError($"Google Maps API error: {apiResult.ErrorMessage}");
-                        continue;
-                    }
-
-                    // Map API results back to our response and cache them
-                    foreach (var pair in batch)
-                    {
-                        // Find indices in batch response
-                        var originIndex = batchOrigins.FindIndex(o =>
-                            Math.Abs(o.Latitude - pair.origin.Latitude) < 0.0001 &&
-                            Math.Abs(o.Longitude - pair.origin.Longitude) < 0.0001);
-
-                        var destIndex = batchDestinations.FindIndex(d =>
-                            Math.Abs(d.Latitude - pair.destination.Latitude) < 0.0001 &&
-                            Math.Abs(d.Longitude - pair.destination.Longitude) < 0.0001);
-
-                        if (originIndex >= 0 && destIndex >= 0 &&
-                            apiResult.Rows.Count > originIndex &&
-                            apiResult.Rows[originIndex].Elements.Count > destIndex)
+                        try
                         {
-                            var element = apiResult.Rows[originIndex].Elements[destIndex];
+                            // Build URL
+                            var url = BuildUrl(DISTANCE_MATRIX_URL, queryParams);
 
-                            // Update response
-                            response.Rows[pair.rowIndex].Elements[pair.elementIndex] = element;
+                            _logger.LogInformation($"Calling Google Distance Matrix API - Attempt {retryCount + 1}/{maxRetries}");
+                            _logger.LogInformation($"Batch size: {batchOrigins.Count} origins × {batchDestinations.Count} destinations = {batchOrigins.Count * batchDestinations.Count} elements");
 
-                            // Cache the result if successful
-                            if (element.Status == "OK" && element.Distance != null && element.Duration != null)
+                            // Make API call with stopwatch
+                            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                            var apiResponse = await _httpClient.GetAsync(url);
+                            stopwatch.Stop();
+
+                            _logger.LogInformation($"API call completed in {stopwatch.ElapsedMilliseconds}ms - Status: {apiResponse.StatusCode}");
+
+                            apiResponse.EnsureSuccessStatusCode();
+
+                            var json = await apiResponse.Content.ReadAsStringAsync();
+                            var apiResult = ParseDistanceMatrixResponse(json);
+
+                            // Check for API errors
+                            if (apiResult.Status == "OVER_QUERY_LIMIT")
                             {
-                                SaveDistanceToCache(
-                                    pair.origin.Latitude, pair.origin.Longitude,
-                                    pair.destination.Latitude, pair.destination.Longitude,
-                                    element.Distance.Value, element.Duration.Value
-                                );
+                                _logger.LogWarning("Hit Google Maps query limit, waiting before retry...");
+                                await Task.Delay(2000); // Wait 2 seconds
+                                retryCount++;
+                                continue;
                             }
+
+                            if (!apiResult.Success)
+                            {
+                                _logger.LogError($"Google Maps API error: {apiResult.ErrorMessage}");
+                                retryCount++;
+                                await Task.Delay(1000 * retryCount); // Exponential backoff
+                                continue;
+                            }
+
+                            // Map API results back to our response and cache them
+                            foreach (var pair in batch)
+                            {
+                                // Find indices in batch response
+                                var originIndex = batchOrigins.FindIndex(o =>
+                                    Math.Abs(o.Latitude - pair.origin.Latitude) < 0.0001 &&
+                                    Math.Abs(o.Longitude - pair.origin.Longitude) < 0.0001);
+
+                                var destIndex = batchDestinations.FindIndex(d =>
+                                    Math.Abs(d.Latitude - pair.destination.Latitude) < 0.0001 &&
+                                    Math.Abs(d.Longitude - pair.destination.Longitude) < 0.0001);
+
+                                if (originIndex >= 0 && destIndex >= 0 &&
+                                    apiResult.Rows.Count > originIndex &&
+                                    apiResult.Rows[originIndex].Elements.Count > destIndex)
+                                {
+                                    var element = apiResult.Rows[originIndex].Elements[destIndex];
+
+                                    // Update response
+                                    response.Rows[pair.rowIndex].Elements[pair.elementIndex] = element;
+
+                                    // Cache the result if successful
+                                    if (element.Status == "OK" && element.Distance != null && element.Duration != null)
+                                    {
+                                        SaveDistanceToCache(
+                                            pair.origin.Latitude, pair.origin.Longitude,
+                                            pair.destination.Latitude, pair.destination.Longitude,
+                                            element.Distance.Value, element.Duration.Value
+                                        );
+                                    }
+                                }
+                            }
+
+                            success = true; // Mark as successful
+                            _logger.LogInformation($"Batch {i / maxElementsPerRequest + 1} processed successfully");
+                        }
+                        catch (TaskCanceledException ex)
+                        {
+                            _logger.LogError($"Request timeout on attempt {retryCount + 1}: {ex.Message}");
+                            retryCount++;
+                            if (retryCount >= maxRetries)
+                            {
+                                throw new Exception($"Failed after {maxRetries} retries due to timeout", ex);
+                            }
+                            await Task.Delay(1000 * retryCount); // Exponential backoff
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            _logger.LogError($"HTTP error on attempt {retryCount + 1}: {ex.Message}");
+                            retryCount++;
+                            if (retryCount >= maxRetries)
+                            {
+                                throw new Exception($"Failed after {maxRetries} retries due to HTTP error", ex);
+                            }
+                            await Task.Delay(1000 * retryCount);
                         }
                     }
 
-                    // Add delay to respect API rate limits
+                    // Add delay between batches to respect API rate limits
                     if (i + maxElementsPerRequest < uncachedPairs.Count)
                     {
-                        await Task.Delay(100);
+                        _logger.LogInformation("Waiting 500ms before next batch to avoid rate limiting...");
+                        await Task.Delay(500);
                     }
                 }
 
@@ -426,42 +483,42 @@ namespace ServerSimulation.DAL
         /// </summary>
         private DistanceMatrixElement GetCachedDistance(double originLat, double originLng, double destLat, double destLng)
         {
+            SqlConnection con = null;
             try
             {
-                SqlConnection con = null;
-                SqlCommand cmd = null;
-
                 con = _dbService.connect("myProjDB");
 
                 var parameters = new Dictionary<string, object>
+        {
+            {"@OriginLat", originLat},
+            {"@OriginLng", originLng},
+            {"@DestLat", destLat},
+            {"@DestLng", destLng},
+            {"@ToleranceMeters", 50}
+        };
+
+                using (var cmd = CreateCommandWithStoredProcedure("FC_SP_GetCachedDistance", con, parameters))
                 {
-                    {"@OriginLat", originLat},
-                    {"@OriginLng", originLng},
-                    {"@DestLat", destLat},
-                    {"@DestLng", destLng},
-                    {"@ToleranceMeters", 50}
-                };
-
-                cmd = CreateCommandWithStoredProcedure("FC_SP_GetCachedDistance", con, parameters);
-
-                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
-
-                if (dr.Read())
-                {
-                    return new DistanceMatrixElement
+                    using (SqlDataReader dr = cmd.ExecuteReader())
                     {
-                        Status = "OK",
-                        Distance = new DistanceInfo
+                        if (dr.Read())
                         {
-                            Value = Convert.ToInt32(dr["distance_meters"]),
-                            Text = $"{dr["distance_meters"]} m"
-                        },
-                        Duration = new DurationInfo
-                        {
-                            Value = Convert.ToInt32(dr["duration_seconds"]),
-                            Text = $"{dr["duration_seconds"]} sec"
+                            return new DistanceMatrixElement
+                            {
+                                Status = "OK",
+                                Distance = new DistanceInfo
+                                {
+                                    Value = Convert.ToInt32(dr["distance_meters"]),
+                                    Text = $"{dr["distance_meters"]} m"
+                                },
+                                Duration = new DurationInfo
+                                {
+                                    Value = Convert.ToInt32(dr["duration_seconds"]),
+                                    Text = $"{dr["duration_seconds"]} sec"
+                                }
+                            };
                         }
-                    };
+                    }
                 }
 
                 return null;
@@ -471,6 +528,14 @@ namespace ServerSimulation.DAL
                 _logger.LogError(ex, "Error retrieving cached distance");
                 return null;
             }
+            finally
+            {
+                if (con != null && con.State == ConnectionState.Open)
+                {
+                    con.Close();
+                    con.Dispose();
+                }
+            }
         }
 
         /// <summary>
@@ -478,31 +543,40 @@ namespace ServerSimulation.DAL
         /// </summary>
         private void SaveDistanceToCache(double originLat, double originLng, double destLat, double destLng, int distanceMeters, int durationSeconds)
         {
+            SqlConnection con = null;
             try
             {
-                SqlConnection con = null;
-                SqlCommand cmd = null;
-
                 con = _dbService.connect("myProjDB");
 
                 var parameters = new Dictionary<string, object>
-                {
-                    {"@OriginLat", originLat},
-                    {"@OriginLng", originLng},
-                    {"@DestLat", destLat},
-                    {"@DestLng", destLng},
-                    {"@DistanceMeters", distanceMeters},
-                    {"@DurationSeconds", durationSeconds}
-                };
+        {
+            {"@OriginLat", originLat},
+            {"@OriginLng", originLng},
+            {"@DestLat", destLat},
+            {"@DestLng", destLng},
+            {"@DistanceMeters", distanceMeters},
+            {"@DurationSeconds", durationSeconds}
+        };
 
-                cmd = CreateCommandWithStoredProcedure("FC_SP_SaveDistanceToCache", con, parameters);
-                cmd.ExecuteNonQuery();
+                using (var cmd = CreateCommandWithStoredProcedure("FC_SP_SaveDistanceToCache", con, parameters))
+                {
+                    cmd.ExecuteNonQuery();
+                }
 
                 _logger.LogInformation($"Distance cached: ({originLat}, {originLng}) to ({destLat}, {destLng}) = {distanceMeters}m");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving distance to cache");
+                // Don't throw - caching failure shouldn't break the main flow
+            }
+            finally
+            {
+                if (con != null && con.State == ConnectionState.Open)
+                {
+                    con.Close();
+                    con.Dispose();
+                }
             }
         }
 

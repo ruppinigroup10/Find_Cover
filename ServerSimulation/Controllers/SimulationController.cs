@@ -993,7 +993,13 @@ namespace FindCover.Controllers
 
                 // STEP 2: Get walking distances from Google Maps
                 _logger.LogInformation("Fetching walking distances from Google Maps...");
+                var walkingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+                // Calculate walking distances using Google Maps API
                 var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(people, shelters);
+
+                walkingStopwatch.Stop();
+                _logger.LogInformation($"Walking distances fetched in {walkingStopwatch.ElapsedMilliseconds}ms for {people.Count * shelters.Count} pairs");
 
                 // STEP 3: Run assignment algorithm with walking distances
                 var assignments = await AssignPeopleToSheltersWithWalkingDistance(
@@ -1103,12 +1109,16 @@ namespace FindCover.Controllers
         //=====================================================================================================
 
         private async Task<Dictionary<int, AssignmentDto>> AssignPeopleToSheltersWithWalkingDistance(
-    List<PersonDto> people,
-    List<ShelterDto> shelters,
-    PrioritySettingsDto prioritySettings,
-    Dictionary<string, Dictionary<string, double>> walkingDistances)
+        List<PersonDto> people,
+        List<ShelterDto> shelters,
+        PrioritySettingsDto prioritySettings,
+        Dictionary<string, Dictionary<string, double>> walkingDistances)
         {
             _logger.LogInformation("Starting shelter assignment with walking distances and cube optimization...");
+
+            // progress logging
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            _logger.LogInformation($"Processing assignment for {people.Count} people and {shelters.Count} shelters");
 
             // Constants for walking time constraints
             const double MAX_TRAVEL_TIME_MINUTES = 1.0; // Maximum travel time in minutes
@@ -1279,6 +1289,10 @@ namespace FindCover.Controllers
             {
                 _logger.LogInformation($"Assignment: Person {kvp.Key} -> Shelter {kvp.Value.ShelterId} at {kvp.Value.Distance}km");
             }
+
+            // check for end of processing
+            stopwatch.Stop();
+            _logger.LogInformation($"Assignment completed in {stopwatch.ElapsedMilliseconds}ms");
 
             return assignments;
         }
