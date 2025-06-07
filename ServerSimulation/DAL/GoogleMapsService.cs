@@ -9,11 +9,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ServerSimulation.Models.DTOs;
 using Newtonsoft.Json.Linq;
+using System.Data.SqlClient;
+using System.Data;
 
 namespace ServerSimulation.DAL
 {
     /// <summary>
-    /// Service for interacting with Google Maps APIs
+    /// Service for interacting with Google Maps APIs with caching support
     /// </summary>
     public class GoogleMapsService : IGoogleMapsService
     {
@@ -22,11 +24,13 @@ namespace ServerSimulation.DAL
         private readonly ILogger<GoogleMapsService> _logger;
         private const string DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json";
         private const string DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
+        private readonly DBservices _dbService;
 
         public GoogleMapsService(HttpClient httpClient, IConfiguration configuration, ILogger<GoogleMapsService> logger)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _dbService = new DBservices(); // Initialize database service
 
             // Load configuration
             _config = new GoogleMapsConfig
@@ -43,7 +47,7 @@ namespace ServerSimulation.DAL
         }
 
         /// <summary>
-        /// Calculate walking distances between multiple origins and destinations
+        /// Calculate walking distances between multiple origins and destinations with caching
         /// </summary>
         public async Task<DistanceMatrixResponse> GetDistanceMatrixAsync(DistanceMatrixRequest request)
         {
@@ -56,43 +60,147 @@ namespace ServerSimulation.DAL
                 if (request.Destinations == null || !request.Destinations.Any())
                     throw new ArgumentException("At least one destination is required");
 
-                // Check Google's limits
-                int totalElements = request.Origins.Count * request.Destinations.Count;
-                if (totalElements > _config.MaxElementsPerRequest)
+                // Create a response object
+                var response = new DistanceMatrixResponse
                 {
-                    _logger.LogWarning($"Request exceeds Google's limit of {_config.MaxElementsPerRequest} elements. Consider batching.");
-                }
-
-                // Build query parameters
-                var queryParams = new Dictionary<string, string>
-                {
-                    ["origins"] = string.Join("|", request.Origins.Select(o => o.ToString())),
-                    ["destinations"] = string.Join("|", request.Destinations.Select(d => d.ToString())),
-                    ["mode"] = request.Mode.ToString().ToLower(),
-                    ["units"] = "metric",
-                    ["language"] = _config.Language,
-                    ["region"] = _config.Region,
-                    ["key"] = _config.ApiKey
+                    Success = true,
+                    Status = "OK",
+                    Rows = new List<DistanceMatrixRow>()
                 };
 
-                if (request.AvoidHighways)
-                    queryParams["avoid"] = "highways";
-                else if (request.AvoidTolls)
-                    queryParams["avoid"] = "tolls";
+                // Track which pairs need API calls
+                var uncachedPairs = new List<(LocationPoint origin, LocationPoint destination, int rowIndex, int elementIndex)>();
 
-                // Build URL
-                var url = BuildUrl(DISTANCE_MATRIX_URL, queryParams);
+                // First pass: Check cache for all origin-destination pairs
+                for (int i = 0; i < request.Origins.Count; i++)
+                {
+                    var row = new DistanceMatrixRow { Elements = new List<DistanceMatrixElement>() };
 
-                // Make API call
-                _logger.LogInformation($"Calling Google Distance Matrix API for {request.Origins.Count} origins and {request.Destinations.Count} destinations");
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
+                    for (int j = 0; j < request.Destinations.Count; j++)
+                    {
+                        var origin = request.Origins[i];
+                        var destination = request.Destinations[j];
 
-                var json = await response.Content.ReadAsStringAsync();
-                var result = ParseDistanceMatrixResponse(json);
+                        // Check cache
+                        var cachedDistance = GetCachedDistance(
+                            origin.Latitude, origin.Longitude,
+                            destination.Latitude, destination.Longitude
+                        );
 
-                _logger.LogInformation($"Distance Matrix API call successful. Status: {result.Status}");
-                return result;
+                        if (cachedDistance != null)
+                        {
+                            // Use cached data
+                            row.Elements.Add(cachedDistance);
+                            _logger.LogInformation($"Cache HIT: ({origin.Latitude}, {origin.Longitude}) to ({destination.Latitude}, {destination.Longitude})");
+                        }
+                        else
+                        {
+                            // Add placeholder, will fill with API call
+                            row.Elements.Add(null);
+                            uncachedPairs.Add((origin, destination, i, j));
+                            _logger.LogInformation($"Cache MISS: ({origin.Latitude}, {origin.Longitude}) to ({destination.Latitude}, {destination.Longitude})");
+                        }
+                    }
+
+                    response.Rows.Add(row);
+                }
+
+                // If all pairs were cached, return immediately
+                if (!uncachedPairs.Any())
+                {
+                    _logger.LogInformation("All distances found in cache!");
+                    return response;
+                }
+
+                // Second pass: Make API calls for uncached pairs in batches
+                _logger.LogInformation($"Need to fetch {uncachedPairs.Count} distances from Google Maps API");
+
+                // Google limits: 100 elements per request
+                const int maxElementsPerRequest = 100;
+
+                for (int i = 0; i < uncachedPairs.Count; i += maxElementsPerRequest)
+                {
+                    var batch = uncachedPairs.Skip(i).Take(maxElementsPerRequest).ToList();
+
+                    // Create unique origins and destinations for this batch
+                    var batchOrigins = batch.Select(b => b.origin).Distinct(new LocationPointComparer()).ToList();
+                    var batchDestinations = batch.Select(b => b.destination).Distinct(new LocationPointComparer()).ToList();
+
+                    // Build query parameters
+                    var queryParams = new Dictionary<string, string>
+                    {
+                        ["origins"] = string.Join("|", batchOrigins.Select(o => $"{o.Latitude},{o.Longitude}")),
+                        ["destinations"] = string.Join("|", batchDestinations.Select(d => $"{d.Latitude},{d.Longitude}")),
+                        ["mode"] = request.Mode.ToString().ToLower(),
+                        ["units"] = "metric",
+                        ["language"] = _config.Language,
+                        ["region"] = _config.Region,
+                        ["key"] = _config.ApiKey
+                    };
+
+                    if (request.AvoidHighways)
+                        queryParams["avoid"] = "highways";
+                    else if (request.AvoidTolls)
+                        queryParams["avoid"] = "tolls";
+
+                    // Make API call
+                    var url = BuildUrl(DISTANCE_MATRIX_URL, queryParams);
+                    _logger.LogInformation($"Calling Google Distance Matrix API for batch {i / maxElementsPerRequest + 1}");
+
+                    var apiResponse = await _httpClient.GetAsync(url);
+                    apiResponse.EnsureSuccessStatusCode();
+
+                    var json = await apiResponse.Content.ReadAsStringAsync();
+                    var apiResult = ParseDistanceMatrixResponse(json);
+
+                    if (!apiResult.Success)
+                    {
+                        _logger.LogError($"Google Maps API error: {apiResult.ErrorMessage}");
+                        continue;
+                    }
+
+                    // Map API results back to our response and cache them
+                    foreach (var pair in batch)
+                    {
+                        // Find indices in batch response
+                        var originIndex = batchOrigins.FindIndex(o =>
+                            Math.Abs(o.Latitude - pair.origin.Latitude) < 0.0001 &&
+                            Math.Abs(o.Longitude - pair.origin.Longitude) < 0.0001);
+
+                        var destIndex = batchDestinations.FindIndex(d =>
+                            Math.Abs(d.Latitude - pair.destination.Latitude) < 0.0001 &&
+                            Math.Abs(d.Longitude - pair.destination.Longitude) < 0.0001);
+
+                        if (originIndex >= 0 && destIndex >= 0 &&
+                            apiResult.Rows.Count > originIndex &&
+                            apiResult.Rows[originIndex].Elements.Count > destIndex)
+                        {
+                            var element = apiResult.Rows[originIndex].Elements[destIndex];
+
+                            // Update response
+                            response.Rows[pair.rowIndex].Elements[pair.elementIndex] = element;
+
+                            // Cache the result if successful
+                            if (element.Status == "OK" && element.Distance != null && element.Duration != null)
+                            {
+                                SaveDistanceToCache(
+                                    pair.origin.Latitude, pair.origin.Longitude,
+                                    pair.destination.Latitude, pair.destination.Longitude,
+                                    element.Distance.Value, element.Duration.Value
+                                );
+                            }
+                        }
+                    }
+
+                    // Add delay to respect API rate limits
+                    if (i + maxElementsPerRequest < uncachedPairs.Count)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+
+                _logger.LogInformation($"Distance Matrix completed. Cached {uncachedPairs.Count} new distances.");
+                return response;
             }
             catch (HttpRequestException ex)
             {
@@ -115,7 +223,7 @@ namespace ServerSimulation.DAL
         }
 
         /// <summary>
-        /// Get detailed walking directions between two points
+        /// Get walking directions between two points with caching
         /// </summary>
         public async Task<DirectionsResponse> GetDirectionsAsync(DirectionsRequest request)
         {
@@ -124,6 +232,23 @@ namespace ServerSimulation.DAL
                 // Validate request
                 if (request.Origin == null || request.Destination == null)
                     throw new ArgumentException("Origin and destination are required");
+
+                // Check cache first
+                var cachedRoute = GetCachedRoute(
+                    request.Origin.Latitude,
+                    request.Origin.Longitude,
+                    request.Destination.Latitude,
+                    request.Destination.Longitude
+                );
+
+                if (cachedRoute != null)
+                {
+                    _logger.LogInformation($"Using cached route from ({request.Origin.Latitude}, {request.Origin.Longitude}) to ({request.Destination.Latitude}, {request.Destination.Longitude})");
+                    return cachedRoute;
+                }
+
+                // If not in cache, make API call
+                _logger.LogInformation($"No cache found, calling Google Directions API");
 
                 // Build query parameters
                 var queryParams = new Dictionary<string, string>
@@ -148,12 +273,23 @@ namespace ServerSimulation.DAL
                 var url = BuildUrl(DIRECTIONS_URL, queryParams);
 
                 // Make API call
-                _logger.LogInformation($"Calling Google Directions API from {request.Origin} to {request.Destination}");
                 var response = await _httpClient.GetAsync(url);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
                 var result = ParseDirectionsResponse(json);
+
+                // Save to cache if successful
+                if (result.Success && result.Routes?.Count > 0)
+                {
+                    SaveRouteToCache(
+                        request.Origin.Latitude,
+                        request.Origin.Longitude,
+                        request.Destination.Latitude,
+                        request.Destination.Longitude,
+                        result
+                    );
+                }
 
                 _logger.LogInformation($"Directions API call successful. Found {result.Routes?.Count ?? 0} routes");
                 return result;
@@ -179,7 +315,7 @@ namespace ServerSimulation.DAL
         }
 
         /// <summary>
-        /// Calculate walking distance for shelter assignments (batch processing)
+        /// Calculate shelter distances for a list of people and shelters
         /// </summary>
         public async Task<Dictionary<string, Dictionary<string, double>>> CalculateShelterDistancesAsync(
             List<PersonDto> people,
@@ -193,59 +329,46 @@ namespace ServerSimulation.DAL
                 var origins = people.Select(p => new LocationPoint(p.Latitude, p.Longitude, p.Id.ToString())).ToList();
                 var destinations = shelters.Select(s => new LocationPoint(s.Latitude, s.Longitude, s.Id.ToString())).ToList();
 
-                // Google limits: 100 elements per request, so we might need to batch
-                int batchSize = 10; // 10x10 = 100 elements
-
-                for (int i = 0; i < origins.Count; i += batchSize)
+                // Use our enhanced distance matrix with caching
+                var request = new DistanceMatrixRequest
                 {
-                    var originBatch = origins.Skip(i).Take(batchSize).ToList();
+                    Origins = origins,
+                    Destinations = destinations,
+                    Mode = TravelMode.Walking
+                };
 
-                    for (int j = 0; j < destinations.Count; j += batchSize)
+                var response = await GetDistanceMatrixAsync(request);
+
+                if (response.Success && response.Rows != null)
+                {
+                    // Process results
+                    for (int i = 0; i < origins.Count; i++)
                     {
-                        var destBatch = destinations.Skip(j).Take(batchSize).ToList();
+                        var originId = origins[i].Id;
+                        if (!result.ContainsKey(originId))
+                            result[originId] = new Dictionary<string, double>();
 
-                        var request = new DistanceMatrixRequest
+                        for (int j = 0; j < destinations.Count; j++)
                         {
-                            Origins = originBatch,
-                            Destinations = destBatch,
-                            Mode = TravelMode.Walking
-                        };
+                            var destId = destinations[j].Id;
 
-                        var response = await GetDistanceMatrixAsync(request);
-
-                        if (response.Success && response.Rows != null)
-                        {
-                            // Process results
-                            for (int oi = 0; oi < originBatch.Count; oi++)
+                            if (i < response.Rows.Count && j < response.Rows[i].Elements.Count)
                             {
-                                var originId = originBatch[oi].Id;
-                                if (!result.ContainsKey(originId))
-                                    result[originId] = new Dictionary<string, double>();
+                                var element = response.Rows[i].Elements[j];
 
-                                for (int di = 0; di < destBatch.Count; di++)
+                                if (element.Status == "OK" && element.Distance != null)
                                 {
-                                    var destId = destBatch[di].Id;
-                                    var element = response.Rows[oi].Elements[di];
-
-                                    if (element.Status == "OK" && element.Distance != null)
-                                    {
-                                        // Convert meters to kilometers
-                                        result[originId][destId] = element.Distance.Value / 1000.0;
-                                    }
-                                    else
-                                    {
-                                        // Use -1 to indicate no route available
-                                        result[originId][destId] = -1;
-                                    }
+                                    // Convert meters to kilometers
+                                    result[originId][destId] = element.Distance.Value / 1000.0;
+                                }
+                                else
+                                {
+                                    // Use -1 to indicate no route available
+                                    result[originId][destId] = -1;
                                 }
                             }
                         }
-
-                        // Add delay to respect API rate limits
-                        await Task.Delay(100);
                     }
-
-
                 }
             }
             catch (Exception ex)
@@ -257,12 +380,13 @@ namespace ServerSimulation.DAL
             return result;
         }
 
-
-
+        /// <summary>
+        /// Get routes for assigned people
+        /// </summary>
         public async Task<Dictionary<string, DirectionsResponse>> GetRoutesForPeople(
-       List<PersonDto> people,
-       List<ShelterDto> shelters,
-       Dictionary<int, AssignmentDto> assignments)
+            List<PersonDto> people,
+            List<ShelterDto> shelters,
+            Dictionary<int, AssignmentDto> assignments)
         {
             var routes = new Dictionary<string, DirectionsResponse>();
 
@@ -295,8 +419,236 @@ namespace ServerSimulation.DAL
             return routes;
         }
 
+        #region Cache Methods
+
+        /// <summary>
+        /// Get cached distance from database
+        /// </summary>
+        private DistanceMatrixElement GetCachedDistance(double originLat, double originLng, double destLat, double destLng)
+        {
+            try
+            {
+                SqlConnection con = null;
+                SqlCommand cmd = null;
+
+                con = _dbService.connect("myProjDB");
+
+                var parameters = new Dictionary<string, object>
+                {
+                    {"@OriginLat", originLat},
+                    {"@OriginLng", originLng},
+                    {"@DestLat", destLat},
+                    {"@DestLng", destLng},
+                    {"@Tolerance", 0.0001}
+                };
+
+                cmd = CreateCommandWithStoredProcedure("FC_SP_GetCachedDistance", con, parameters);
+
+                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
+                if (dr.Read())
+                {
+                    return new DistanceMatrixElement
+                    {
+                        Status = "OK",
+                        Distance = new DistanceInfo
+                        {
+                            Value = Convert.ToInt32(dr["distance_meters"]),
+                            Text = $"{dr["distance_meters"]} m"
+                        },
+                        Duration = new DurationInfo
+                        {
+                            Value = Convert.ToInt32(dr["duration_seconds"]),
+                            Text = $"{dr["duration_seconds"]} sec"
+                        }
+                    };
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving cached distance");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Save distance to cache
+        /// </summary>
+        private void SaveDistanceToCache(double originLat, double originLng, double destLat, double destLng, int distanceMeters, int durationSeconds)
+        {
+            try
+            {
+                SqlConnection con = null;
+                SqlCommand cmd = null;
+
+                con = _dbService.connect("myProjDB");
+
+                var parameters = new Dictionary<string, object>
+                {
+                    {"@OriginLat", originLat},
+                    {"@OriginLng", originLng},
+                    {"@DestLat", destLat},
+                    {"@DestLng", destLng},
+                    {"@DistanceMeters", distanceMeters},
+                    {"@DurationSeconds", durationSeconds}
+                };
+
+                cmd = CreateCommandWithStoredProcedure("FC_SP_SaveDistanceToCache", con, parameters);
+                cmd.ExecuteNonQuery();
+
+                _logger.LogInformation($"Distance cached: ({originLat}, {originLng}) to ({destLat}, {destLng}) = {distanceMeters}m");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving distance to cache");
+            }
+        }
+
+        /// <summary>
+        /// Get cached route from database
+        /// </summary>
+        private DirectionsResponse GetCachedRoute(double originLat, double originLng, double destLat, double destLng)
+        {
+            try
+            {
+                SqlConnection con = null;
+                SqlCommand cmd = null;
+
+                con = _dbService.connect("myProjDB");
+
+                // Prepare parameters
+                var parameters = new Dictionary<string, object>
+                {
+                    {"@OriginLat", originLat},
+                    {"@OriginLng", originLng},
+                    {"@DestLat", destLat},
+                    {"@DestLng", destLng},
+                    {"@Tolerance", 0.0001} // About 11 meters tolerance
+                };
+
+                cmd = CreateCommandWithStoredProcedure("FC_SP_GetCachedRoute", con, parameters);
+
+                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
+                if (dr.Read())
+                {
+                    // Found cached route
+                    var response = new DirectionsResponse
+                    {
+                        Success = true,
+                        Status = "OK",
+                        Routes = new List<ServerSimulation.Models.Route>()
+                    };
+
+                    var route = new ServerSimulation.Models.Route
+                    {
+                        Summary = "Cached route",
+                        OverviewPolyline = dr["route_polyline"] as string,
+                        Legs = new List<Leg>()
+                    };
+
+                    var leg = new Leg
+                    {
+                        Distance = new DistanceInfo
+                        {
+                            Value = Convert.ToInt32(dr["distance_meters"]),
+                            Text = dr["distance_text"] as string ?? $"{dr["distance_meters"]} m"
+                        },
+                        Duration = new DurationInfo
+                        {
+                            Value = Convert.ToInt32(dr["duration_seconds"]),
+                            Text = dr["duration_text"] as string ?? $"{dr["duration_seconds"]} sec"
+                        },
+                        StartLocation = new LocationPoint(originLat, originLng),
+                        EndLocation = new LocationPoint(destLat, destLng)
+                    };
+
+                    route.Legs.Add(leg);
+                    response.Routes.Add(route);
+
+                    return response;
+                }
+
+                return null; // No cache found
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving cached route");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Save route to cache in database
+        /// </summary>
+        private void SaveRouteToCache(double originLat, double originLng, double destLat, double destLng, DirectionsResponse response)
+        {
+            try
+            {
+                if (response.Routes == null || response.Routes.Count == 0) return;
+
+                var route = response.Routes[0];
+                if (route.Legs == null || route.Legs.Count == 0) return;
+
+                var leg = route.Legs[0];
+
+                SqlConnection con = null;
+                SqlCommand cmd = null;
+
+                con = _dbService.connect("myProjDB");
+
+                var parameters = new Dictionary<string, object>
+                {
+                    {"@OriginLat", originLat},
+                    {"@OriginLng", originLng},
+                    {"@DestLat", destLat},
+                    {"@DestLng", destLng},
+                    {"@DistanceMeters", leg.Distance?.Value ?? 0},
+                    {"@DurationSeconds", leg.Duration?.Value ?? 0},
+                    {"@DistanceText", leg.Distance?.Text},
+                    {"@DurationText", leg.Duration?.Text},
+                    {"@RoutePolyline", route.OverviewPolyline}
+                };
+
+                cmd = CreateCommandWithStoredProcedure("FC_SP_SaveRouteToCache", con, parameters);
+                cmd.ExecuteNonQuery();
+
+                _logger.LogInformation($"Route cached successfully from ({originLat}, {originLng}) to ({destLat}, {destLng})");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving route to cache");
+                // Don't throw - caching failure shouldn't break the main flow
+            }
+        }
+
+        #endregion
 
         #region Helper Methods
+
+        /// <summary>
+        /// Helper method to create SQL command with stored procedure
+        /// </summary>
+        private SqlCommand CreateCommandWithStoredProcedure(string spName, SqlConnection con, Dictionary<string, object> parameters)
+        {
+            SqlCommand cmd = new SqlCommand();
+            cmd.Connection = con;
+            cmd.CommandText = spName;
+            cmd.CommandTimeout = 10;
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                {
+                    cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                }
+            }
+
+            return cmd;
+        }
 
         private string BuildUrl(string baseUrl, Dictionary<string, string> queryParams)
         {
@@ -585,7 +937,23 @@ namespace ServerSimulation.DAL
         }
 
         #endregion
+
+        /// <summary>
+        /// Helper class to compare LocationPoint objects
+        /// </summary>
+        public class LocationPointComparer : IEqualityComparer<LocationPoint>
+        {
+            public bool Equals(LocationPoint x, LocationPoint y)
+            {
+                if (x == null || y == null) return false;
+                return Math.Abs(x.Latitude - y.Latitude) < 0.0001 &&
+                       Math.Abs(x.Longitude - y.Longitude) < 0.0001;
+            }
+
+            public int GetHashCode(LocationPoint obj)
+            {
+                return $"{obj.Latitude:F4},{obj.Longitude:F4}".GetHashCode();
+            }
+        }
     }
-
-
 }
