@@ -439,7 +439,7 @@ namespace ServerSimulation.DAL
                     {"@OriginLng", originLng},
                     {"@DestLat", destLat},
                     {"@DestLng", destLng},
-                    {"@Tolerance", 0.0001}
+                    {"@ToleranceMeters", 50}
                 };
 
                 cmd = CreateCommandWithStoredProcedure("FC_SP_GetCachedDistance", con, parameters);
