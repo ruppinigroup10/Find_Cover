@@ -35,12 +35,17 @@ namespace FindCover.Controllers
         // For the cube calculation, we define the size of the cube in kilometers
         private const double CUBE_SIZE_KM = 0.2; // 200 meters in kilometers
         private const double CUBE_SIZE_LAT = CUBE_SIZE_KM / 111.0; // Convert to latitude degrees
+        private const double CENTER_LON = 34.7913; // Beer Sheva center longitude
 
 
+        // ensure the service is properly injected
         public SimulationController(IGoogleMapsService googleMapsService, ILogger<SimulationController> logger)
         {
-            _googleMapsService = googleMapsService;
-            _logger = logger;
+            _googleMapsService = googleMapsService ?? throw new ArgumentNullException(nameof(googleMapsService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            // verify injection
+            _logger.LogInformation($"SimulationController initialized. GoogleMapsService is null: {_googleMapsService == null}");
         }
 
         //===================================
@@ -99,6 +104,12 @@ namespace FindCover.Controllers
                         request.RadiusKm,
                         request.ZeroCapacityShelters, // Whether to include shelters with zero capacity
                         request.UseDatabaseShelters); // Whether to include shelters from database
+                }
+
+                // DEBUG CUBE CONFIGURATION CHECK
+                if (people.Any() && shelters.Any())
+                {
+                    DebugCubeConfiguration(people, shelters, centerLat, centerLon);
                 }
 
                 // STEP 3: DETERMINE OPTIMAL ASSIGNMENTS
@@ -374,14 +385,14 @@ namespace FindCover.Controllers
         /// <summary>
         /// Calculate the cube key for a given coordinate
         /// </summary>
-        private string GetCubeKey(double latitude, double longitude, double centerLat)
+        private string GetCubeKey(double latitude, double longitude, double centerLat, double centerLon)
         {
             // Calculate longitude cube size based on latitude (it varies by latitude)
             double cubeSizeLon = CUBE_SIZE_KM / (111.0 * Math.Cos(centerLat * Math.PI / 180));
 
             // Calculate grid indices
             int latIndex = (int)Math.Floor((latitude - centerLat) / CUBE_SIZE_LAT);
-            int lonIndex = (int)Math.Floor((longitude - centerLat) / cubeSizeLon);
+            int lonIndex = (int)Math.Floor((longitude - centerLon) / cubeSizeLon);  // use centerLon
 
             return $"{latIndex}_{lonIndex}";
         }
@@ -389,14 +400,14 @@ namespace FindCover.Controllers
         /// <summary>
         /// Get all 9 surrounding cube keys (including the center cube)
         /// </summary>
-        private List<string> GetSurroundingCubes(double latitude, double longitude, double centerLat)
+        private List<string> GetSurroundingCubes(double latitude, double longitude, double centerLat, double centerLon)
         {
             var cubes = new List<string>();
             double cubeSizeLon = CUBE_SIZE_KM / (111.0 * Math.Cos(centerLat * Math.PI / 180));
 
             // Get the center cube indices
             int centerLatIndex = (int)Math.Floor((latitude - centerLat) / CUBE_SIZE_LAT);
-            int centerLonIndex = (int)Math.Floor((longitude - centerLat) / cubeSizeLon);
+            int centerLonIndex = (int)Math.Floor((longitude - centerLon) / cubeSizeLon);  // Fixed
 
             // Add the 9 cubes (3x3 grid)
             for (int latOffset = -1; latOffset <= 1; latOffset++)
@@ -411,7 +422,7 @@ namespace FindCover.Controllers
 
             // Check if person is near edge and add buffer cubes
             double latInCube = ((latitude - centerLat) / CUBE_SIZE_LAT) - centerLatIndex;
-            double lonInCube = ((longitude - centerLat) / cubeSizeLon) - centerLonIndex;
+            double lonInCube = ((longitude - centerLon) / cubeSizeLon) - centerLonIndex;  // Fixed
 
             const double EDGE_THRESHOLD = 0.25; // 25% from edge = 50m from edge
 
@@ -452,13 +463,13 @@ namespace FindCover.Controllers
         /// <summary>
         /// Build an index mapping cubes to shelters for fast lookup
         /// </summary>
-        private Dictionary<string, List<int>> BuildCubeToShelterIndex(List<ShelterDto> shelters, double centerLat)
+        private Dictionary<string, List<int>> BuildCubeToShelterIndex(List<ShelterDto> shelters, double centerLat, double centerLon)
         {
             var cubeToShelters = new Dictionary<string, List<int>>();
 
             foreach (var shelter in shelters)
             {
-                string cubeKey = GetCubeKey(shelter.Latitude, shelter.Longitude, centerLat);
+                string cubeKey = GetCubeKey(shelter.Latitude, shelter.Longitude, centerLat, centerLon);  // Fixed
 
                 if (!cubeToShelters.ContainsKey(cubeKey))
                 {
@@ -481,9 +492,10 @@ namespace FindCover.Controllers
             double personLon,
             List<ShelterDto> allShelters,
             Dictionary<string, List<int>> cubeToShelters,
-            double centerLat)
+            double centerLat,
+            double centerLon)  // Added centerLon parameter
         {
-            var surroundingCubes = GetSurroundingCubes(personLat, personLon, centerLat);
+            var surroundingCubes = GetSurroundingCubes(personLat, personLon, centerLat, centerLon);  // Fixed
             var shelterIds = new HashSet<int>();
 
             foreach (var cubeKey in surroundingCubes)
@@ -497,7 +509,6 @@ namespace FindCover.Controllers
                 }
             }
 
-            // Return only the shelters in the surrounding cubes
             return allShelters.Where(s => shelterIds.Contains(s.Id)).ToList();
         }
 
@@ -525,11 +536,15 @@ namespace FindCover.Controllers
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
             const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
             const double CENTER_LAT = 31.2518; // Beer Sheva center for cube calculations
+            const double CENTER_LON = 34.7913;
 
             Console.WriteLine($"Maximum distance constraint: {MAX_DISTANCE_KM:F4} km");
 
+            // Check how the cube optimization works
+            DebugCubeConfiguration(people, shelters, CENTER_LAT, CENTER_LON);
+
             // STEP 2: BUILD CUBE INDEX FOR SHELTERS
-            var cubeToShelters = BuildCubeToShelterIndex(shelters, CENTER_LAT);
+            var cubeToShelters = BuildCubeToShelterIndex(shelters, CENTER_LAT, CENTER_LON);
 
             // STEP 3: INITIALIZE TRACKING STRUCTURES
             var assignments = new Dictionary<int, AssignmentDto>();
@@ -555,7 +570,8 @@ namespace FindCover.Controllers
                     person.Longitude,
                     shelters,
                     cubeToShelters,
-                    CENTER_LAT
+                    CENTER_LAT,
+                    CENTER_LON
                 );
 
                 Console.WriteLine($"Person {person.Id}: Checking {nearbyShelters.Count} shelters in nearby cubes (instead of {shelters.Count} total)");
@@ -955,26 +971,35 @@ namespace FindCover.Controllers
         {
             try
             {
+                if (_googleMapsService == null)
+                {
+                    _logger.LogError("GoogleMapsService is not initialized");
+                    throw new InvalidOperationException("GoogleMapsService is not initialized");
+                }
+
+                // Validate request
                 if (request == null)
                 {
                     return BadRequest("Invalid simulation request data");
                 }
 
-                // Set the center coordinates for the simulation
+                // Set center coordinates
                 double centerLat = 31.2518;
                 double centerLon = 34.7913;
 
-                // STEP 1: Generate or use custom people and shelters (same as before)
+                // STEP 1: DETERMINE PEOPLE LOCATIONS (unchanged)
                 List<PersonDto> people;
                 if (request.UseCustomPeople && request.CustomPeople != null && request.CustomPeople.Any())
                 {
                     people = request.CustomPeople;
+                    _logger.LogInformation($"Using {people.Count} custom people from request");
                 }
                 else
                 {
                     people = GeneratePeople(request.PeopleCount, centerLat, centerLon, request.RadiusKm);
                 }
 
+                // STEP 2: DETERMINE SHELTER LOCATIONS (unchanged)
                 List<ShelterDto> shelters;
                 if (request.UseCustomShelters && request.CustomShelters != null && request.CustomShelters.Any())
                 {
@@ -991,29 +1016,261 @@ namespace FindCover.Controllers
                         request.UseDatabaseShelters);
                 }
 
-                // STEP 2: Get walking distances from Google Maps
-                _logger.LogInformation("Fetching walking distances from Google Maps...");
-                var walkingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                // ===== NEW: PHASE 1 - INITIAL ASSIGNMENT WITH AIR DISTANCES =====
+                _logger.LogInformation("=== PHASE 1: Running initial assignment with AIR DISTANCES ===");
 
-                // Calculate walking distances using Google Maps API
-                var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(people, shelters);
+                // Use your existing optimal assignment method with air distances
+                var airDistanceAssignments = AssignPeopleToSheltersOptimal(people, shelters, request.PrioritySettings);
 
-                walkingStopwatch.Stop();
-                _logger.LogInformation($"Walking distances fetched in {walkingStopwatch.ElapsedMilliseconds}ms for {people.Count * shelters.Count} pairs");
+                _logger.LogInformation($"Phase 1 complete: {airDistanceAssignments.Count} people assigned using air distances");
 
-                // STEP 3: Run assignment algorithm with walking distances
-                var assignments = await AssignPeopleToSheltersWithWalkingDistance(
-                    people,
-                    shelters,
-                    request.PrioritySettings,
-                    walkingDistances);
+                // Log phase 1 statistics
+                if (airDistanceAssignments.Count > 0)
+                {
+                    var avgAirDistance = airDistanceAssignments.Values.Average(a => a.Distance);
+                    var maxAirDistance = airDistanceAssignments.Values.Max(a => a.Distance);
+                    _logger.LogInformation($"Phase 1 - Average air distance: {avgAirDistance * 1000:F0}m, Max: {maxAirDistance * 1000:F0}m");
+                }
 
-                // STEP 3.5: Get actual walking routes (ADD THIS SECTION)
-                _logger.LogInformation("Fetching walking routes from Google Maps...");
-                var routes = await _googleMapsService.GetRoutesForPeople(people, shelters, assignments);
+                // ===== NEW: PHASE 2 - VALIDATE WITH WALKING DISTANCES =====
+                _logger.LogInformation("=== PHASE 2: Validating assignments with WALKING DISTANCES ===");
+
+                // Prepare for walking distance validation
+                var walkingDistances = new Dictionary<string, Dictionary<string, double>>();
+                var finalAssignments = new Dictionary<int, AssignmentDto>();
+                var peopleNeedingReassignment = new List<PersonDto>();
+
+                // Only fetch walking distances for assigned people to save API calls
+                var assignedPeople = people.Where(p => airDistanceAssignments.ContainsKey(p.Id)).ToList();
+
+                if (assignedPeople.Count > 0)
+                {
+                    // ===== CHANGED: Fetch walking distances only for assigned people =====
+                    var walkingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    _logger.LogInformation($"Fetching walking distances for {assignedPeople.Count} assigned people...");
+
+                    // Get unique shelter IDs from assignments and add a few alternatives
+                    var assignedShelterIds = airDistanceAssignments.Values.Select(a => a.ShelterId).Distinct().ToList();
+                    var sheltersToCheck = shelters.Where(s => assignedShelterIds.Contains(s.Id)).ToList();
+
+                    // Add 2-3 nearest alternative shelters for each person (for potential reassignment)
+                    foreach (var person in assignedPeople)
+                    {
+                        var alternatives = shelters
+                            .Where(s => !assignedShelterIds.Contains(s.Id))
+                            .OrderBy(s => CalculateDistance(person.Latitude, person.Longitude, s.Latitude, s.Longitude))
+                            .Take(3)
+                            .ToList();
+
+                        sheltersToCheck.AddRange(alternatives);
+                    }
+                    sheltersToCheck = sheltersToCheck.Distinct().ToList();
+
+                    walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(assignedPeople, sheltersToCheck);
+                    walkingStopwatch.Stop();
+                    _logger.LogInformation($"Walking distances fetched in {walkingStopwatch.ElapsedMilliseconds}ms");
+                }
+
+                // ===== NEW: VALIDATE AND REASSIGN BASED ON WALKING DISTANCES =====
+                const double MAX_DISTANCE_KM = 0.6; // 600m limit
+                const double WALKING_TO_AIR_RATIO_THRESHOLD = 1.8; // If walking is 1.8x longer than air
+
+                var shelterCapacity = shelters.ToDictionary(s => s.Id, s => s.Capacity);
+
+                // First pass: validate current assignments
+                foreach (var kvp in airDistanceAssignments)
+                {
+                    var personId = kvp.Key;
+                    var airAssignment = kvp.Value;
+                    var person = people.First(p => p.Id == personId);
+
+                    bool keepAssignment = false; // Changed: default to false - require walking distance
+                    double actualDistance = airAssignment.Distance;
+                    bool isWalkingDistance = false;
+
+                    // Check if we have walking distance for this assignment
+                    if (walkingDistances.ContainsKey(personId.ToString()) &&
+                        walkingDistances[personId.ToString()].ContainsKey(airAssignment.ShelterId.ToString()))
+                    {
+                        var walkingDist = walkingDistances[personId.ToString()][airAssignment.ShelterId.ToString()];
+
+                        if (walkingDist > 0) // Valid walking distance
+                        {
+                            // Check if walking distance is acceptable
+                            if (walkingDist <= MAX_DISTANCE_KM &&
+                                walkingDist <= airAssignment.Distance * WALKING_TO_AIR_RATIO_THRESHOLD)
+                            {
+                                // Walking distance is acceptable
+                                actualDistance = walkingDist;
+                                isWalkingDistance = true;
+                                keepAssignment = true;
+                                _logger.LogInformation($"Person {personId}: Walking distance {walkingDist * 1000:F0}m is acceptable");
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Person {personId}: Walking distance {walkingDist * 1000:F0}m exceeds limits");
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"Person {personId}: No walking route available to shelter {airAssignment.ShelterId}");
+                        }
+                    }
+                    else
+                    {
+                        // No walking distance data available - cannot assign
+                        _logger.LogWarning($"Person {personId}: No walking distance data for shelter {airAssignment.ShelterId}");
+                    }
+
+                    if (keepAssignment)
+                    {
+                        finalAssignments[personId] = new AssignmentDto
+                        {
+                            PersonId = personId,
+                            ShelterId = airAssignment.ShelterId,
+                            Distance = actualDistance,
+                            IsWalkingDistance = true // Always true for final assignments
+                        };
+                        shelterCapacity[airAssignment.ShelterId]--;
+                    }
+                    else
+                    {
+                        peopleNeedingReassignment.Add(person);
+                    }
+                }
+
+                _logger.LogInformation($"After validation: {finalAssignments.Count} assignments kept, {peopleNeedingReassignment.Count} need reassignment");
+
+                // ===== MODIFIED: REASSIGN ONLY WITH WALKING DISTANCES =====
+                if (peopleNeedingReassignment.Count > 0)
+                {
+                    _logger.LogInformation("Attempting to reassign people with valid walking distances...");
+
+                    // First fetch additional walking distances if needed
+                    var sheltersWithCapacity = shelters.Where(s => shelterCapacity[s.Id] > 0).ToList();
+
+                    if (sheltersWithCapacity.Count > 0)
+                    {
+                        // Check which person-shelter pairs we're missing
+                        var missingPairs = new List<(PersonDto person, ShelterDto shelter)>();
+
+                        foreach (var person in peopleNeedingReassignment)
+                        {
+                            foreach (var shelter in sheltersWithCapacity)
+                            {
+                                if (!walkingDistances.ContainsKey(person.Id.ToString()) ||
+                                    !walkingDistances[person.Id.ToString()].ContainsKey(shelter.Id.ToString()))
+                                {
+                                    missingPairs.Add((person, shelter));
+                                }
+                            }
+                        }
+
+                        if (missingPairs.Count > 0)
+                        {
+                            _logger.LogInformation($"Fetching {missingPairs.Count} additional walking distances");
+
+                            var additionalPeople = missingPairs.Select(p => p.person).Distinct().ToList();
+                            var additionalShelters = missingPairs.Select(p => p.shelter).Distinct().ToList();
+
+                            var additionalDistances = await _googleMapsService.CalculateShelterDistancesAsync(
+                                additionalPeople,
+                                additionalShelters
+                            );
+
+                            // Merge with existing walking distances
+                            foreach (var personEntry in additionalDistances)
+                            {
+                                if (!walkingDistances.ContainsKey(personEntry.Key))
+                                    walkingDistances[personEntry.Key] = new Dictionary<string, double>();
+
+                                foreach (var shelterEntry in personEntry.Value)
+                                {
+                                    walkingDistances[personEntry.Key][shelterEntry.Key] = shelterEntry.Value;
+                                }
+                            }
+                        }
+                    }
+
+                    var reassignmentQueue = new PriorityQueue<AssignmentOption, double>();
+
+                    foreach (var person in peopleNeedingReassignment)
+                    {
+                        foreach (var shelter in shelters.Where(s => shelterCapacity[s.Id] > 0))
+                        {
+                            // ONLY consider shelters with valid walking distances
+                            if (walkingDistances.ContainsKey(person.Id.ToString()) &&
+                                walkingDistances[person.Id.ToString()].ContainsKey(shelter.Id.ToString()))
+                            {
+                                var walkDist = walkingDistances[person.Id.ToString()][shelter.Id.ToString()];
+
+                                // Only add to queue if we have a valid walking route within limits
+                                if (walkDist > 0 && walkDist <= MAX_DISTANCE_KM)
+                                {
+                                    var option = new AssignmentOption
+                                    {
+                                        PersonId = person.Id,
+                                        ShelterId = shelter.Id,
+                                        Distance = walkDist,
+                                        IsReachable = true,
+                                        VulnerabilityScore = CalculateVulnerabilityScore(person.Age)
+                                    };
+
+                                    double priority = walkDist;
+                                    if (request.PrioritySettings?.EnableAgePriority == true)
+                                    {
+                                        priority -= option.VulnerabilityScore * 0.01;
+                                    }
+
+                                    reassignmentQueue.Enqueue(option, priority);
+                                }
+                            }
+                        }
+                    }
+
+                    // Process reassignments
+                    var reassigned = new HashSet<int>();
+                    while (reassignmentQueue.Count > 0)
+                    {
+                        var option = reassignmentQueue.Dequeue();
+
+                        if (reassigned.Contains(option.PersonId)) continue;
+                        if (shelterCapacity[option.ShelterId] <= 0) continue;
+
+                        finalAssignments[option.PersonId] = new AssignmentDto
+                        {
+                            PersonId = option.PersonId,
+                            ShelterId = option.ShelterId,
+                            Distance = option.Distance,
+                            IsWalkingDistance = true // Always true since we only use walking distances
+                        };
+
+                        reassigned.Add(option.PersonId);
+                        shelterCapacity[option.ShelterId]--;
+
+                        _logger.LogInformation($"Reassigned person {option.PersonId} to shelter {option.ShelterId} at {option.Distance * 1000:F0}m (walking)");
+                    }
+
+                    _logger.LogInformation($"Successfully reassigned {reassigned.Count} out of {peopleNeedingReassignment.Count} people");
+
+                    // Log people who couldn't be reassigned
+                    var stillUnassigned = peopleNeedingReassignment.Where(p => !reassigned.Contains(p.Id)).ToList();
+                    if (stillUnassigned.Count > 0)
+                    {
+                        _logger.LogWarning($"{stillUnassigned.Count} people could not be assigned to any shelter with valid walking distance:");
+                        foreach (var person in stillUnassigned)
+                        {
+                            _logger.LogWarning($"  - Person {person.Id} (age {person.Age})");
+                        }
+                    }
+                }
+
+                // ===== CHANGED: Now fetch routes only for final assignments =====
+                _logger.LogInformation("Fetching walking routes for final assignments...");
+                var routes = await _googleMapsService.GetRoutesForPeople(people, shelters, finalAssignments);
 
                 // Update assignments with route information
-                foreach (var assignment in assignments)
+                foreach (var assignment in finalAssignments)
                 {
                     var routeKey = $"{assignment.Key}-{assignment.Value.ShelterId}";
                     if (routes.ContainsKey(routeKey) && routes[routeKey].Routes?.Any() == true)
@@ -1022,28 +1279,21 @@ namespace FindCover.Controllers
                         if (!string.IsNullOrEmpty(route.OverviewPolyline))
                         {
                             assignment.Value.RoutePolyline = route.OverviewPolyline;
-                            _logger.LogInformation($"Added route polyline for person {assignment.Key} to shelter {assignment.Value.ShelterId}");
                         }
                     }
                 }
 
-                // STEP 4: Handle unassigned people (same as before but with walking distances)
-                var unassignedPeople = people.Where(p => !assignments.ContainsKey(p.Id)).ToList();
+                // STEP 4: Handle remaining unassigned people
+                var unassignedPeople = people.Where(p => !finalAssignments.ContainsKey(p.Id)).ToList();
                 foreach (var person in unassignedPeople)
                 {
+                    // Find nearest shelter even if they can't reach it
                     ShelterDto nearestShelter = null;
                     double nearestDistance = double.MaxValue;
 
                     foreach (var shelter in shelters)
                     {
-                        // Try to use walking distance first
-                        var walkingDist = walkingDistances.ContainsKey(person.Id.ToString()) &&
-                                         walkingDistances[person.Id.ToString()].ContainsKey(shelter.Id.ToString())
-                            ? walkingDistances[person.Id.ToString()][shelter.Id.ToString()]
-                            : -1;
-
-                        // Fall back to air distance if walking distance not available
-                        double distance = walkingDist > 0 ? walkingDist : CalculateDistance(
+                        double distance = CalculateDistance(
                             person.Latitude, person.Longitude,
                             shelter.Latitude, shelter.Longitude);
 
@@ -1056,25 +1306,36 @@ namespace FindCover.Controllers
 
                     if (nearestShelter != null)
                     {
+                        // Update the person's nearest shelter info
                         person.NearestShelterId = nearestShelter.Id;
                         person.NearestShelterDistance = nearestDistance;
                     }
                 }
 
-                // STEP 5: Calculate statistics
-                var assignedCount = assignments.Count;
-                var averageDistance = assignments.Values.Count > 0 ? assignments.Values.Average(a => a.Distance) : 0;
-                var maxDistance = assignments.Values.Count > 0 ? assignments.Values.Max(a => a.Distance) : 0;
+                // Calculate final statistics
+                int assignedCount = finalAssignments.Count;
+                double averageDistance = assignedCount > 0
+                    ? finalAssignments.Values.Average(a => a.Distance)
+                    : 0;
+                double maxDistance = finalAssignments.Values.Count > 0
+                    ? finalAssignments.Values.Max(a => a.Distance)
+                    : 0;
 
-                // STEP 6: Prepare response
+                // Log phase comparison
+                _logger.LogInformation("=== PHASE COMPARISON ===");
+                _logger.LogInformation($"Phase 1 (Air): {airDistanceAssignments.Count} assignments");
+                _logger.LogInformation($"Phase 2 (Final): {assignedCount} assignments");
+                _logger.LogInformation($"Difference: {airDistanceAssignments.Count - assignedCount} people reassigned/unassigned due to walking distances");
+
+                // Prepare response using your existing DTOs
                 var response = new SimulationResponseDto
                 {
                     People = people,
                     Shelters = shelters,
-                    Assignments = assignments,
+                    Assignments = finalAssignments,
                     Statistics = new SimulationStatisticsDto
                     {
-                        ExecutionTimeMs = 0,
+                        ExecutionTimeMs = 0, // You can add timing if needed
                         AssignedCount = assignedCount,
                         UnassignedCount = people.Count - assignedCount,
                         AssignmentPercentage = people.Count > 0 ? (double)assignedCount / people.Count : 0,
@@ -1084,15 +1345,14 @@ namespace FindCover.Controllers
                             : 0,
                         AverageDistance = averageDistance,
                         MaxDistance = maxDistance,
-                        MinDistance = assignments.Values.Count > 0 ? assignments.Values.Min(a => a.Distance) : 0
+                        MinDistance = finalAssignments.Values.Count > 0 ? finalAssignments.Values.Min(a => a.Distance) : 0
                     }
                 };
 
-                foreach (var assignment in assignments)
+                foreach (var assignment in finalAssignments)
                 {
                     _logger.LogInformation($"Final assignment: Person {assignment.Key} -> Shelter {assignment.Value.ShelterId}, Distance: {assignment.Value.Distance}km, IsWalkingDistance: {assignment.Value.IsWalkingDistance}");
                 }
-
 
                 return Ok(response);
             }
@@ -1114,6 +1374,13 @@ namespace FindCover.Controllers
         PrioritySettingsDto prioritySettings,
         Dictionary<string, Dictionary<string, double>> walkingDistances)
         {
+            // null checks
+            if (_googleMapsService == null)
+            {
+                _logger.LogError("GoogleMapsService is null!");
+                throw new InvalidOperationException("GoogleMapsService is not initialized");
+            }
+
             _logger.LogInformation("Starting shelter assignment with walking distances and cube optimization...");
 
             // progress logging
@@ -1125,9 +1392,13 @@ namespace FindCover.Controllers
             const double WALKING_SPEED_KM_PER_MINUTE = 0.6; // ~5 km/h = 0.6 km/min
             const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE; // Should be about 0.6km
             const double CENTER_LAT = 31.2518; // Beer Sheva center for cube calculations
+            const double CENTER_LON = 34.7913;
+
+            // Check the cube optimization works
+            DebugCubeConfiguration(people, shelters, CENTER_LAT, CENTER_LON);
 
             // Build cube index for shelters
-            var cubeToShelters = BuildCubeToShelterIndex(shelters, CENTER_LAT);
+            var cubeToShelters = BuildCubeToShelterIndex(shelters, CENTER_LAT, CENTER_LON);
 
             // LOG THE WALKING DISTANCES TO SEE WHAT YOU'RE GETTING
             int validDistances = 0;
@@ -1178,7 +1449,8 @@ namespace FindCover.Controllers
                     person.Longitude,
                     shelters,
                     cubeToShelters,
-                    CENTER_LAT
+                    CENTER_LAT,
+                    CENTER_LON
                 );
 
                 _logger.LogInformation($"Person {person.Id}: Checking {nearbyShelters.Count} shelters in nearby cubes (instead of {shelters.Count} total)");
@@ -1300,6 +1572,35 @@ namespace FindCover.Controllers
         //===================================
         // Extras and Helpers
         //===================================
+
+        /* Debug to check how the cube configuration works */
+
+        private void DebugCubeConfiguration(List<PersonDto> people, List<ShelterDto> shelters, double centerLat, double centerLon)
+        {
+            _logger.LogInformation("=== CUBE CONFIGURATION DEBUG ===");
+            _logger.LogInformation($"Cube size: {CUBE_SIZE_KM}km ({CUBE_SIZE_KM * 1000}m)");
+            _logger.LogInformation($"Center: ({centerLat}, {centerLon})");
+
+            // Test cube assignment for a few people
+            foreach (var person in people.Take(5))
+            {
+                string cubeKey = GetCubeKey(person.Latitude, person.Longitude, centerLat, centerLon);
+                var surroundingCubes = GetSurroundingCubes(person.Latitude, person.Longitude, centerLat, centerLon);
+
+                _logger.LogInformation($"Person {person.Id} at ({person.Latitude:F6}, {person.Longitude:F6}):");
+                _logger.LogInformation($"  - Cube: {cubeKey}");
+                _logger.LogInformation($"  - Surrounding cubes: {string.Join(", ", surroundingCubes)}");
+            }
+
+            // Show cube distribution
+            var cubeToShelters = BuildCubeToShelterIndex(shelters, centerLat, centerLon);
+            _logger.LogInformation($"Total cubes with shelters: {cubeToShelters.Count}");
+            foreach (var cube in cubeToShelters.Take(5))
+            {
+                _logger.LogInformation($"  Cube {cube.Key}: {cube.Value.Count} shelters");
+            }
+        }
+
 
         /**
          * Helper class to store assignment options with additional metadata

@@ -6,43 +6,43 @@ namespace ServerSimulation.Models
     /// <summary>
     /// Request model for calculating distances between multiple origins and destinations
     /// </summary>
-    public class DistanceMatrixRequest
-    {
-        public List<LocationPoint> Origins { get; set; }
-        public List<LocationPoint> Destinations { get; set; }
-        public TravelMode Mode { get; set; } = TravelMode.Walking;
-        public bool AvoidHighways { get; set; } = false;
-        public bool AvoidTolls { get; set; } = false;
-    }
+    // public class DistanceMatrixRequest
+    // {
+    //     public List<LocationPoint> Origins { get; set; }
+    //     public List<LocationPoint> Destinations { get; set; }
+    //     public TravelMode Mode { get; set; } = TravelMode.Walking;
+    //     public bool AvoidHighways { get; set; } = false;
+    //     public bool AvoidTolls { get; set; } = false;
+    // }
 
     /// <summary>
     /// Response model containing the distance matrix results
     /// </summary>
-    public class DistanceMatrixResponse
-    {
-        public bool Success { get; set; }
-        public string ErrorMessage { get; set; }
-        public List<DistanceMatrixRow> Rows { get; set; }
-        public string Status { get; set; }
-    }
+    // public class DistanceMatrixResponse
+    // {
+    //     public bool Success { get; set; }
+    //     public string ErrorMessage { get; set; }
+    //     public List<DistanceMatrixRow> Rows { get; set; }
+    //     public string Status { get; set; }
+    // }
 
     /// <summary>
     /// Represents a single row in the distance matrix (one origin to all destinations)
     /// </summary>
-    public class DistanceMatrixRow
-    {
-        public List<DistanceMatrixElement> Elements { get; set; }
-    }
+    // public class DistanceMatrixRow
+    // {
+    //     public List<DistanceMatrixElement> Elements { get; set; }
+    // }
 
     /// <summary>
     /// Represents a single origin-destination pair result
     /// </summary>
-    public class DistanceMatrixElement
-    {
-        public DistanceInfo Distance { get; set; }
-        public DurationInfo Duration { get; set; }
-        public string Status { get; set; }
-    }
+    // public class DistanceMatrixElement
+    // {
+    //     public DistanceInfo Distance { get; set; }
+    //     public DurationInfo Duration { get; set; }
+    //     public string Status { get; set; }
+    // }
 
     /// <summary>
     /// Distance information between two points

@@ -7,7 +7,10 @@ namespace ServerSimulation.DAL
 {
     public interface IGoogleMapsService
     {
-        Task<DistanceMatrixResponse> GetDistanceMatrixAsync(DistanceMatrixRequest request);
+        // Distance Matrix API
+        //Task<DistanceMatrixResponse> GetDistanceMatrixAsync(DistanceMatrixRequest request);
+
+        // Directions API
         Task<DirectionsResponse> GetDirectionsAsync(DirectionsRequest request);
         Task<Dictionary<string, Dictionary<string, double>>> CalculateShelterDistancesAsync(
             List<PersonDto> people,

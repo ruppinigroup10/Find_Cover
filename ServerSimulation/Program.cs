@@ -6,6 +6,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
+// Add logging
+builder.Services.AddLogging(logging =>
+{
+    logging.AddConsole();
+    logging.AddDebug();
+});
+
 // Register Google Maps service with HttpClient
 builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>(client =>
 {
@@ -17,8 +24,8 @@ builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>(client =>
     ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true // For dev only
 });
 
-// Add logging
-builder.Services.AddLogging();
+// builder configuration
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
