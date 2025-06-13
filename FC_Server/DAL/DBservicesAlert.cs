@@ -62,10 +62,10 @@ public class DBservicesAlert
 
             DateTime alertTime = DateTimeOffset.FromUnixTimeSeconds(alert.AlertTime).UtcDateTime;
             string data = alert.Data;
-            string alertType = alert.AlertType;
+            //string alertType = alert.AlertType;
 
             paramDic.Add("@alert_time", alertTime);
-            paramDic.Add("@alert_type", alertType);
+            //paramDic.Add("@alert_type", alertType);
             paramDic.Add("@data", data);
             paramDic.Add("@is_active", alert.IsActive);
 
