@@ -60,7 +60,7 @@ public class DBservicesAlert
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>();
 
-            DateTime alertTime = DateTimeOffset.FromUnixTimeSeconds(alert.AlertTime.Ticks / TimeSpan.TicksPerSecond).DateTime;
+            DateTime alertTime = DateTimeOffset.FromUnixTimeSeconds(alert.AlertTime).UtcDateTime;
             string data = alert.Data;
             string alertType = alert.AlertType;
 
@@ -68,6 +68,8 @@ public class DBservicesAlert
             paramDic.Add("@alert_type", alertType);
             paramDic.Add("@data", data);
             paramDic.Add("@is_active", alert.IsActive);
+
+            Console.WriteLine($"Saving alert: time={alertTime}, data={data}");
 
             cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddAlert", con, paramDic);
 
@@ -77,6 +79,7 @@ public class DBservicesAlert
             }
             catch (SqlException)
             {
+                Console.WriteLine($"[DB ERROR] Failed to save alert. Reason: {ex.Message}");
                 continue;
             }
         }
