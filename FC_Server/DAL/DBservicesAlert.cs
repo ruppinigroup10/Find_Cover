@@ -77,7 +77,7 @@ public class DBservicesAlert
             {
                 cmd.ExecuteNonQuery();
             }
-            catch (SqlException)
+            catch (SqlException ex)
             {
                 Console.WriteLine($"[DB ERROR] Failed to save alert. Reason: {ex.Message}");
                 continue;
