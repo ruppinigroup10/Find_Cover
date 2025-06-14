@@ -58,18 +58,22 @@ public class DBservicesAlert
 
         foreach (var alert in alerts)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-
-            DateTime alertTime = DateTimeOffset.FromUnixTimeSeconds(alert.AlertTime).UtcDateTime;
-            string data = alert.Data;
-            //string alertType = alert.AlertType;
-
-            paramDic.Add("@alert_time", alertTime);
-            //paramDic.Add("@alert_type", alertType);
-            paramDic.Add("@data", data);
-            paramDic.Add("@is_active", alert.IsActive);
+            DateTime alertTime = DateTimeOffset.FromUnixTimeSeconds(alert.time).ToLocalTime().DateTime;
+            string data = string.Join(",", alert.cities);
+            string alertType = alert.threat switch
+            {
+                0 => "Rocket",
+                1 => "Infiltration",
+                _ => "Unknown"
+            };
 
             Console.WriteLine($"Saving alert: time={alertTime}, data={data}");
+
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@alert_time", alertTime);
+            paramDic.Add("@data", data);
+            paramDic.Add("@is_active", !alert.isDrill); // אם זה תרגיל – לא אקטיבי
+            paramDic.Add("@alert_type", alertType);
 
             cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddAlert", con, paramDic);
 
