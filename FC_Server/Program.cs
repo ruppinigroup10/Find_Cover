@@ -1,7 +1,13 @@
+using System.Data.SqlClient; // חשוב לייבא את המחלקה הזו למעלה
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+/*הוספה שך אוראל*/
+builder.Services.AddScoped<LocationDbService>(provider =>
+    new LocationDbService("Server=media.ruppin.ac.il;Database=igroup10_prod;User Id=igroup10;Password=igroup10_73888;Encrypt=False"));
+
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
