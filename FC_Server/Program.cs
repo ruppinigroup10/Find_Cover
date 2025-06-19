@@ -1,14 +1,17 @@
-using System.Data.SqlClient; // зщеб мййба аъ дозмчд дже мотмд
+using FC_Server.Services;
+using System.Data.SqlClient; // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
-/*десфд щк аешам*/
+/*пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ*/
 builder.Services.AddScoped<LocationDbService>(provider =>
     new LocationDbService("Server=media.ruppin.ac.il;Database=igroup10_prod;User Id=igroup10;Password=igroup10_73888;Encrypt=False"));
 
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
+builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

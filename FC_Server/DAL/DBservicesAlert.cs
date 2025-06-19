@@ -6,6 +6,9 @@ using Microsoft.Extensions.Configuration;
 
 public class DBservicesAlert
 {
+    //--------------------------------------------------------------------------------------------------
+    // This method creates a connection to the database according to the connectionString name in the web.config 
+    //--------------------------------------------------------------------------------------------------
     public SqlConnection connect(String conString)
     {
         IConfigurationRoot configuration = new ConfigurationBuilder()
@@ -16,6 +19,9 @@ public class DBservicesAlert
         return con;
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // Create the SqlCommand
+    //--------------------------------------------------------------------------------------------------
     private SqlCommand CreateCommandWithStoredProcedureGeneral(String spName, SqlConnection con, Dictionary<string, object> paramDic)
     {
         SqlCommand cmd = new SqlCommand();

@@ -30,5 +30,72 @@ using Microsoft.AspNetCore.Mvc;
                 }
             }
         }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method creates a connection to the database according to the connectionString name in the web.config 
+    //--------------------------------------------------------------------------------------------------
+    public SqlConnection connect(String conString)
+    {
+        // read the connection string from the configuration file
+        IConfigurationRoot configuration = new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json").Build();
+        string cStr = configuration.GetConnectionString("myProjDB");
+        SqlConnection con = new SqlConnection(cStr);
+        con.Open();
+        return con;
     }
+
+    //--------------------------------------------------------------------------------------------------
+    // Create the SqlCommand
+    //--------------------------------------------------------------------------------------------------
+    private SqlCommand CreateCommandWithStoredProcedureGeneral(String spName, SqlConnection con, Dictionary<string, object> paramDic)
+    {
+        SqlCommand cmd = new SqlCommand(); // create the command object
+        cmd.Connection = con;              // assign the connection to the command object
+        cmd.CommandText = spName;      // can be Select, Insert, Update, Delete 
+        cmd.CommandTimeout = 10;           // Time to wait for the execution' The default is 30 seconds
+        cmd.CommandType = System.Data.CommandType.StoredProcedure; // the type of the command, can also be text
+        if (paramDic != null)
+            foreach (KeyValuePair<string, object> param in paramDic)
+            {
+                cmd.Parameters.AddWithValue(param.Key, param.Value);
+
+            }
+        return cmd;
+    }
+
+    public void CleanupUserLocations()
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+       
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_CleanupUserLastLocations", con, null);
+
+        try
+        {
+            cmd.ExecuteNonQuery(); // לא מחזיר תוצאה – רק מבצע
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Cleanup failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con.State == ConnectionState.Open)
+                con.Close();
+        }
+    }
+}
+
+
 
