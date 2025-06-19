@@ -1,17 +1,18 @@
 using FC_Server.Services;
-using System.Data.SqlClient; // ���� ����� �� ������ ��� �����
+using FC_Server.Models; // אם אתה משתמש במחלקה LocationDbService כאן
+using System.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
-/*����� �� �����*/
-builder.Services.AddScoped<LocationDbService>(provider =>
-    new LocationDbService("Server=media.ruppin.ac.il;Database=igroup10_prod;User Id=igroup10;Password=igroup10_73888;Encrypt=False"));
+
+// 🚀 הוספת שירות ה-LocationDbService ל-DI עם מחרוזת החיבור
+string connectionString = builder.Configuration.GetConnectionString("myProjDB");
+builder.Services.AddScoped<LocationDbService>(provider => new LocationDbService(connectionString));
 
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
-
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -22,7 +23,6 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (true)
 {
-
     //windows
     app.UseSwagger();
     app.UseSwaggerUI();

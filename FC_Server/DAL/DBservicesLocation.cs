@@ -13,23 +13,47 @@ using Microsoft.AspNetCore.Mvc;
             _connectionString = connectionString;
         }
 
-        public void InsertUserLocation(UserLocation location)
-        {
-            using (SqlConnection conn = new SqlConnection(_connectionString))
-            {
-                using (SqlCommand cmd = new SqlCommand("FC_SP_AddUserLastLocation", conn)) 
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@user_id", location.UserId);
-                    cmd.Parameters.AddWithValue("@latitude", location.Latitude);
-                    cmd.Parameters.AddWithValue("@longitude", location.Longitude);
-                    cmd.Parameters.AddWithValue("@created_at", location.CreatedAt); // ← חובה בטבלה
+    //--------------------------------------------------------------------------------------------------
+    // This method inserts a new user location using a stored procedure
+    //--------------------------------------------------------------------------------------------------
+    public void InsertUserLocation(UserLocation location)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
 
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+        try
+        {
+            con = connect("myProjDB"); // שימוש בפונקציית connect בדיוק כמו בשאר המתודות
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", location.UserId);
+        paramDic.Add("@latitude", location.Latitude);
+        paramDic.Add("@longitude", location.Longitude);
+        paramDic.Add("@created_at", location.CreatedAt);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddUserLastLocation", con, paramDic);
+
+        try
+        {
+            cmd.ExecuteNonQuery(); // אין קריאת תוצאה – רק הוספה
+        }
+        catch (SqlException ex)
+        {
+            throw new Exception("Insert location failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
             }
         }
+    }
 
     //--------------------------------------------------------------------------------------------------
     // This method creates a connection to the database according to the connectionString name in the web.config 
