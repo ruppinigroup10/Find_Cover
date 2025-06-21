@@ -81,7 +81,9 @@ namespace FC_Server.Models
 
     public class Coordinate
     {
+        [JsonProperty("lat")]
         public double Latitude { get; set; }
+        [JsonProperty("lng")]
         public double Longitude { get; set; }
     }
 }
