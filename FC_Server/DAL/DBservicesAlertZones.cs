@@ -10,7 +10,7 @@ namespace FC_Server.DAL
 {
     public class DBservicesAlertZones
     {
-
+        // שימוש באותה מתודת חיבור כמו בפרויקט שלך
         public SqlConnection connect(String conString)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()
@@ -136,6 +136,82 @@ namespace FC_Server.DAL
             catch (Exception ex)
             {
                 throw new Exception("Failed to check active alert: " + ex.Message);
+            }
+            finally
+            {
+                if (con != null)
+                    con.Close();
+            }
+        }
+
+        // מביא את המיקום האחרון של המשתמש
+        public UserLocation GetUserLastLocation(int userId)
+        {
+            SqlConnection con = null;
+            SqlCommand cmd = null;
+
+            try
+            {
+                con = connect("myProjDB");
+
+                string query = @"
+                    SELECT TOP 1 user_id, latitude, longitude, created_at
+                    FROM FC_USER_LAST_LOCATION
+                    WHERE user_id = @userId
+                    ORDER BY created_at DESC";
+
+                cmd = new SqlCommand(query, con);
+                cmd.Parameters.AddWithValue("@userId", userId);
+
+                SqlDataReader dr = cmd.ExecuteReader();
+
+                if (dr.Read())
+                {
+                    return new UserLocation
+                    {
+                        UserId = Convert.ToInt32(dr["user_id"]),
+                        Latitude = Convert.ToDouble(dr["latitude"]),
+                        Longitude = Convert.ToDouble(dr["longitude"]),
+                        CreatedAt = Convert.ToDateTime(dr["created_at"])
+                    };
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed to get user last location: " + ex.Message);
+            }
+            finally
+            {
+                if (con != null)
+                    con.Close();
+            }
+        }
+
+        // עדכון מיקום משתמש
+        public void UpdateUserLocation(UserLocation location)
+        {
+            SqlConnection con = null;
+            SqlCommand cmd = null;
+
+            try
+            {
+                con = connect("myProjDB");
+
+                cmd = new SqlCommand("FC_SP_AddUserLastLocation", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                cmd.Parameters.AddWithValue("@user_id", location.UserId);
+                cmd.Parameters.AddWithValue("@latitude", location.Latitude);
+                cmd.Parameters.AddWithValue("@longitude", location.Longitude);
+                cmd.Parameters.AddWithValue("@created_at", location.CreatedAt);
+
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed to update user location: " + ex.Message);
             }
             finally
             {

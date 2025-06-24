@@ -16,7 +16,22 @@ namespace FC_Server.Controllers
             _alertManager = new AlertManager();
         }
 
-        // בדיקת אזור התרעה והאם יש התרעה פעילה
+        // בדיקת התרעה למשתמש לפי המיקום האחרון שלו
+        [HttpGet("check-user/{userId}")]
+        public IActionResult CheckUserAlert(int userId)
+        {
+            try
+            {
+                var result = _alertManager.CheckActiveAlertForUser(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // בדיקת אזור התרעה לפי מיקום ספציפי
         [HttpGet("check")]
         public IActionResult CheckLocation(double lat, double lng)
         {
@@ -24,6 +39,42 @@ namespace FC_Server.Controllers
             {
                 var result = _alertManager.CheckActiveAlertForLocation(lat, lng);
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // עדכון מיקום משתמש
+        [HttpPost("update-location")]
+        public IActionResult UpdateUserLocation([FromBody] UpdateLocationRequest request)
+        {
+            try
+            {
+                if (request == null || request.UserId == 0)
+                {
+                    return BadRequest(new { error = "Invalid request data" });
+                }
+
+                // עדכן את המיקום
+                _alertManager.UpdateUserLocation(
+                    request.UserId,
+                    request.Latitude,
+                    request.Longitude
+                );
+
+                // בדוק אם יש התרעה באזור החדש
+                var alertResult = _alertManager.CheckActiveAlertForLocation(
+                    request.Latitude,
+                    request.Longitude
+                );
+
+                return Ok(new
+                {
+                    locationUpdated = true,
+                    alertStatus = alertResult
+                });
             }
             catch (Exception ex)
             {
@@ -88,6 +139,13 @@ namespace FC_Server.Controllers
 
     public class LocationCheckRequest
     {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+
+    public class UpdateLocationRequest
+    {
+        public int UserId { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }
