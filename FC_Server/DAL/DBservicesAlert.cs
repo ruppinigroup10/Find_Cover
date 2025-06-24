@@ -39,8 +39,7 @@ public class DBservicesAlert
     {
         using (HttpClient client = new HttpClient())
         {
-            client.Timeout = TimeSpan.FromSeconds(60);
-               //if there is more timeout maybe 90. come back!
+            client.Timeout = TimeSpan.FromSeconds(120);
 
             var response = await client.GetAsync("https://api.tzevaadom.co.il/notifications");
             if (!response.IsSuccessStatusCode)
