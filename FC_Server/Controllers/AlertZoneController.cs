@@ -10,9 +10,11 @@ namespace FC_Server.Controllers
     public class AlertZoneController : ControllerBase
     {
         private readonly AlertManager _alertManager;
+        private readonly ILogger<AlertZoneController> _logger;
 
-        public AlertZoneController()
+        public AlertZoneController(ILogger<AlertZoneController> logger)
         {
+            _logger = logger;
             _alertManager = new AlertManager();
         }
 
@@ -32,17 +34,33 @@ namespace FC_Server.Controllers
         }
 
         // בדיקת אזור התרעה לפי מיקום ספציפי
-        [HttpGet("check")]
+        [HttpGet("check-location")]
         public IActionResult CheckLocation(double lat, double lng)
         {
             try
             {
+                // ולידציה
+                if (lat == 0 || lng == 0)
+                {
+                    return BadRequest(new { error = "Invalid coordinates" });
+                }
+
                 var result = _alertManager.CheckActiveAlertForLocation(lat, lng);
-                return Ok(result);
+
+                // תגובה מובנית - השתמש רק בשדות שקיימים במודל
+                return Ok(new
+                {
+                    isInAlertZone = result.IsInAlertZone,
+                    zoneName = result.ZoneName,
+                    hasActiveAlert = result.HasActiveAlert,
+                    message = result.Message,
+                    responseTime = result.ResponseTime,
+                    timestamp = DateTime.UtcNow
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { error = "Failed to check location" });
             }
         }
 
@@ -105,36 +123,7 @@ namespace FC_Server.Controllers
             }
         }
 
-        // בדיקה אם משתמש נמצא באזור ספציפי
-        [HttpPost("contains-point")]
-        public IActionResult CheckIfPointInZone([FromBody] LocationCheckRequest request)
-        {
-            try
-            {
-                if (request == null || request.Latitude == 0 || request.Longitude == 0)
-                {
-                    return BadRequest(new { error = "Invalid location data" });
-                }
 
-                var result = _alertManager.CheckActiveAlertForLocation(
-                    request.Latitude,
-                    request.Longitude
-                );
-
-                return Ok(new
-                {
-                    isInZone = result.IsInAlertZone,
-                    zoneName = result.ZoneName,
-                    responseTime = result.ResponseTime,
-                    hasActiveAlert = result.HasActiveAlert,
-                    message = result.Message
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message });
-            }
-        }
     }
 
     public class LocationCheckRequest
