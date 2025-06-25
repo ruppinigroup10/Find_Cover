@@ -4,15 +4,26 @@ using System.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// HttpClient עבור Google Maps
+builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+
 // Add services to the container.
 builder.Services.AddControllers();
 
-// 🚀 הוספת שירות ה-LocationDbService ל-DI עם מחרוזת החיבור
+// הוספת שירות ה-LocationDbService ל-DI עם מחרוזת החיבור
 string connectionString = builder.Configuration.GetConnectionString("myProjDB");
 builder.Services.AddScoped<LocationDbService>(provider => new LocationDbService(connectionString));
 
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
+builder.Services.AddScoped<ShelterAllocationService>();
+builder.Services.AddScoped<UserLocationTrackingService>();
+builder.Services.AddScoped<EmergencyAlertService>();
+builder.Services.AddScoped<DBservicesLocation>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

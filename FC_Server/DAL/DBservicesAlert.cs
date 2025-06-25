@@ -19,6 +19,109 @@ public class DBservicesAlert
         return con;
     }
 
+
+    #region Emergency System Methods
+    //--------------------------------------------------------------------------------------------------
+    // This method retrieves all active alerts from the database
+    //--------------------------------------------------------------------------------------------------
+    public async Task<List<Alert>> GetActiveAlertsAsync()
+    {
+        return await Task.Run(() =>
+        {
+            List<Alert> alerts = new List<Alert>();
+            using (SqlConnection con = connect())
+            {
+                string query = "SELECT * FROM Alerts WHERE is_active = 1";
+                SqlCommand cmd = CreateCommand(query, con);
+
+                using (SqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        alerts.Add(BuildAlertFromReader(reader));
+                    }
+                }
+            }
+            return alerts;
+        });
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method gets an Alert object from a SqlDataReader
+    //--------------------------------------------------------------------------------------------------
+    public async Task<Alert> GetAlertByIdAsync(int alertId)
+    {
+        return await Task.Run(() =>
+        {
+            using (SqlConnection con = connect())
+            {
+                string query = "SELECT * FROM Alerts WHERE alert_id = @AlertId";
+                SqlCommand cmd = CreateCommand(query, con);
+                cmd.Parameters.AddWithValue("@AlertId", alertId);
+
+                using (SqlDataReader reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        return BuildAlertFromReader(reader);
+                    }
+                }
+            }
+            return null;
+        });
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method creates a SqlCommand with the specified query and connection
+    //--------------------------------------------------------------------------------------------------
+    public async Task<int> CreateAlertAsync(Alert alert)
+    {
+        return await Task.Run(() =>
+        {
+            using (SqlConnection con = connect())
+            {
+                string query = @"
+                INSERT INTO Alerts (alert_type, CenterLatitude, CenterLongitude, 
+                                  RadiusKm, created_at, is_active, created_by)
+                VALUES (@Type, @Lat, @Lon, @Radius, @Created, 1, @CreatedBy);
+                SELECT SCOPE_IDENTITY();";
+
+                SqlCommand cmd = CreateCommand(query, con);
+                cmd.Parameters.AddWithValue("@Type", alert.alert_type);
+                cmd.Parameters.AddWithValue("@Lat", alert.CenterLatitude);
+                cmd.Parameters.AddWithValue("@Lon", alert.CenterLongitude);
+                cmd.Parameters.AddWithValue("@Radius", alert.RadiusKm);
+                cmd.Parameters.AddWithValue("@Created", alert.created_at);
+                cmd.Parameters.AddWithValue("@CreatedBy", alert.created_by);
+
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        });
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method ends an active alert by setting its is_active flag to 0 and updating the end_time
+    //--------------------------------------------------------------------------------------------------
+    public async Task EndAlertAsync(int alertId)
+    {
+        await Task.Run(() =>
+        {
+            using (SqlConnection con = connect())
+            {
+                string query = @"
+                UPDATE Alerts 
+                SET is_active = 0, end_time = GETDATE()
+                WHERE alert_id = @AlertId";
+
+                SqlCommand cmd = CreateCommand(query, con);
+                cmd.Parameters.AddWithValue("@AlertId", alertId);
+                cmd.ExecuteNonQuery();
+            }
+        });
+    }
+
+    #endregion
+
     //--------------------------------------------------------------------------------------------------
     // Create the SqlCommand
     //--------------------------------------------------------------------------------------------------

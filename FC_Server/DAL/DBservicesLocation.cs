@@ -4,14 +4,14 @@ using FC_Server.Models;
 using Microsoft.AspNetCore.Mvc;
 
 
-    public class LocationDbService
-    {
-        private readonly string _connectionString;
+public class LocationDbService
+{
+    private readonly string _connectionString;
 
-        public LocationDbService(string connectionString)
-        {
-            _connectionString = connectionString;
-        }
+    public LocationDbService(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
 
     //--------------------------------------------------------------------------------------------------
     // This method inserts a new user location using a stored procedure
@@ -54,6 +54,70 @@ using Microsoft.AspNetCore.Mvc;
             }
         }
     }
+
+
+
+    //--------------------------------------------------------------------------------------------------
+
+    #region Emergency System Methods - New Methods to Add
+
+    //-----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// שמירת מיקום משתמש (לשימוש כ-fallback)
+    /// </summary>
+    public async Task SaveUserLocation(int userId, double lat, double lon)
+    {
+        using (SqlConnection con = connect())
+        {
+            // פשוט הוסף רשומה - המערכת תנקה אוטומטית
+            string insertQuery = @"
+            INSERT INTO FC_USER_LAST_LOCATION 
+            (created_at, user_id, latitude, longitude)
+            VALUES (GETDATE(), @UserId, @Lat, @Lon)";
+
+            SqlCommand cmd = CreateCommand(insertQuery, con);
+            cmd.Parameters.AddWithValue("@UserId", userId);
+            cmd.Parameters.AddWithValue("@Lat", lat);
+            cmd.Parameters.AddWithValue("@Lon", lon);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    /// <summary>
+    /// קבלת מיקום אחרון ידוע (רק אם אין מיקום real-time)
+    /// </summary>
+    public async Task<(double? lat, double? lon, DateTime? time)> GetLastKnownLocation(int userId)
+    {
+        using (SqlConnection con = connect())
+        {
+            string query = @"
+            SELECT TOP 1 latitude, longitude, created_at
+            FROM FC_USER_LAST_LOCATION 
+            WHERE user_id = @UserId
+            ORDER BY created_at DESC";
+
+            SqlCommand cmd = CreateCommand(query, con);
+            cmd.Parameters.AddWithValue("@UserId", userId);
+
+            using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+            {
+                if (reader.Read())
+                {
+                    return (
+                        lat: reader["latitude"] as double?,
+                        lon: reader["longitude"] as double?,
+                        time: reader["created_at"] as DateTime?
+                    );
+                }
+            }
+
+            return (null, null, null);
+        }
+    }
+
+    #endregion
 
     //--------------------------------------------------------------------------------------------------
     // This method creates a connection to the database according to the connectionString name in the web.config 
@@ -102,7 +166,7 @@ using Microsoft.AspNetCore.Mvc;
             throw new Exception("Database connection error: " + ex.Message);
         }
 
-       
+
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_CleanupUserLastLocations", con, null);
 
         try
