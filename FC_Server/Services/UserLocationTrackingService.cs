@@ -13,6 +13,7 @@ namespace FC_Server.Services
     /// </summary>
     public class UserLocationTrackingService
     {
+        private readonly LocationDbService _locationDbService;
         private readonly ILogger<UserLocationTrackingService> _logger;
         private readonly IGoogleMapsService _googleMapsService;
         private readonly DBservicesLocation _dbLocation;
@@ -26,7 +27,7 @@ namespace FC_Server.Services
         {
             _logger = logger;
             _googleMapsService = googleMapsService;
-            _dbLocation = dbLocation;
+            _dbLocation = new DBservicesLocation();
         }
 
         /// <summary>
