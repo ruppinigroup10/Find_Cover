@@ -408,6 +408,36 @@ public class UserController : ControllerBase
         }
     }
 
+    // GET: api/Visit/GetUserVisitHistory?user_id=5
+    [HttpGet("GetUserVisitHistory")]
+    public IActionResult GetUserVisitHistory(int user_id)
+    {
+        try
+        {
+            var history = FC_Server.Models.VisitHistory.GetUserVisitHistory(user_id);
+
+            if (history != null && history.Count > 0)
+            {
+                return Ok(new
+                {
+                    message = "User visit history retrieved successfully",
+                    visits = history
+                });
+            }
+
+            return BadRequest(new { message = "No visit history found for this user" });
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+            {
+                return BadRequest(new { message = "Invalid user ID" });
+            }
+
+            return BadRequest(new { message = "Failed to retrieve visit history" });
+        }
+    }
+
     // Default controllers  
     [HttpGet]
     public IEnumerable<string> Get()

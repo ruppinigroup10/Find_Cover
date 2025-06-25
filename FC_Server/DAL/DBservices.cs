@@ -856,6 +856,64 @@ public class DBservices
         }
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // This method gets the shelter visit history for a specific user
+    //--------------------------------------------------------------------------------------------------
+    public List<VisitHistory> GetUserVisitHistory(int user_id)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        List<VisitHistory> historyList = new List<VisitHistory>();
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@user_id", user_id);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetShelterVisitHistory", con, paramDic);
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                while (dr.Read())
+                {
+                    VisitHistory visit = new VisitHistory
+                    {
+                        VisitId = Convert.ToInt32(dr["visit_id"]),
+                        ArrivalTime = Convert.ToDateTime(dr["arrival_time"]),
+                        ShelterName = dr["shelter_name"].ToString() ?? "",
+                        ShelterAddress = dr["shelter_address"].ToString() ?? "",
+                        AdditionalInformation = dr["additional_information"].ToString() ?? ""
+                    };
+
+                    historyList.Add(visit);
+                }
+            }
+            return historyList;
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("Invalid ID"))
+                throw new Exception("Invalid ID");
+            throw new Exception("Failed to retrieve visit history");
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
 
 }
 
