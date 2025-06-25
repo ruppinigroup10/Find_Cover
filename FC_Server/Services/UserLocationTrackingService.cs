@@ -21,11 +21,12 @@ namespace FC_Server.Services
 
         public UserLocationTrackingService(
             ILogger<UserLocationTrackingService> logger,
-            IGoogleMapsService googleMapsService)
+            IGoogleMapsService googleMapsService,
+            DBservicesLocation dbLocation)
         {
             _logger = logger;
             _googleMapsService = googleMapsService;
-            _dbLocation = new DBservicesLocation();
+            _dbLocation = dbLocation;
         }
 
         /// <summary>
