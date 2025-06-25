@@ -78,7 +78,7 @@ namespace FC_Server.Services
                 }
 
                 // חישוב מרחק למרחב המוגן
-                var distanceToShelter = CalculateDistance(lat, lon, shelter.latitude, shelter.longitude);
+                var distanceToShelter = CalculateDistance(lat, lon, shelter.Latitude, shelter.Longitude);
 
                 var result = new TrackingResult
                 {
@@ -214,7 +214,7 @@ namespace FC_Server.Services
         {
             try
             {
-                var distance = CalculateDistance(lat, lon, shelter.latitude, shelter.longitude);
+                var distance = CalculateDistance(lat, lon, shelter.Latitude, shelter.Longitude);
 
                 if (distance < 0.05) // 50 מטר
                     return "המרחב המוגן ממש קרוב, חפש את הכניסה";

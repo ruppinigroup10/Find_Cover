@@ -24,100 +24,191 @@ public class DBservicesAlert
     //--------------------------------------------------------------------------------------------------
     // This method retrieves all active alerts from the database
     //--------------------------------------------------------------------------------------------------
-    public async Task<List<Alert>> GetActiveAlertsAsync()
+    public List<Alert> GetActiveAlerts()
     {
-        return await Task.Run(() =>
-        {
-            List<Alert> alerts = new List<Alert>();
-            using (SqlConnection con = connect())
-            {
-                string query = "SELECT * FROM Alerts WHERE is_active = 1";
-                SqlCommand cmd = CreateCommand(query, con);
+        SqlConnection con;
+        SqlCommand cmd;
+        List<Alert> alerts = new List<Alert>();
 
-                using (SqlDataReader reader = cmd.ExecuteReader())
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        try
+        {
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveAlerts", con, null);
+
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                while (dr.Read())
                 {
-                    while (reader.Read())
+                    Alert alert = new Alert
                     {
-                        alerts.Add(BuildAlertFromReader(reader));
-                    }
+                        notificationId = dr["notification_id"].ToString() ?? "",
+                        time = Convert.ToInt64(dr["time"]),
+                        threat = Convert.ToInt32(dr["threat"]),
+                        isDrill = Convert.ToBoolean(dr["is_drill"]),
+                        cities = dr["cities"].ToString()?.Split(',').ToList() ?? new List<string>()
+                    };
+                    alerts.Add(alert);
                 }
             }
             return alerts;
-        });
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Get active alerts failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
     }
 
-    //--------------------------------------------------------------------------------------------------
-    // This method gets an Alert object from a SqlDataReader
-    //--------------------------------------------------------------------------------------------------
-    public async Task<Alert> GetAlertByIdAsync(int alertId)
-    {
-        return await Task.Run(() =>
-        {
-            using (SqlConnection con = connect())
-            {
-                string query = "SELECT * FROM Alerts WHERE alert_id = @AlertId";
-                SqlCommand cmd = CreateCommand(query, con);
-                cmd.Parameters.AddWithValue("@AlertId", alertId);
 
-                using (SqlDataReader reader = cmd.ExecuteReader())
+    //--------------------------------------------------------------------------------------------------
+    // This method gets an Alert object by ID
+    //--------------------------------------------------------------------------------------------------
+    public Alert? GetAlertById(int alertId)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        Alert? alert = null;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        try
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@alertId", alertId);
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetAlertById", con, paramDic);
+
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
                 {
-                    if (reader.Read())
+                    alert = new Alert
                     {
-                        return BuildAlertFromReader(reader);
-                    }
+                        notificationId = dr["notification_id"].ToString() ?? "",
+                        time = Convert.ToInt64(dr["time"]),
+                        threat = Convert.ToInt32(dr["threat"]),
+                        isDrill = Convert.ToBoolean(dr["is_drill"]),
+                        cities = dr["cities"].ToString()?.Split(',').ToList() ?? new List<string>()
+                    };
                 }
             }
-            return null;
-        });
+            return alert;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Get alert by ID failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
     }
 
     //--------------------------------------------------------------------------------------------------
-    // This method creates a SqlCommand with the specified query and connection
+    // This method creates a new alert
     //--------------------------------------------------------------------------------------------------
-    public async Task<int> CreateAlertAsync(Alert alert)
+    public int CreateAlert(string notificationId, long time, int threat, bool isDrill, List<string> cities)
     {
-        return await Task.Run(() =>
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
         {
-            using (SqlConnection con = connect())
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        try
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@notificationId", notificationId);
+            paramDic.Add("@time", time);
+            paramDic.Add("@threat", threat);
+            paramDic.Add("@isDrill", isDrill);
+            paramDic.Add("@cities", string.Join(",", cities));
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_CreateAlert", con, paramDic);
+
+            object result = cmd.ExecuteScalar();
+            return result != null ? Convert.ToInt32(result) : 0;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Create alert failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                string query = @"
-                INSERT INTO Alerts (alert_type, CenterLatitude, CenterLongitude, 
-                                  RadiusKm, created_at, is_active, created_by)
-                VALUES (@Type, @Lat, @Lon, @Radius, @Created, 1, @CreatedBy);
-                SELECT SCOPE_IDENTITY();";
-
-                SqlCommand cmd = CreateCommand(query, con);
-                cmd.Parameters.AddWithValue("@Type", alert.alert_type);
-                cmd.Parameters.AddWithValue("@Lat", alert.CenterLatitude);
-                cmd.Parameters.AddWithValue("@Lon", alert.CenterLongitude);
-                cmd.Parameters.AddWithValue("@Radius", alert.RadiusKm);
-                cmd.Parameters.AddWithValue("@Created", alert.created_at);
-                cmd.Parameters.AddWithValue("@CreatedBy", alert.created_by);
-
-                return Convert.ToInt32(cmd.ExecuteScalar());
+                con.Close();
             }
-        });
+        }
     }
 
-    //--------------------------------------------------------------------------------------------------
-    // This method ends an active alert by setting its is_active flag to 0 and updating the end_time
-    //--------------------------------------------------------------------------------------------------
-    public async Task EndAlertAsync(int alertId)
-    {
-        await Task.Run(() =>
-        {
-            using (SqlConnection con = connect())
-            {
-                string query = @"
-                UPDATE Alerts 
-                SET is_active = 0, end_time = GETDATE()
-                WHERE alert_id = @AlertId";
 
-                SqlCommand cmd = CreateCommand(query, con);
-                cmd.Parameters.AddWithValue("@AlertId", alertId);
-                cmd.ExecuteNonQuery();
+    //--------------------------------------------------------------------------------------------------
+    // This method ends an active alert
+    //--------------------------------------------------------------------------------------------------
+    public void EndAlert(int alertId)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        try
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@alertId", alertId);
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_EndAlert", con, paramDic);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("End alert failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
             }
-        });
+        }
     }
 
     #endregion

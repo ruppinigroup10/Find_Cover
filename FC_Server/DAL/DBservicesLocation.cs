@@ -2,9 +2,9 @@
 using System.Data;
 using FC_Server.Models;
 using Microsoft.AspNetCore.Mvc;
+using FC_Server.DAL;
 
-
-namespace FC_Server.DAL  // ADD NAMESPACE
+namespace FC_Server.DAL
 {
     public class DBservicesLocation
     {

@@ -363,7 +363,7 @@ namespace FC_Server.DAL
                 var response = new DirectionsResponse
                 {
                     Status = jObject["status"]?.ToString(),
-                    Routes = new List<Route>()
+                    Routes = new List<FC_Server.Models.Route>()
                 };
 
                 if (response.Status != "OK")
@@ -384,7 +384,7 @@ namespace FC_Server.DAL
                 {
                     foreach (var route in routes)
                     {
-                        var routeObj = new Route
+                        var routeObj = new FC_Server.Models.Route
                         {
                             Summary = route["summary"]?.ToString(),
                             OverviewPolyline = route["overview_polyline"]?["points"]?.ToString(),

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace FC_Server.Models
 {
+    /// <summary>
+    /// מודל להקצאת משתמש למרחב מוגן
+    /// </summary>
     public class ShelterAllocation
     {
         public int allocation_id { get; set; }
@@ -18,6 +21,9 @@ namespace FC_Server.Models
         public int? actual_walking_time { get; set; }
     }
 
+    /// <summary>
+    /// תוצאת הקצאה
+    /// </summary>
     public class ShelterAllocationResult
     {
         public bool Success { get; set; }
@@ -34,6 +40,9 @@ namespace FC_Server.Models
         public ShelterDetailsDto ShelterDetails { get; set; }
     }
 
+    /// <summary>
+    /// תוצאת הקצאה המונית
+    /// </summary>
     public class BatchAllocationResult
     {
         public bool Success { get; set; }
@@ -46,13 +55,19 @@ namespace FC_Server.Models
         public DateTime CompletionTime { get; set; }
     }
 
-    public class UserLocation
+    /// <summary>
+    /// מיקום משתמש להקצאה
+    /// </summary>
+    public class UserLocationWithDetails
     {
         public User User { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }
 
+    /// <summary>
+    /// סטטיסטיקות הקצאה
+    /// </summary>
     public class AllocationStatistics
     {
         public int stat_id { get; set; }
@@ -66,6 +81,9 @@ namespace FC_Server.Models
         public TimeSpan? ActualWalkingTime { get; set; }
     }
 
+    /// <summary>
+    /// הקצאת משתמש - לשימוש פנימי
+    /// </summary>
     public class UserAllocation
     {
         public int UserId { get; set; }

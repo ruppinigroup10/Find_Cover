@@ -1,10 +1,7 @@
-﻿using System;
-using FC_Server.Models;
-
+﻿
 
 namespace FC_Server.Models
 {
-
     public class UserLocation
     {
         private int user_id;

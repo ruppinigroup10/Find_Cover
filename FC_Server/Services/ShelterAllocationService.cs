@@ -60,14 +60,14 @@ namespace FC_Server.Services
 
                     // בדיקת תפוסה עדכנית
                     var availableShelters = shelters
-                        .Where(s => GetCurrentOccupancy(s.shelter_id) < s.capacity)
+                        .Where(s => GetCurrentOccupancy(s.ShelterId) < s.Capacity)
                         .ToList();
 
                     if (!availableShelters.Any())
                     {
                         // מציאת המרחב הקרוב ביותר עם תור המתנה
                         var nearestShelter = shelters
-                            .OrderBy(s => CalculateDistance(userLat, userLon, s.latitude, s.longitude))
+                            .OrderBy(s => CalculateDistance(userLat, userLon, s.Latitude, s.Longitude))
                             .First();
 
                         return new ShelterAllocationResult
@@ -102,14 +102,14 @@ namespace FC_Server.Services
                     // ביצוע ההקצאה
                     DBservicesShelter dbShelter = new DBservicesShelter();
                     var allocationSuccess = dbShelter.AllocateUserToShelter(
-                        user.user_id, optimalShelter.shelter_id, 1); // alert_id = 1 לעכשיו
+                        user.UserId, optimalShelter.ShelterId, 1); // alert_id = 1 לעכשיו
 
                     if (allocationSuccess)
                     {
                         // קבלת נתיב הליכה
                         var route = Task.Run(async () =>
                             await GetWalkingRoute(userLat, userLon,
-                                optimalShelter.latitude, optimalShelter.longitude)
+                                optimalShelter.Latitude, optimalShelter.Longitude)
                         ).Result;
 
                         return new ShelterAllocationResult
@@ -117,21 +117,21 @@ namespace FC_Server.Services
                             Success = true,
                             Message = "הוקצה מרחב מוגן בהצלחה",
                             AllocatedShelterId = optimalShelter.shelter_id,
-                            ShelterName = optimalShelter.name,
-                            Distance = walkingDistances[optimalShelter.shelter_id],
+                            ShelterName = optimalShelter.Name,
+                            Distance = walkingDistances[optimalShelter.ShelterId],
                             EstimatedArrivalTime = CalculateArrivalTime(walkingDistances[optimalShelter.shelter_id]),
                             RoutePolyline = route?.OverviewPolyline,
                             RouteInstructions = route?.TextInstructions,
                             ShelterDetails = new ShelterDetailsDto
                             {
-                                ShelterId = optimalShelter.shelter_id,
-                                Name = optimalShelter.name,
-                                Address = optimalShelter.address,
-                                Latitude = optimalShelter.latitude,
-                                Longitude = optimalShelter.longitude,
-                                Capacity = optimalShelter.capacity,
-                                IsAccessible = optimalShelter.is_accessible,
-                                PetsFriendly = optimalShelter.pets_friendly
+                                ShelterId = optimalShelter.ShelterId,
+                                Name = optimalShelter.Name,
+                                Address = optimalShelter.Address,
+                                Latitude = optimalShelter.Latitude,
+                                Longitude = optimalShelter.Longitude,
+                                Capacity = optimalShelter.Capacity,
+                                IsAccessible = optimalShelter.IsAccessible,
+                                PetsFriendly = optimalShelter.PetsFriendly
                             }
                         };
                     }
@@ -181,11 +181,11 @@ namespace FC_Server.Services
                         Status = allocation.status,
                         ShelterDetails = new ShelterDetailsDto
                         {
-                            ShelterId = shelter.shelter_id,
-                            Name = shelter.name,
-                            Address = shelter.address,
-                            Latitude = shelter.latitude,
-                            Longitude = shelter.longitude
+                            ShelterId = shelter.ShelterId,
+                            Name = shelter.Name,
+                            Address = shelter.Address,
+                            Latitude = shelter.Latitude,
+                            Longitude = shelter.Longitude
                         }
                     };
                 }
@@ -325,19 +325,19 @@ namespace FC_Server.Services
             // המרת למבנה הנתונים של ServerSimulation
             var personDto = new PersonDto
             {
-                Id = user.user_id,
-                Age = CalculateAge(user.date_of_birth),
+                Id = user.UserId,
+                Age = CalculateAge(user.CreatedAt),
                 Latitude = userLat,
                 Longitude = userLon
             };
 
             var shelterDtos = shelters.Select(s => new ShelterDto
             {
-                Id = s.shelter_id,
-                Name = s.name,
-                Latitude = s.latitude,
-                Longitude = s.longitude,
-                Capacity = s.capacity
+                Id = s.ShelterId,
+                Name = s.Name,
+                Latitude = s.Latitude,
+                Longitude = s.Longitude,
+                Capacity = s.Capacity
             }).ToList();
 
             // קריאה לשירות Google Maps
@@ -346,20 +346,20 @@ namespace FC_Server.Services
                 shelterDtos);
 
             // המרת התוצאות
-            if (walkingDistances.ContainsKey(user.user_id.ToString()))
+            if (walkingDistances.ContainsKey(user.UserId.ToString()))
             {
-                var userDistances = walkingDistances[user.user_id.ToString()];
+                var userDistances = walkingDistances[user.UserId.ToString()];
                 foreach (var shelter in shelters)
                 {
-                    if (userDistances.ContainsKey(shelter.shelter_id.ToString()))
+                    if (userDistances.ContainsKey(shelter.ShelterId.ToString()))
                     {
-                        distances[shelter.shelter_id] = userDistances[shelter.shelter_id.ToString()];
+                        distances[shelter.ShelterId] = userDistances[shelter.ShelterId.ToString()];
                     }
                     else
                     {
                         // אם אין מרחק הליכה, חשב מרחק אווירי
-                        distances[shelter.shelter_id] = CalculateDistance(
-                            userLat, userLon, shelter.latitude, shelter.longitude);
+                        distances[shelter.ShelterId] = CalculateDistance(
+                            userLat, userLon, shelter.Latitude, shelter.Longitude);
                     }
                 }
             }
@@ -374,8 +374,8 @@ namespace FC_Server.Services
         {
             // סינון מרחבים במרחק הליכה סביר
             var reachableShelters = availableShelters
-                .Where(s => walkingDistances.ContainsKey(s.shelter_id) &&
-                           walkingDistances[s.shelter_id] <= MAX_DISTANCE_KM)
+                .Where(s => walkingDistances.ContainsKey(s.ShelterId) &&
+                           walkingDistances[s.ShelterId] <= MAX_DISTANCE_KM)
                 .ToList();
 
             if (!reachableShelters.Any())
