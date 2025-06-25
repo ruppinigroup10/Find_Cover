@@ -4,15 +4,20 @@ using FC_Server.Models;
 using Microsoft.AspNetCore.Mvc;
 
 
-namespace FC_Server.DAL
+namespace FC_Server.DAL  // ADD NAMESPACE
 {
-    public class LocationDbService
+    public class DBservicesLocation
     {
         private readonly string _connectionString;
 
-        public LocationDbService(string connectionString)
+        public DBservicesLocation(string connectionString)
         {
             _connectionString = connectionString;
+        }
+
+        public DBservicesLocation()
+        {
+            _connectionString = null; // Will be set in connect()
         }
 
         //--------------------------------------------------------------------------------------------------
@@ -70,15 +75,15 @@ namespace FC_Server.DAL
         /// </summary>
         public async Task SaveUserLocation(int userId, double lat, double lon)
         {
-            using (SqlConnection con = connect())
+            using (SqlConnection con = connect("myProjDB"))
             {
-                // פשוט הוסף רשומה - המערכת תנקה אוטומטית
+
                 string insertQuery = @"
             INSERT INTO FC_USER_LAST_LOCATION 
             (created_at, user_id, latitude, longitude)
             VALUES (GETDATE(), @UserId, @Lat, @Lon)";
 
-                SqlCommand cmd = CreateCommand(insertQuery, con);
+                SqlCommand cmd = new SqlCommand(insertQuery, con);
                 cmd.Parameters.AddWithValue("@UserId", userId);
                 cmd.Parameters.AddWithValue("@Lat", lat);
                 cmd.Parameters.AddWithValue("@Lon", lon);
@@ -92,7 +97,7 @@ namespace FC_Server.DAL
         /// </summary>
         public async Task<(double? lat, double? lon, DateTime? time)> GetLastKnownLocation(int userId)
         {
-            using (SqlConnection con = connect())
+            using (SqlConnection con = connect("myProjDB"))
             {
                 string query = @"
             SELECT TOP 1 latitude, longitude, created_at
@@ -100,7 +105,7 @@ namespace FC_Server.DAL
             WHERE user_id = @UserId
             ORDER BY created_at DESC";
 
-                SqlCommand cmd = CreateCommand(query, con);
+                SqlCommand cmd = new SqlCommand(query, con);
                 cmd.Parameters.AddWithValue("@UserId", userId);
 
                 using (SqlDataReader reader = await cmd.ExecuteReaderAsync())

@@ -1,5 +1,6 @@
 using FC_Server.Services;
-using FC_Server.Models; // אם אתה משתמש במחלקה LocationDbService כאן
+using FC_Server.DAL;
+using FC_Server.Models;
 using System.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,7 +19,11 @@ builder.Services.AddControllers();
 string connectionString = builder.Configuration.GetConnectionString("myProjDB");
 builder.Services.AddScoped<LocationDbService>(provider => new LocationDbService(connectionString));
 builder.Services.AddScoped<LocationDbService>(provider =>
-    new LocationDbService(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    var configuration = provider.GetRequiredService<IConfiguration>();
+    var connectionString = configuration.GetConnectionString("myProjDB");
+    return new LocationDbService(connectionString);
+});
 
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
@@ -26,7 +31,9 @@ builder.Services.AddScoped<ShelterAllocationService>();
 builder.Services.AddScoped<UserLocationTrackingService>();
 builder.Services.AddScoped<EmergencyAlertService>();
 builder.Services.AddScoped<DBservicesLocation>();
-
+builder.Services.AddScoped<DBservices>();
+builder.Services.AddScoped<DBservicesAlert>();
+builder.Services.AddScoped<DBservicesShelter>();
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

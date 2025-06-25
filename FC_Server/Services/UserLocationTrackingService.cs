@@ -13,10 +13,9 @@ namespace FC_Server.Services
     /// </summary>
     public class UserLocationTrackingService
     {
-        private readonly LocationDbService _locationDbService;
+        private readonly DBservicesLocation _dbLocation;
         private readonly ILogger<UserLocationTrackingService> _logger;
         private readonly IGoogleMapsService _googleMapsService;
-        private readonly DBservicesLocation _dbLocation;
         private const double ARRIVAL_THRESHOLD_KM = 0.01; // 10 מטר
         private const double ROUTE_DEVIATION_THRESHOLD_KM = 0.1; // 100 מטר
 

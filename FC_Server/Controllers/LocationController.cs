@@ -8,9 +8,9 @@ namespace FC_Server.Controllers
     [ApiController]
     public class LocationController : ControllerBase
     {
-        private readonly LocationDbService _locationService;
+        private readonly DBservicesLocation _locationService;
 
-        public LocationController(LocationDbService locationService)
+        public LocationController(DBservicesLocation locationService)
         {
             _locationService = locationService;
         }
