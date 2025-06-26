@@ -85,7 +85,7 @@ namespace FC_Server.Services
         {
             try
             {
-                var alert = await _dbAlert.GetAlertByIdAsync(alertId);
+                var alert = _dbAlert.GetAlertById(alertId);
                 if (alert == null)
                 {
                     return null;
@@ -114,7 +114,7 @@ namespace FC_Server.Services
         {
             try
             {
-                var newAlert = new Alert
+                var newAlert = new AlertRecord
                 {
                     alert_type = request.AlertType,
                     CenterLatitude = request.CenterLatitude,
@@ -126,7 +126,7 @@ namespace FC_Server.Services
                     alert_source = "EmergencySystem"
                 };
 
-                var alertId = await _dbAlert.CreateAlertAsync(newAlert);
+                var alertId = _dbAlert.CreateAlertAsync(newAlert);
 
                 _logger.LogInformation($"Created new emergency alert {alertId} at ({request.CenterLatitude}, {request.CenterLongitude})");
 

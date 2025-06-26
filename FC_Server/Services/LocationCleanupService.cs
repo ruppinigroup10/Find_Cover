@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using FC_Server;
+using FC_Server.DAL;
 
 namespace FC_Server.Services
 {
@@ -29,7 +29,7 @@ namespace FC_Server.Services
                 {
                     using (var scope = _serviceProvider.CreateScope())
                     {
-                        var locationService = scope.ServiceProvider.GetRequiredService<LocationDbService>();
+                        var locationService = scope.ServiceProvider.GetRequiredService<DBservicesLocation>();
                         locationService.CleanupUserLocations();
                         _logger.LogInformation("CleanupUserLocations executed at: {time}", DateTimeOffset.Now);
                     }

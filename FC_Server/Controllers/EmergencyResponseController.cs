@@ -101,7 +101,7 @@ namespace FC_Server.Controllers
                 }
 
                 // משתמש חדש - הקצה מרחב מוגן
-                var user = User.getUser(request.UserId);
+                var user = FC_Server.Models.User.getUser(request.UserId);
                 if (user == null)
                 {
                     return BadRequest(new { success = false, message = "משתמש לא נמצא" });
@@ -335,30 +335,31 @@ namespace FC_Server.Controllers
         {
             try
             {
-                var shelters = Shelter.getActiveShelters()
-                    .Where(s => CalculateDistance(latitude, longitude, s.latitude, s.longitude) <= radiusKm)
+                DBservicesShelter dbShelter = new DBservicesShelter();
+                var shelters = dbShelter.GetActiveShelters()
+                    .Where(s => CalculateDistance(latitude, longitude, s.Latitude, s.Longitude) <= radiusKm)
                     .ToList();
 
                 var shelterStatuses = new List<ShelterStatusDto>();
 
                 foreach (var shelter in shelters)
                 {
-                    var currentOccupancy = GetCurrentOccupancy(shelter.shelter_id);
+                    var currentOccupancy = GetCurrentOccupancy(shelter.ShelterId);
                     var status = new ShelterStatusDto
                     {
-                        ShelterId = shelter.shelter_id,
-                        Name = shelter.name,
-                        Address = shelter.address,
-                        Latitude = shelter.latitude,
-                        Longitude = shelter.longitude,
-                        Capacity = shelter.capacity,
+                        ShelterId = shelter.ShelterId,
+                        Name = shelter.Name,
+                        Address = shelter.Address,
+                        Latitude = shelter.Latitude,
+                        Longitude = shelter.Longitude,
+                        Capacity = shelter.Capacity,
                         CurrentOccupancy = currentOccupancy,
-                        AvailableSpaces = Math.Max(0, shelter.capacity - currentOccupancy),
-                        OccupancyPercentage = shelter.capacity > 0
-                            ? (double)currentOccupancy / shelter.capacity * 100
+                        AvailableSpaces = Math.Max(0, shelter.Capacity - currentOccupancy),
+                        OccupancyPercentage = shelter.Capacity > 0
+                            ? (double)currentOccupancy / shelter.Capacity * 100
                             : 100,
-                        Status = GetShelterStatus(currentOccupancy, shelter.capacity),
-                        Distance = CalculateDistance(latitude, longitude, shelter.latitude, shelter.longitude)
+                        Status = GetShelterStatus(currentOccupancy, shelter.Capacity),
+                        Distance = CalculateDistance(latitude, longitude, shelter.Latitude, shelter.Longitude)
                     };
 
                     shelterStatuses.Add(status);
@@ -417,7 +418,7 @@ namespace FC_Server.Controllers
             {
                 await _allocationService.ReleaseUserFromShelter(userId);
                 await _locationTrackingService.StopTrackingUser(userId);
-                await SaveAllocationStatistics(userId, allocation);
+                //await SaveAllocationStatistics(userId, allocation);
 
                 _logger.LogInformation($"Alert ended - released user {userId} from shelter {allocation.ShelterId}");
             }
@@ -440,25 +441,25 @@ namespace FC_Server.Controllers
             }
         }
 
-        private async Task SaveAllocationStatistics(int userId, UserAllocation allocation)
-        {
-            var stats = new AllocationStatistics
-            {
-                UserId = userId,
-                ShelterId = allocation.ShelterId,
-                AllocationTime = allocation.AllocationTime,
-                ArrivalTime = allocation.ArrivalTime,
-                ReleaseTime = DateTime.Now,
-                TotalTimeInShelter = allocation.ArrivalTime.HasValue
-                    ? DateTime.Now - allocation.ArrivalTime.Value
-                    : TimeSpan.Zero,
-                WalkingDistance = allocation.WalkingDistance,
-                ActualWalkingTime = allocation.ActualWalkingTime
-            };
+        // private async Task SaveAllocationStatistics(int userId, UserAllocation allocation)
+        // {
+        //     var stats = new AllocationStatistics
+        //     {
+        //         UserId = userId,
+        //         ShelterId = allocation.ShelterId,
+        //         AllocationTime = allocation.AllocationTime,
+        //         ArrivalTime = allocation.ArrivalTime,
+        //         ReleaseTime = DateTime.Now,
+        //         TotalTimeInShelter = allocation.ArrivalTime.HasValue
+        //             ? DateTime.Now - allocation.ArrivalTime.Value
+        //             : TimeSpan.Zero,
+        //         WalkingDistance = allocation.WalkingDistance,
+        //         ActualWalkingTime = allocation.ActualWalkingTime
+        //     };
 
-            DBservicesStatistics dbs = new DBservicesStatistics();
-            await dbs.SaveAllocationStatistics(stats);
-        }
+        //     DBservicesStatistics dbs = new DBservicesStatistics();
+        //     await dbs.SaveAllocationStatistics(stats);
+        // }
 
         private int GetCurrentOccupancy(int shelterId)
         {

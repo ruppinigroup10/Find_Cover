@@ -24,11 +24,11 @@ public class DBservicesAlert
     //--------------------------------------------------------------------------------------------------
     // This method retrieves all active alerts from the database
     //--------------------------------------------------------------------------------------------------
-    public List<Alert> GetActiveAlerts()
+    public List<AlertRecord> GetActiveAlerts()
     {
         SqlConnection con;
         SqlCommand cmd;
-        List<Alert> alerts = new List<Alert>();
+        List<AlertRecord> alerts = new List<AlertRecord>();
 
         try
         {
@@ -47,13 +47,18 @@ public class DBservicesAlert
             {
                 while (dr.Read())
                 {
-                    Alert alert = new Alert
+                    AlertRecord alert = new AlertRecord
                     {
-                        notificationId = dr["notification_id"].ToString() ?? "",
-                        time = Convert.ToInt64(dr["time"]),
-                        threat = Convert.ToInt32(dr["threat"]),
-                        isDrill = Convert.ToBoolean(dr["is_drill"]),
-                        cities = dr["cities"].ToString()?.Split(',').ToList() ?? new List<string>()
+                        alert_id = Convert.ToInt32(dr["alert_id"]),
+                        alert_type = dr["alert_type"].ToString() ?? "",
+                        CenterLatitude = dr["center_latitude"] != DBNull.Value ? Convert.ToDouble(dr["center_latitude"]) : 0,
+                        CenterLongitude = dr["center_longitude"] != DBNull.Value ? Convert.ToDouble(dr["center_longitude"]) : 0,
+                        RadiusKm = dr["radius_km"] != DBNull.Value ? Convert.ToDouble(dr["radius_km"]) : 0,
+                        created_at = Convert.ToDateTime(dr["created_at"]),
+                        end_time = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : null,
+                        is_active = Convert.ToBoolean(dr["is_active"]),
+                        created_by = dr["created_by"]?.ToString() ?? "System",
+                        alert_source = dr["alert_source"]?.ToString() ?? "Database"
                     };
                     alerts.Add(alert);
                 }
@@ -73,15 +78,23 @@ public class DBservicesAlert
         }
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // Async wrapper for GetActiveAlerts
+    //--------------------------------------------------------------------------------------------------
+
+    public async Task<List<AlertRecord>> GetActiveAlertsAsync()
+    {
+        return await Task.Run(() => GetActiveAlerts());
+    }
 
     //--------------------------------------------------------------------------------------------------
     // This method gets an Alert object by ID
     //--------------------------------------------------------------------------------------------------
-    public Alert? GetAlertById(int alertId)
+    public AlertRecord? GetAlertById(int alertId)
     {
         SqlConnection con;
         SqlCommand cmd;
-        Alert? alert = null;
+        AlertRecord? alert = null;
 
         try
         {
@@ -103,13 +116,18 @@ public class DBservicesAlert
             {
                 if (dr.Read())
                 {
-                    alert = new Alert
+                    alert = new AlertRecord
                     {
-                        notificationId = dr["notification_id"].ToString() ?? "",
-                        time = Convert.ToInt64(dr["time"]),
-                        threat = Convert.ToInt32(dr["threat"]),
-                        isDrill = Convert.ToBoolean(dr["is_drill"]),
-                        cities = dr["cities"].ToString()?.Split(',').ToList() ?? new List<string>()
+                        alert_id = Convert.ToInt32(dr["alert_id"]),
+                        alert_type = dr["alert_type"].ToString() ?? "",
+                        CenterLatitude = dr["center_latitude"] != DBNull.Value ? Convert.ToDouble(dr["center_latitude"]) : 0,
+                        CenterLongitude = dr["center_longitude"] != DBNull.Value ? Convert.ToDouble(dr["center_longitude"]) : 0,
+                        RadiusKm = dr["radius_km"] != DBNull.Value ? Convert.ToDouble(dr["radius_km"]) : 0,
+                        created_at = Convert.ToDateTime(dr["created_at"]),
+                        end_time = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : null,
+                        is_active = Convert.ToBoolean(dr["is_active"]),
+                        created_by = dr["created_by"]?.ToString() ?? "System",
+                        alert_source = dr["alert_source"]?.ToString() ?? "Database"
                     };
                 }
             }
@@ -131,7 +149,7 @@ public class DBservicesAlert
     //--------------------------------------------------------------------------------------------------
     // This method creates a new alert
     //--------------------------------------------------------------------------------------------------
-    public int CreateAlert(string notificationId, long time, int threat, bool isDrill, List<string> cities)
+    public int CreateAlertAsync(AlertRecord alert)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -148,13 +166,14 @@ public class DBservicesAlert
         try
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@notificationId", notificationId);
-            paramDic.Add("@time", time);
-            paramDic.Add("@threat", threat);
-            paramDic.Add("@isDrill", isDrill);
-            paramDic.Add("@cities", string.Join(",", cities));
+            paramDic.Add("@alert_type", alert.alert_type);
+            paramDic.Add("@center_latitude", alert.CenterLatitude);
+            paramDic.Add("@center_longitude", alert.CenterLongitude);
+            paramDic.Add("@radius_km", alert.RadiusKm);
+            paramDic.Add("@created_by", alert.created_by);
+            paramDic.Add("@alert_source", alert.alert_source);
 
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_CreateAlert", con, paramDic);
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_CreateAlertWithLocation", con, paramDic);
 
             object result = cmd.ExecuteScalar();
             return result != null ? Convert.ToInt32(result) : 0;
@@ -171,6 +190,7 @@ public class DBservicesAlert
             }
         }
     }
+
 
 
     //--------------------------------------------------------------------------------------------------
@@ -209,6 +229,14 @@ public class DBservicesAlert
                 con.Close();
             }
         }
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Async wrapper for EndAlert 
+    //--------------------------------------------------------------------------------------------------
+    public async Task EndAlertAsync(int alertId)
+    {
+        await Task.Run(() => EndAlert(alertId));
     }
 
     #endregion

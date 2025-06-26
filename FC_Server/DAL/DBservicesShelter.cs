@@ -777,5 +777,109 @@ public class DBservicesShelter
             }
         }
     }
+
+    //--------------------------------------------------------------------------------------------------
+    // This method updates the allocation status for a user
+    //--------------------------------------------------------------------------------------------------
+    public void UpdateAllocationStatus(int userId, string status)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        try
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@userId", userId);
+            paramDic.Add("@status", status);
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateAllocationStatus", con, paramDic);
+
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Update allocation status failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Get all active shelters from the database
+    //--------------------------------------------------------------------------------------------------
+
+    public List<Shelter> GetAllActiveShelters()
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        List<Shelter> sheltersList = new List<Shelter>();
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Failed to connect to DB: " + ex.Message);
+        }
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_getAllShelters", con, null);
+
+        try
+        {
+            SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
+            while (dr.Read())
+            {
+                Shelter shelter = new Shelter
+                {
+                    ShelterId = Convert.ToInt32(dr["shelter_id"]),
+                    ProviderId = Convert.ToInt32(dr["provider_id"]),
+                    ShelterType = dr["shelter_type"].ToString(),
+                    Name = dr["name"].ToString(),
+                    Latitude = Convert.ToSingle(dr["latitude"]),
+                    Longitude = Convert.ToSingle(dr["longitude"]),
+                    Address = dr["address"].ToString(),
+                    Capacity = Convert.ToInt32(dr["capacity"]),
+                    IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                    PetsFriendly = dr["pets_friendly"] != DBNull.Value ? Convert.ToBoolean(dr["pets_friendly"]) : false,
+                    IsActive = Convert.ToBoolean(dr["is_active"]),
+                    CreatedAt = Convert.ToDateTime(dr["created_at"]),
+                    LastUpdated = Convert.ToDateTime(dr["last_updated"]),
+                    AdditionalInformation = dr["additional_information"] != DBNull.Value ? dr["additional_information"].ToString() : ""
+                };
+
+                sheltersList.Add(shelter);
+            }
+
+            return sheltersList;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Failed to get active shelters: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
     #endregion
 }

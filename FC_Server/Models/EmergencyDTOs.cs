@@ -234,6 +234,7 @@ namespace FC_Server.Models
     {
         public string OverviewPolyline { get; set; }
         public List<string> TextInstructions { get; set; }
+        public double Distance { get; set; }
     }
 
     #endregion

@@ -74,8 +74,8 @@ namespace FC_Server.Services
                         {
                             Success = false,
                             Message = "כל המרחבים המוגנים באזור מלאים",
-                            NearestShelterId = nearestShelter.shelter_id,
-                            EstimatedWaitTime = CalculateEstimatedWaitTime(nearestShelter.shelter_id),
+                            NearestShelterId = nearestShelter.ShelterId,
+                            EstimatedWaitTime = CalculateEstimatedWaitTime(nearestShelter.ShelterId),
                             RecommendedAction = "המתן בתור או חפש מחסה חלופי"
                         };
                     }
@@ -116,10 +116,10 @@ namespace FC_Server.Services
                         {
                             Success = true,
                             Message = "הוקצה מרחב מוגן בהצלחה",
-                            AllocatedShelterId = optimalShelter.shelter_id,
+                            AllocatedShelterId = optimalShelter.ShelterId,
                             ShelterName = optimalShelter.Name,
                             Distance = walkingDistances[optimalShelter.ShelterId],
-                            EstimatedArrivalTime = CalculateArrivalTime(walkingDistances[optimalShelter.shelter_id]),
+                            EstimatedArrivalTime = CalculateArrivalTime(walkingDistances[optimalShelter.ShelterId]),
                             RoutePolyline = route?.OverviewPolyline,
                             RouteInstructions = route?.TextInstructions,
                             ShelterDetails = new ShelterDetailsDto
@@ -148,7 +148,7 @@ namespace FC_Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error allocating shelter for user {UserId}", user.user_id);
+                _logger.LogError(ex, "Error allocating shelter for user {UserId}", user.UserId);
                 return new ShelterAllocationResult
                 {
                     Success = false,
@@ -177,7 +177,7 @@ namespace FC_Server.Services
                         UserId = userId,
                         ShelterId = allocation.shelter_id,
                         AlertId = allocation.alert_id,
-                        AllocationTime = allocation.entrance_time,
+                        AllocationTime = allocation.arrival_time ?? DateTime.Now,
                         Status = allocation.status,
                         ShelterDetails = new ShelterDetailsDto
                         {
@@ -253,14 +253,37 @@ namespace FC_Server.Services
         {
             try
             {
-                var route = await GetWalkingRoute(currentLat, currentLon, destLat, destLon);
+                // Call Google Maps API directly to get full route information
+                var request = new DirectionsRequest
+                {
+                    Origin = new LocationPoint(currentLat, currentLon, "user"),
+                    Destination = new LocationPoint(destLat, destLon, "shelter"),
+                    Mode = TravelMode.Walking
+                };
+
+                var response = await _googleMapsService.GetDirectionsAsync(request);
+
+                if (response.Success && response.Routes?.Any() == true)
+                {
+                    var route = response.Routes.First();
+                    var leg = route.Legs?.FirstOrDefault();
+
+                    return new RouteInfoDto
+                    {
+                        Distance = (leg?.Distance?.Value ?? 0) / 1000.0, // Convert meters to km
+                        RoutePolyline = route.OverviewPolyline,
+                        AllInstructions = leg?.Steps?.Select(s => s.HtmlInstructions).ToList(),
+                        CurrentInstruction = leg?.Steps?.FirstOrDefault()?.HtmlInstructions,
+                        EstimatedArrivalTime = DateTime.Now.AddSeconds(leg?.Duration?.Value ?? 0)
+                    };
+                }
+
                 return new RouteInfoDto
                 {
-                    Distance = route?.Distance ?? 0,
-                    RoutePolyline = route?.OverviewPolyline,
-                    AllInstructions = route?.TextInstructions,
-                    CurrentInstruction = route?.TextInstructions?.FirstOrDefault(),
-                    EstimatedArrivalTime = DateTime.Now.AddMinutes(route?.Duration ?? 0)
+                    Distance = 0,
+                    RoutePolyline = string.Empty,
+                    AllInstructions = new List<string>(),
+                    CurrentInstruction = "Unable to calculate route"
                 };
             }
             catch (Exception ex)
@@ -307,7 +330,7 @@ namespace FC_Server.Services
         private List<Shelter> GetActiveSheltersInArea(double lat, double lon, double radiusKm)
         {
             return Shelter.getActiveShelters()
-                .Where(s => CalculateDistance(lat, lon, s.latitude, s.longitude) <= radiusKm)
+                .Where(s => CalculateDistance(lat, lon, s.Latitude, s.Longitude) <= radiusKm)
                 .ToList();
         }
 
@@ -386,9 +409,9 @@ namespace FC_Server.Services
             // 2. נגישות (אם רלוונטי)
             // 3. תפוסה נוכחית
             return reachableShelters
-                .OrderBy(s => walkingDistances[s.shelter_id])
-                .ThenByDescending(s => s.is_accessible && UserNeedsAccessibility(user))
-                .ThenBy(s => GetOccupancyPercentage(s.shelter_id))
+                .OrderBy(s => walkingDistances[s.ShelterId])
+                .ThenByDescending(s => s.IsAccessible && UserNeedsAccessibility(user))
+                .ThenBy(s => GetOccupancyPercentage(s.ShelterId))
                 .FirstOrDefault();
         }
 
@@ -415,7 +438,8 @@ namespace FC_Server.Services
                     OverviewPolyline = route.OverviewPolyline,
                     TextInstructions = leg?.Steps?
                         .Select(s => s.HtmlInstructions)
-                        .ToList()
+                        .ToList(),
+                    Distance = (leg?.Distance?.Value ?? 0) / 1000.0 // Convert meters to km
                 };
             }
 
@@ -456,16 +480,18 @@ namespace FC_Server.Services
 
         private bool UserNeedsAccessibility(User user)
         {
-            return user.mobility_aids != null && user.mobility_aids.Any();
+            // Get user preferences to check if accessibility is needed
+            var preferences = UserPreferences.GetUserPreferences(user.UserId);
+            return preferences?.AccessibilityNeeded ?? false;
         }
 
         private double GetOccupancyPercentage(int shelterId)
         {
             var shelter = Shelter.getShelter(shelterId);
-            if (shelter == null || shelter.capacity == 0) return 100;
+            if (shelter == null || shelter.Capacity == 0) return 100;
 
             var currentOccupancy = GetCurrentOccupancy(shelterId);
-            return (double)currentOccupancy / shelter.capacity * 100;
+            return (double)currentOccupancy / shelter.Capacity * 100;
         }
 
         #endregion

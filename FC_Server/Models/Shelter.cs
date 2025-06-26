@@ -78,9 +78,9 @@
                                             bool is_accessible, bool pets_friendly,
                                             string additional_information, int provider_id)
         {
-            shelter_type =  "פרטי";
+            shelter_type = "פרטי";
             latitude = 31.2518f;
-            longitude = 34.7913f;    
+            longitude = 34.7913f;
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity,
                                             is_accessible, pets_friendly, additional_information, provider_id);
@@ -108,6 +108,12 @@
         {
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.shelterActiveStatus(shelter_id, status);
+        }
+
+        public static List<Shelter> getActiveShelters()
+        {
+            DBservicesShelter dbs = new DBservicesShelter();
+            return dbs.GetAllActiveShelters();
         }
 
         public static void DeleteShelter(int shelter_id, int provider_id)
