@@ -21,9 +21,10 @@ string connectionString = builder.Configuration.GetConnectionString("myProjDB");
 
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
-builder.Services.AddScoped<ShelterAllocationService>();
-builder.Services.AddScoped<UserLocationTrackingService>();
-builder.Services.AddScoped<EmergencyAlertService>();
+
+builder.Services.AddScoped<FC_Server.Services.ShelterAllocationService>();
+builder.Services.AddScoped<FC_Server.Services.EmergencyAlertService>();
+builder.Services.AddScoped<FC_Server.Services.UserLocationTrackingService>();
 
 builder.Services.AddScoped<DBservices>();
 builder.Services.AddScoped<DBservicesAlert>();

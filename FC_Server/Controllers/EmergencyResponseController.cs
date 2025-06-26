@@ -172,77 +172,110 @@ namespace FC_Server.Controllers
         /// <summary>
         /// עדכון מיקום משתמש - נקרא באופן תקופתי מהלקוח
         /// </summary>
+        // [HttpPost("update-location")]
+        // public async Task<IActionResult> UpdateUserLocation([FromBody] UserLocationRequest request)
+        // {
+        //     try
+        //     {
+        //         // עדכון המיקום במערכת המעקב
+        //         var trackingResult = await _locationTrackingService.UpdateUserLocation(
+        //             request.UserId,
+        //             request.Latitude,
+        //             request.Longitude);
+
+        //         if (!trackingResult.IsBeingTracked)
+        //         {
+        //             return Ok(new LocationUpdateResponse
+        //             {
+        //                 Success = true,
+        //                 Message = "אין מעקב פעיל",
+        //                 RequiresAction = false
+        //             });
+        //         }
+
+        //         // בדיקה אם המשתמש הגיע למרחב המוגן
+        //         if (trackingResult.HasArrivedAtShelter)
+        //         {
+        //             // סמן את המשתמש כנמצא במרחב
+        //             await _allocationService.MarkUserAsArrived(
+        //                 request.UserId,
+        //                 trackingResult.ShelterId);
+
+        //             return Ok(new LocationUpdateResponse
+        //             {
+        //                 Success = true,
+        //                 Message = "הגעת למרחב המוגן!",
+        //                 HasArrived = true,
+        //                 RequiresAction = false
+        //             });
+        //         }
+
+        //         // בדיקה אם המשתמש סטה מהנתיב
+        //         if (trackingResult.HasDeviatedFromRoute)
+        //         {
+        //             // חישוב נתיב מחדש
+        //             var newRoute = await _allocationService.RecalculateRoute(
+        //                 request.UserId,
+        //                 request.Latitude,
+        //                 request.Longitude);
+
+        //             return Ok(new LocationUpdateResponse
+        //             {
+        //                 Success = true,
+        //                 Message = "חושב נתיב מחדש",
+        //                 UpdatedRoute = newRoute,
+        //                 RequiresAction = true,
+        //                 ActionType = "ROUTE_UPDATED"
+        //             });
+        //         }
+
+        //         // המשך רגיל בנתיב
+        //         return Ok(new LocationUpdateResponse
+        //         {
+        //             Success = true,
+        //             Message = "ממשיך במעקב",
+        //             DistanceRemaining = trackingResult.DistanceToShelter,
+        //             EstimatedTimeRemaining = trackingResult.EstimatedTimeToArrival,
+        //             CurrentInstruction = trackingResult.CurrentNavigationInstruction
+        //         });
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Error updating location for user {UserId}", request.UserId);
+        //         return StatusCode(500, new { success = false, message = "שגיאה בעדכון מיקום" });
+        //     }
+        // }
+
+        /// <summary>
+        ///DEBUGGING
+        /// </summary>
         [HttpPost("update-location")]
         public async Task<IActionResult> UpdateUserLocation([FromBody] UserLocationRequest request)
         {
             try
             {
-                // עדכון המיקום במערכת המעקב
-                var trackingResult = await _locationTrackingService.UpdateUserLocation(
-                    request.UserId,
-                    request.Latitude,
-                    request.Longitude);
+                _logger.LogInformation($"UpdateUserLocation called: userId={request?.UserId}, lat={request?.Latitude}, lon={request?.Longitude}");
 
-                if (!trackingResult.IsBeingTracked)
+                // Test basic response first
+                return Ok(new
                 {
-                    return Ok(new LocationUpdateResponse
-                    {
-                        Success = true,
-                        Message = "אין מעקב פעיל",
-                        RequiresAction = false
-                    });
-                }
-
-                // בדיקה אם המשתמש הגיע למרחב המוגן
-                if (trackingResult.HasArrivedAtShelter)
-                {
-                    // סמן את המשתמש כנמצא במרחב
-                    await _allocationService.MarkUserAsArrived(
-                        request.UserId,
-                        trackingResult.ShelterId);
-
-                    return Ok(new LocationUpdateResponse
-                    {
-                        Success = true,
-                        Message = "הגעת למרחב המוגן!",
-                        HasArrived = true,
-                        RequiresAction = false
-                    });
-                }
-
-                // בדיקה אם המשתמש סטה מהנתיב
-                if (trackingResult.HasDeviatedFromRoute)
-                {
-                    // חישוב נתיב מחדש
-                    var newRoute = await _allocationService.RecalculateRoute(
-                        request.UserId,
-                        request.Latitude,
-                        request.Longitude);
-
-                    return Ok(new LocationUpdateResponse
-                    {
-                        Success = true,
-                        Message = "חושב נתיב מחדש",
-                        UpdatedRoute = newRoute,
-                        RequiresAction = true,
-                        ActionType = "ROUTE_UPDATED"
-                    });
-                }
-
-                // המשך רגיל בנתיב
-                return Ok(new LocationUpdateResponse
-                {
-                    Success = true,
-                    Message = "ממשיך במעקב",
-                    DistanceRemaining = trackingResult.DistanceToShelter,
-                    EstimatedTimeRemaining = trackingResult.EstimatedTimeToArrival,
-                    CurrentInstruction = trackingResult.CurrentNavigationInstruction
+                    success = true,
+                    message = "Test successful",
+                    data = request,
+                    timestamp = DateTime.Now
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating location for user {UserId}", request.UserId);
-                return StatusCode(500, new { success = false, message = "שגיאה בעדכון מיקום" });
+                _logger.LogError(ex, "Error in UpdateUserLocation");
+                // Return detailed error for debugging
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "שגיאה בעדכון מיקום",
+                    error = ex.Message,
+                    stackTrace = ex.StackTrace // Remove this in production!
+                });
             }
         }
 
@@ -327,6 +360,68 @@ namespace FC_Server.Controllers
         /// <summary>
         /// קבלת סטטוס תפוסה של מרחבים מוגנים באזור
         /// </summary>
+        // [HttpGet("area-shelters-status")]
+        // public async Task<IActionResult> GetAreaSheltersStatus(
+        //     [FromQuery] double latitude,
+        //     [FromQuery] double longitude,
+        //     [FromQuery] double radiusKm = 2.0)
+        // {
+        //     try
+        //     {
+        //         DBservicesShelter dbShelter = new DBservicesShelter();
+        //         var shelters = dbShelter.GetActiveShelters()
+        //             .Where(s => CalculateDistance(latitude, longitude, s.Latitude, s.Longitude) <= radiusKm)
+        //             .ToList();
+
+        //         var shelterStatuses = new List<ShelterStatusDto>();
+
+        //         foreach (var shelter in shelters)
+        //         {
+        //             var currentOccupancy = GetCurrentOccupancy(shelter.ShelterId);
+        //             var status = new ShelterStatusDto
+        //             {
+        //                 ShelterId = shelter.ShelterId,
+        //                 Name = shelter.Name,
+        //                 Address = shelter.Address,
+        //                 Latitude = shelter.Latitude,
+        //                 Longitude = shelter.Longitude,
+        //                 Capacity = shelter.Capacity,
+        //                 CurrentOccupancy = currentOccupancy,
+        //                 AvailableSpaces = Math.Max(0, shelter.Capacity - currentOccupancy),
+        //                 OccupancyPercentage = shelter.Capacity > 0
+        //                     ? (double)currentOccupancy / shelter.Capacity * 100
+        //                     : 100,
+        //                 Status = GetShelterStatus(currentOccupancy, shelter.Capacity),
+        //                 Distance = CalculateDistance(latitude, longitude, shelter.Latitude, shelter.Longitude)
+        //             };
+
+        //             shelterStatuses.Add(status);
+        //         }
+
+        //         var response = new AreaStatusResponse
+        //         {
+        //             TotalShelters = shelterStatuses.Count,
+        //             AvailableShelters = shelterStatuses.Count(s => s.Status == "Available"),
+        //             FullShelters = shelterStatuses.Count(s => s.Status == "Full"),
+        //             Shelters = shelterStatuses.OrderBy(s => s.Distance).ToList()
+        //         };
+
+        //         return Ok(response);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Error getting area shelter status");
+        //         return StatusCode(500, new
+        //         {
+        //             success = false,
+        //             message = "אירעה שגיאה בקבלת סטטוס המרחבים המוגנים"
+        //         });
+        //     }
+        // }
+
+        /// <summary>
+        ///DEBUGGING GetAreaSheltersStatus
+        /// </summary>
         [HttpGet("area-shelters-status")]
         public async Task<IActionResult> GetAreaSheltersStatus(
             [FromQuery] double latitude,
@@ -335,53 +430,29 @@ namespace FC_Server.Controllers
         {
             try
             {
-                DBservicesShelter dbShelter = new DBservicesShelter();
-                var shelters = dbShelter.GetActiveShelters()
-                    .Where(s => CalculateDistance(latitude, longitude, s.Latitude, s.Longitude) <= radiusKm)
-                    .ToList();
+                _logger.LogInformation($"GetAreaSheltersStatus called: lat={latitude}, lon={longitude}, radius={radiusKm}");
 
-                var shelterStatuses = new List<ShelterStatusDto>();
-
-                foreach (var shelter in shelters)
+                // Test basic response first
+                return Ok(new
                 {
-                    var currentOccupancy = GetCurrentOccupancy(shelter.ShelterId);
-                    var status = new ShelterStatusDto
-                    {
-                        ShelterId = shelter.ShelterId,
-                        Name = shelter.Name,
-                        Address = shelter.Address,
-                        Latitude = shelter.Latitude,
-                        Longitude = shelter.Longitude,
-                        Capacity = shelter.Capacity,
-                        CurrentOccupancy = currentOccupancy,
-                        AvailableSpaces = Math.Max(0, shelter.Capacity - currentOccupancy),
-                        OccupancyPercentage = shelter.Capacity > 0
-                            ? (double)currentOccupancy / shelter.Capacity * 100
-                            : 100,
-                        Status = GetShelterStatus(currentOccupancy, shelter.Capacity),
-                        Distance = CalculateDistance(latitude, longitude, shelter.Latitude, shelter.Longitude)
-                    };
-
-                    shelterStatuses.Add(status);
-                }
-
-                var response = new AreaStatusResponse
-                {
-                    TotalShelters = shelterStatuses.Count,
-                    AvailableShelters = shelterStatuses.Count(s => s.Status == "Available"),
-                    FullShelters = shelterStatuses.Count(s => s.Status == "Full"),
-                    Shelters = shelterStatuses.OrderBy(s => s.Distance).ToList()
-                };
-
-                return Ok(response);
+                    success = true,
+                    message = "Test successful",
+                    latitude = latitude,
+                    longitude = longitude,
+                    radiusKm = radiusKm,
+                    timestamp = DateTime.Now
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting area shelter status");
+                _logger.LogError(ex, "Error in GetAreaSheltersStatus");
+                // Return detailed error for debugging
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = "אירעה שגיאה בקבלת סטטוס המרחבים המוגנים"
+                    message = "אירעה שגיאה בקבלת סטטוס התראות החירום",
+                    error = ex.Message,
+                    stackTrace = ex.StackTrace // Remove this in production!
                 });
             }
         }

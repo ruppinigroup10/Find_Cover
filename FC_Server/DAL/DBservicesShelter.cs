@@ -462,126 +462,84 @@ public class DBservicesShelter
     //--------------------------------------------------------------------------------------------------
     public bool AllocateUserToShelter(int userId, int shelterId, int alertId)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            // First check current occupancy
-            Dictionary<string, object> checkParams = new Dictionary<string, object>();
-            checkParams.Add("@shelterId", shelterId);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetShelterOccupancy", con, checkParams);
-
-            int capacity = 0;
-            int currentOccupancy = 0;
-
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlConnection con = connect("myProjDB"))
             {
-                if (dr.Read())
-                {
-                    capacity = Convert.ToInt32(dr["capacity"]);
-                    currentOccupancy = Convert.ToInt32(dr["current_occupancy"]);
-                }
-            }
+                SqlCommand cmd = new SqlCommand("FC_SP_AllocateUserToShelter", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@userId", userId);
+                cmd.Parameters.AddWithValue("@shelterId", shelterId);
+                cmd.Parameters.AddWithValue("@alertId", alertId);
 
-            // Check if shelter is full
-            if (currentOccupancy >= capacity)
-            {
-                return false;
-            }
+                // Output parameter for result
+                SqlParameter resultParam = new SqlParameter("@result", SqlDbType.Bit);
+                resultParam.Direction = ParameterDirection.Output;
+                cmd.Parameters.Add(resultParam);
 
-            // Allocate user to shelter
-            Dictionary<string, object> allocateParams = new Dictionary<string, object>();
-            allocateParams.Add("@userId", userId);
-            allocateParams.Add("@shelterId", shelterId);
-            allocateParams.Add("@alertId", alertId);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AllocateUserToShelter", con, allocateParams);
-            cmd.ExecuteNonQuery();
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Allocation failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
+                cmd.ExecuteNonQuery();
+                bool result = Convert.ToBoolean(resultParam.Value);
                 con.Close();
+
+                return result;
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error allocating user {userId} to shelter {shelterId}: {ex.Message}");
+            return false;
         }
     }
 
     //--------------------------------------------------------------------------------------------------
     // This method gets the active allocation for a user
     //--------------------------------------------------------------------------------------------------
-    public ShelterAllocation? GetActiveUserAllocation(int userId)
+
+    public UserVisit GetActiveUserAllocation(int userId)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-        ShelterAllocation? allocation = null;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@userId", userId);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveUserAllocation", con, paramDic);
-
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_GetActiveUserAllocation", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@userId", userId);
+
+                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
                 if (dr.Read())
                 {
-                    allocation = new ShelterAllocation
+                    var visit = new UserVisit
                     {
-                        allocation_id = Convert.ToInt32(dr["allocation_id"]),
+                        visit_id = Convert.ToInt32(dr["visit_id"]),
                         user_id = Convert.ToInt32(dr["user_id"]),
                         shelter_id = Convert.ToInt32(dr["shelter_id"]),
-                        alert_id = Convert.ToInt32(dr["alert_id"]),
-                        allocation_time = Convert.ToDateTime(dr["allocation_time"]),
-                        arrival_time = dr["arrival_time"] != DBNull.Value ? Convert.ToDateTime(dr["arrival_time"]) : null,
-                        exit_time = dr["exit_time"] != DBNull.Value ? Convert.ToDateTime(dr["exit_time"]) : null,
-                        status = dr["status"].ToString() ?? "EN_ROUTE",
-                        is_active = Convert.ToBoolean(dr["is_active"]),
-                        walking_distance = dr["walking_distance"] != DBNull.Value ? Convert.ToDouble(dr["walking_distance"]) : null,
-                        actual_walking_time = dr["actual_walking_time"] != DBNull.Value ? Convert.ToInt32(dr["actual_walking_time"]) : null
+                        alert_id = dr["alert_id"] != DBNull.Value ? Convert.ToInt32(dr["alert_id"]) : 0,
+                        arrival_time = dr["arrival_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["arrival_time"]) : (DateTime?)null,
+                        departure_time = dr["departure_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["departure_time"]) : (DateTime?)null,
+                        status = dr["status"] != DBNull.Value ? dr["status"].ToString() : "EN_ROUTE",
+                        distance_to_shelter = dr["distance_to_shelter"] != DBNull.Value ?
+                            Convert.ToDouble(dr["distance_to_shelter"]) : (double?)null,
+                        confirmed_arrival = dr["confirmed_arrival"] != DBNull.Value ?
+                            Convert.ToBoolean(dr["confirmed_arrival"]) : false,
+                        walking_distance = dr["walking_distance"] != DBNull.Value ?
+                            Convert.ToDouble(dr["walking_distance"]) : (double?)null,
+                        route_polyline = dr["route_polyline"] != DBNull.Value ?
+                            dr["route_polyline"].ToString() : null
                     };
+                    con.Close();
+                    return visit;
                 }
+                con.Close();
+                return null;
             }
-
-            return allocation;
         }
         catch (Exception ex)
         {
-            throw new Exception("Get active allocation failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
-                con.Close();
-            }
+            Console.WriteLine($"Error getting active allocation for user {userId}: {ex.Message}");
+            throw;
         }
     }
 
@@ -590,79 +548,48 @@ public class DBservicesShelter
     //--------------------------------------------------------------------------------------------------
     public void UpdateVisitStatus(int userId, int shelterId, string status)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@userId", userId);
-            paramDic.Add("@shelterId", shelterId);
-            paramDic.Add("@status", status);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateVisitStatus", con, paramDic);
-
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Update visit status failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_UpdateVisitStatus", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@userId", userId);
+                cmd.Parameters.AddWithValue("@shelterId", shelterId);
+                cmd.Parameters.AddWithValue("@status", status);
+
+                cmd.ExecuteNonQuery();
                 con.Close();
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating visit status: {ex.Message}");
+            throw;
         }
     }
 
     //--------------------------------------------------------------------------------------------------
     // This method releases a user from a shelter
     //--------------------------------------------------------------------------------------------------
-    public bool ReleaseUserFromShelter(int userId)
+    public void ReleaseUserFromShelter(int userId)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@userId", userId);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_ReleaseUserFromShelter", con, paramDic);
-
-            int rowsAffected = cmd.ExecuteNonQuery();
-            return rowsAffected > 0;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Release failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_ReleaseUserFromShelter", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@userId", userId);
+
+                cmd.ExecuteNonQuery();
                 con.Close();
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error releasing user {userId}: {ex.Message}");
+            throw;
         }
     }
 
@@ -671,111 +598,136 @@ public class DBservicesShelter
     //--------------------------------------------------------------------------------------------------
     public int GetCurrentOccupancy(int shelterId)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-        int occupancy = 0;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@shelterId", shelterId);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetCurrentOccupancy", con, paramDic);
-
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_GetShelterOccupancy", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@shelterId", shelterId);
+
+                SqlDataReader dr = cmd.ExecuteReader();
+                int count = 0;
                 if (dr.Read())
                 {
-                    occupancy = Convert.ToInt32(dr["occupancy"]);
+                    count = Convert.ToInt32(dr["occupancy_count"]);
                 }
+                con.Close();
+                return count;
             }
-
-            return occupancy;
         }
         catch (Exception ex)
         {
-            throw new Exception("Get occupancy failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
-                con.Close();
-            }
+            Console.WriteLine($"Error getting occupancy for shelter {shelterId}: {ex.Message}");
+            return 0;
         }
     }
-
 
     //--------------------------------------------------------------------------------------------------
     // This method gets all active shelters
     //--------------------------------------------------------------------------------------------------
     public List<Shelter> GetActiveShelters()
     {
-        SqlConnection con;
-        SqlCommand cmd;
         List<Shelter> shelters = new List<Shelter>();
 
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveShelters", con, null);
-
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_GetActiveShelters", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
                 while (dr.Read())
                 {
-                    Shelter shelter = new Shelter
+                    shelters.Add(new Shelter
                     {
                         ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                        ShelterType = dr["shelter_type"].ToString() ?? "",
-                        Name = dr["name"].ToString() ?? "",
-                        Latitude = Convert.ToSingle(dr["latitude"]),
-                        Longitude = Convert.ToSingle(dr["longitude"]),
-                        Address = dr["address"].ToString() ?? "",
+                        ProviderId = Convert.ToInt32(dr["provider_id"]),
+                        ShelterType = dr["shelter_type"].ToString(),
+                        Name = dr["name"].ToString(),
+                        Latitude = (float)Convert.ToDouble(dr["latitude"]),
+                        Longitude = (float)Convert.ToDouble(dr["longitude"]),
+                        Address = dr["address"].ToString(),
                         Capacity = Convert.ToInt32(dr["capacity"]),
-                        AdditionalInformation = dr["additional_information"].ToString() ?? "",
-                        ProviderId = dr["provider_id"] != DBNull.Value ? Convert.ToInt32(dr["provider_id"]) : 0,
                         IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
                         PetsFriendly = Convert.ToBoolean(dr["pets_friendly"]),
                         IsActive = Convert.ToBoolean(dr["is_active"]),
+                        AdditionalInformation = dr["additional_information"]?.ToString(),
+                        CreatedAt = Convert.ToDateTime(dr["created_at"]),
+                        LastUpdated = Convert.ToDateTime(dr["last_updated"])
+                    });
+                }
+                con.Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting active shelters: {ex.Message}");
+            throw;
+        }
+
+        return shelters;
+    }
+
+
+    //--------------------------------------------------------------------------------------------------
+    // Get shelters within radius using stored procedure
+    //--------------------------------------------------------------------------------------------------
+
+    public List<Shelter> GetSheltersInRadius(double latitude, double longitude, double radiusKm)
+    {
+        List<Shelter> shelters = new List<Shelter>();
+
+        try
+        {
+            using (SqlConnection con = connect("myProjDB"))
+            {
+                SqlCommand cmd = new SqlCommand("FC_SP_GetSheltersInRadius", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@latitude", latitude);
+                cmd.Parameters.AddWithValue("@longitude", longitude);
+                cmd.Parameters.AddWithValue("@radiusKm", radiusKm);
+
+                SqlDataReader dr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+
+                while (dr.Read())
+                {
+                    var shelter = new Shelter
+                    {
+                        ShelterId = Convert.ToInt32(dr["shelter_id"]),
+                        ProviderId = Convert.ToInt32(dr["provider_id"]),
+                        ShelterType = dr["shelter_type"].ToString(),
+                        Name = dr["name"].ToString(),
+                        Latitude = (float)Convert.ToDouble(dr["latitude"]),
+                        Longitude = (float)Convert.ToDouble(dr["longitude"]),
+                        Address = dr["address"].ToString(),
+                        Capacity = Convert.ToInt32(dr["capacity"]),
+                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                        PetsFriendly = Convert.ToBoolean(dr["pets_friendly"]),
+                        IsActive = Convert.ToBoolean(dr["is_active"]),
+                        AdditionalInformation = dr["additional_information"]?.ToString(),
                         CreatedAt = Convert.ToDateTime(dr["created_at"]),
                         LastUpdated = Convert.ToDateTime(dr["last_updated"])
                     };
 
+                    // The stored procedure also returns distance
+                    // You might want to add a Distance property to your Shelter model
+                    // or create a ShelterWithDistance class
+
                     shelters.Add(shelter);
                 }
-            }
-
-            return shelters;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Get active shelters failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
-            {
                 con.Close();
             }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting shelters in radius: {ex.Message}");
+            throw;
+        }
+
+        return shelters;
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -783,38 +735,23 @@ public class DBservicesShelter
     //--------------------------------------------------------------------------------------------------
     public void UpdateAllocationStatus(int userId, string status)
     {
-        SqlConnection con;
-        SqlCommand cmd;
-
         try
         {
-            con = connect("myProjDB");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Database connection error: " + ex.Message);
-        }
-
-        try
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@userId", userId);
-            paramDic.Add("@status", status);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_UpdateAllocationStatus", con, paramDic);
-
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Update allocation status failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            using (SqlConnection con = connect("myProjDB"))
             {
+                SqlCommand cmd = new SqlCommand("FC_SP_UpdateAllocationStatus", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@userId", userId);
+                cmd.Parameters.AddWithValue("@status", status);
+
+                cmd.ExecuteNonQuery();
                 con.Close();
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating allocation status: {ex.Message}");
+            throw;
         }
     }
 
