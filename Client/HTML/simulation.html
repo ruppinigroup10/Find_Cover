@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emergency Response Controller - בדיקת מערכת</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial,
+          sans-serif;
+        background-color: #f0f0f0;
+        direction: rtl;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .test-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .test-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .endpoint-test {
+        background: #f5f5f5;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #2196f3;
+      }
+
+      .endpoint-test.active {
+        background: #e3f2fd;
+        border-left-color: #ff9800;
+      }
+
+      .endpoint-test.success {
+        background: #e8f5e9;
+        border-left-color: #4caf50;
+      }
+
+      .endpoint-test.error {
+        background: #ffebee;
+        border-left-color: #f44336;
+      }
+
+      h3 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .endpoint-url {
+        font-family: monospace;
+        background: #e0e0e0;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin: 10px 0;
+      }
+
+      .params {
+        margin: 10px 0;
+      }
+
+      .param-group {
+        margin: 5px 0;
+      }
+
+      label {
+        display: inline-block;
+        width: 120px;
+        font-weight: bold;
+        color: #666;
+      }
+
+      input[type="number"],
+      input[type="text"] {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        width: 200px;
+      }
+
+      button {
+        background: #2196f3;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+
+      button:hover {
+        background: #1976d2;
+      }
+
+      button.danger {
+        background: #d32f2f;
+      }
+
+      button.success {
+        background: #4caf50;
+      }
+
+      .response-box {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        display: none;
+      }
+
+      .response-box.show {
+        display: block;
+      }
+
+      #map {
+        height: 400px;
+        width: 100%;
+        margin-top: 20px;
+        border-radius: 8px;
+      }
+
+      .alert-simulation {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        margin-left: 10px;
+      }
+
+      .status-badge.success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .status-badge.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .status-badge.warning {
+        background: #fff3cd;
+        color: #856404;
+      }
+
+      .log-container {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        padding: 5px 0;
+        font-size: 12px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .log-entry.info {
+        color: #2196f3;
+      }
+
+      .log-entry.success {
+        color: #4caf50;
+      }
+
+      .log-entry.error {
+        color: #f44336;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-top: 20px;
+      }
+
+      .stat-card {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2196f3;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>בדיקת EmergencyResponseController</h1>
+        <p>בדיקת כל הנתיבים (endpoints) של מערכת החירום</p>
+      </div>
+
+      <div class="test-grid">
+        <!-- Left Column - Main Tests -->
+        <div>
+          <!-- Get Shelter Route Test -->
+          <div class="test-section">
+            <h2>1. קבלת נתיב למרחב מוגן</h2>
+            <div class="endpoint-test" id="test1">
+              <h3>POST: /api/EmergencyResponse/get-shelter-route</h3>
+              <div class="endpoint-url">
+                /api/EmergencyResponse/get-shelter-route
+              </div>
+
+              <div class="params">
+                <div class="param-group">
+                  <label>User ID:</label>
+                  <input type="number" id="userId1" value="1" />
+                </div>
+                <div class="param-group">
+                  <label>Latitude:</label>
+                  <input
+                    type="number"
+                    id="lat1"
+                    value="32.8156"
+                    step="0.0001"
+                  />
+                </div>
+                <div class="param-group">
+                  <label>Longitude:</label>
+                  <input
+                    type="number"
+                    id="lng1"
+                    value="34.9892"
+                    step="0.0001"
+                  />
+                </div>
+              </div>
+
+              <button onclick="testGetShelterRoute()">בדוק נתיב למקלט</button>
+              <div class="response-box" id="response1"></div>
+            </div>
+          </div>
+
+          <!-- Update Location Test -->
+          <div class="test-section">
+            <h2>2. עדכון מיקום משתמש</h2>
+            <div class="endpoint-test" id="test2">
+              <h3>POST: /api/EmergencyResponse/update-location</h3>
+              <div class="endpoint-url">
+                /api/EmergencyResponse/update-location
+              </div>
+
+              <div class="params">
+                <div class="param-group">
+                  <label>User ID:</label>
+                  <input type="number" id="userId2" value="1" />
+                </div>
+                <div class="param-group">
+                  <label>Latitude:</label>
+                  <input
+                    type="number"
+                    id="lat2"
+                    value="32.8160"
+                    step="0.0001"
+                  />
+                </div>
+                <div class="param-group">
+                  <label>Longitude:</label>
+                  <input
+                    type="number"
+                    id="lng2"
+                    value="34.9895"
+                    step="0.0001"
+                  />
+                </div>
+              </div>
+
+              <button onclick="testUpdateLocation()">עדכן מיקום</button>
+              <div class="response-box" id="response2"></div>
+            </div>
+          </div>
+
+          <!-- Check Emergency Status Test -->
+          <div class="test-section">
+            <h2>3. בדיקת סטטוס חירום</h2>
+            <div class="endpoint-test" id="test3">
+              <h3>GET: /api/EmergencyResponse/check-emergency-status</h3>
+              <div class="endpoint-url">
+                /api/EmergencyResponse/check-emergency-status?userId={userId}
+              </div>
+
+              <div class="params">
+                <div class="param-group">
+                  <label>User ID:</label>
+                  <input type="number" id="userId3" value="1" />
+                </div>
+              </div>
+
+              <button onclick="testCheckEmergencyStatus()">בדוק סטטוס</button>
+              <div class="response-box" id="response3"></div>
+            </div>
+          </div>
+
+          <!-- Area Shelters Status Test -->
+          <div class="test-section">
+            <h2>4. סטטוס מקלטים באזור</h2>
+            <div class="endpoint-test" id="test4">
+              <h3>GET: /api/EmergencyResponse/area-shelters-status</h3>
+              <div class="endpoint-url">
+                /api/EmergencyResponse/area-shelters-status?latitude={lat}&longitude={lng}&radiusKm={radius}
+              </div>
+
+              <div class="params">
+                <div class="param-group">
+                  <label>Latitude:</label>
+                  <input
+                    type="number"
+                    id="lat4"
+                    value="32.8156"
+                    step="0.0001"
+                  />
+                </div>
+                <div class="param-group">
+                  <label>Longitude:</label>
+                  <input
+                    type="number"
+                    id="lng4"
+                    value="34.9892"
+                    step="0.0001"
+                  />
+                </div>
+                <div class="param-group">
+                  <label>Radius (km):</label>
+                  <input type="number" id="radius4" value="2.0" step="0.1" />
+                </div>
+              </div>
+
+              <button onclick="testAreaSheltersStatus()">
+                בדוק מקלטים באזור
+              </button>
+              <div class="response-box" id="response4"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column - Simulation & Map -->
+        <div>
+          <!-- Alert Simulation -->
+          <div class="test-section alert-simulation">
+            <h2>סימולציית התראה מלאה</h2>
+            <p>הרץ סימולציה של תרחיש התראה מלא - מקבלת התראה ועד הגעה למקלט</p>
+
+            <div class="params">
+              <div class="param-group">
+                <label>User ID:</label>
+                <input type="number" id="simUserId" value="1" />
+              </div>
+              <div class="param-group">
+                <label>מיקום התחלתי:</label>
+                <input
+                  type="number"
+                  id="simLat"
+                  value="32.8156"
+                  step="0.0001"
+                />
+                <input
+                  type="number"
+                  id="simLng"
+                  value="34.9892"
+                  step="0.0001"
+                />
+              </div>
+            </div>
+
+            <button class="danger" onclick="runFullSimulation()">
+              🚨 הפעל סימולציה
+            </button>
+            <button onclick="stopSimulation()">עצור סימולציה</button>
+
+            <div class="log-container" id="simLog"></div>
+          </div>
+
+          <!-- Map -->
+          <div class="test-section">
+            <h2>מפת בדיקה</h2>
+            <div id="map"></div>
+          </div>
+
+          <!-- Statistics -->
+          <div class="test-section">
+            <h2>סטטיסטיקות</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value" id="statTests">0</div>
+                <div class="stat-label">בדיקות שבוצעו</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="statSuccess">0</div>
+                <div class="stat-label">בדיקות הצליחו</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="statErrors">0</div>
+                <div class="stat-label">שגיאות</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="statAvgTime">0ms</div>
+                <div class="stat-label">זמן תגובה ממוצע</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Global variables
+      let map;
+      let markers = [];
+      let simulationInterval;
+      let stats = {
+        tests: 0,
+        success: 0,
+        errors: 0,
+        totalTime: 0,
+      };
+
+      // Initialize map
+      function initMap() {
+        map = L.map("map").setView([32.8156, 34.9892], 14);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors",
+        }).addTo(map);
+      }
+
+      // Helper function to make API calls
+      async function callApi(method, url, body = null) {
+        const startTime = Date.now();
+        stats.tests++;
+        updateStats();
+
+        try {
+          const options = {
+            method: method,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          };
+
+          if (body) {
+            options.body = JSON.stringify(body);
+          }
+
+          const response = await fetch(url, options);
+          const data = await response.json();
+          const responseTime = Date.now() - startTime;
+
+          stats.totalTime += responseTime;
+
+          if (response.ok) {
+            stats.success++;
+          } else {
+            stats.errors++;
+          }
+
+          updateStats();
+
+          return {
+            success: response.ok,
+            status: response.status,
+            data: data,
+            responseTime: responseTime,
+          };
+        } catch (error) {
+          stats.errors++;
+          updateStats();
+          return {
+            success: false,
+            error: error.message,
+            responseTime: Date.now() - startTime,
+          };
+        }
+      }
+
+      // Update statistics display
+      function updateStats() {
+        document.getElementById("statTests").textContent = stats.tests;
+        document.getElementById("statSuccess").textContent = stats.success;
+        document.getElementById("statErrors").textContent = stats.errors;
+        document.getElementById("statAvgTime").textContent =
+          stats.tests > 0
+            ? Math.round(stats.totalTime / stats.tests) + "ms"
+            : "0ms";
+      }
+
+      // Display response in UI
+      function displayResponse(elementId, testId, result) {
+        const responseBox = document.getElementById(elementId);
+        const testBox = document.getElementById(testId);
+
+        responseBox.classList.add("show");
+        testBox.classList.remove("active", "success", "error");
+
+        if (result.success) {
+          testBox.classList.add("success");
+          responseBox.style.borderLeft = "4px solid #4caf50";
+        } else {
+          testBox.classList.add("error");
+          responseBox.style.borderLeft = "4px solid #f44336";
+        }
+
+        responseBox.textContent = JSON.stringify(result, null, 2);
+      }
+
+      // Log to simulation console
+      function simLog(message, type = "info") {
+        const logContainer = document.getElementById("simLog");
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        const time = new Date().toLocaleTimeString("he-IL");
+        entry.textContent = `[${time}] ${message}`;
+        logContainer.appendChild(entry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      // Test functions
+      async function testGetShelterRoute() {
+        const testId = "test1";
+        document.getElementById(testId).classList.add("active");
+
+        const body = {
+          userId: parseInt(document.getElementById("userId1").value),
+          latitude: parseFloat(document.getElementById("lat1").value),
+          longitude: parseFloat(document.getElementById("lng1").value),
+        };
+
+        const result = await callApi(
+          "POST",
+          "https://localhost:7203/api/EmergencyResponse/get-shelter-route",
+          body
+        );
+        displayResponse("response1", testId, result);
+
+        // Show on map if successful
+        if (
+          result.success &&
+          result.data.success &&
+          result.data.shelterDetails
+        ) {
+          clearMarkers();
+
+          // User marker
+          const userMarker = L.marker([body.latitude, body.longitude])
+            .addTo(map)
+            .bindPopup("מיקום משתמש");
+          markers.push(userMarker);
+
+          // Shelter marker
+          const shelter = result.data.shelterDetails;
+          const shelterMarker = L.marker(
+            [shelter.latitude, shelter.longitude],
+            {
+              icon: L.icon({
+                iconUrl:
+                  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiNkMzJmMmYiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNS0xLjEyIDIuNS0yLjUgMi41eiIvPjwvc3ZnPg==",
+                iconSize: [32, 32],
+              }),
+            }
+          )
+            .addTo(map)
+            .bindPopup(shelter.name);
+          markers.push(shelterMarker);
+
+          map.fitBounds([
+            [body.latitude, body.longitude],
+            [shelter.latitude, shelter.longitude],
+          ]);
+        }
+      }
+
+      async function testUpdateLocation() {
+        const testId = "test2";
+        document.getElementById(testId).classList.add("active");
+
+        const body = {
+          userId: parseInt(document.getElementById("userId2").value),
+          latitude: parseFloat(document.getElementById("lat2").value),
+          longitude: parseFloat(document.getElementById("lng2").value),
+        };
+
+        const result = await callApi(
+          "POST",
+          "https://localhost:7203/api/EmergencyResponse/update-location",
+          body
+        );
+        displayResponse("response2", testId, result);
+      }
+
+      async function testCheckEmergencyStatus() {
+        const testId = "test3";
+        document.getElementById(testId).classList.add("active");
+
+        const userId = document.getElementById("userId3").value;
+        const result = await callApi(
+          "GET",
+          `https://localhost:7203/api/EmergencyResponse/check-emergency-status?userId=${userId}`
+        );
+        displayResponse("response3", testId, result);
+      }
+
+      async function testAreaSheltersStatus() {
+        const testId = "test4";
+        document.getElementById(testId).classList.add("active");
+
+        const lat = document.getElementById("lat4").value;
+        const lng = document.getElementById("lng4").value;
+        const radius = document.getElementById("radius4").value;
+
+        const result = await callApi(
+          "GET",
+          `https://localhost:7203/api/EmergencyResponse/area-shelters-status?latitude=${lat}&longitude=${lng}&radiusKm=${radius}`
+        );
+        displayResponse("response4", testId, result);
+
+        // Show shelters on map
+        if (result.success && result.data.shelters) {
+          clearMarkers();
+
+          // Center marker
+          const centerMarker = L.marker([parseFloat(lat), parseFloat(lng)])
+            .addTo(map)
+            .bindPopup("מרכז חיפוש");
+          markers.push(centerMarker);
+
+          // Shelter markers
+          result.data.shelters.forEach((shelter) => {
+            const color =
+              shelter.status === "Full"
+                ? "#f44336"
+                : shelter.status === "AlmostFull"
+                ? "#ff9800"
+                : "#4caf50";
+
+            const marker = L.circleMarker(
+              [shelter.latitude, shelter.longitude],
+              {
+                radius: 8,
+                fillColor: color,
+                color: "#fff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8,
+              }
+            )
+              .addTo(map)
+              .bindPopup(
+                `<strong>${shelter.name}</strong><br>` +
+                  `כתובת: ${shelter.address}<br>` +
+                  `תפוסה: ${shelter.currentOccupancy}/${shelter.capacity}<br>` +
+                  `מרחק: ${shelter.distance.toFixed(2)} ק"מ`
+              );
+            markers.push(marker);
+          });
+
+          // Draw radius circle
+          const circle = L.circle([parseFloat(lat), parseFloat(lng)], {
+            radius: parseFloat(radius) * 1000,
+            color: "#2196f3",
+            fillColor: "#2196f3",
+            fillOpacity: 0.1,
+          }).addTo(map);
+          markers.push(circle);
+
+          map.fitBounds(circle.getBounds());
+        }
+      }
+
+      // Clear all markers from map
+      function clearMarkers() {
+        markers.forEach((marker) => map.removeLayer(marker));
+        markers = [];
+      }
+
+      // Run full simulation
+      async function runFullSimulation() {
+        simLog("מתחיל סימולציה...", "info");
+        clearInterval(simulationInterval);
+
+        const userId = parseInt(document.getElementById("simUserId").value);
+        let lat = parseFloat(document.getElementById("simLat").value);
+        let lng = parseFloat(document.getElementById("simLng").value);
+
+        // Step 1: Get shelter route
+        simLog("שלב 1: מבקש נתיב למקלט...");
+        const routeResult = await callApi(
+          "POST",
+          "https://localhost:7203/api/EmergencyResponse/get-shelter-route",
+          {
+            userId: userId,
+            latitude: lat,
+            longitude: lng,
+          }
+        );
+
+        if (!routeResult.success || !routeResult.data.success) {
+          simLog("שגיאה בקבלת נתיב למקלט", "error");
+          return;
+        }
+
+        simLog(`נמצא מקלט: ${routeResult.data.shelterDetails.name}`, "success");
+        simLog(`מרחק: ${routeResult.data.shelterDetails.distance} מטר`);
+
+        const shelterLat = routeResult.data.shelterDetails.latitude;
+        const shelterLng = routeResult.data.shelterDetails.longitude;
+
+        // Show on map
+        clearMarkers();
+        const userMarker = L.marker([lat, lng])
+          .addTo(map)
+          .bindPopup("מיקום נוכחי");
+        const shelterMarker = L.marker([shelterLat, shelterLng], {
+          icon: L.icon({
+            iconUrl:
+              "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiNkMzJmMmYiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNS0xLjEyIDIuNS0yLjUgMi41eiIvPjwvc3ZnPg==",
+            iconSize: [32, 32],
+          }),
+        })
+          .addTo(map)
+          .bindPopup(routeResult.data.shelterDetails.name);
+        markers.push(userMarker, shelterMarker);
+
+        // Step 2: Simulate movement
+        simLog("שלב 2: מתחיל תנועה למקלט...");
+        let step = 0;
+        const totalSteps = 10;
+
+        simulationInterval = setInterval(async () => {
+          step++;
+
+          // Calculate new position (moving towards shelter)
+          const progress = step / totalSteps;
+          lat = lat + (shelterLat - lat) * 0.1;
+          lng = lng + (shelterLng - lng) * 0.1;
+
+          // Update location
+          const updateResult = await callApi(
+            "POST",
+            "https://localhost:7203/api/EmergencyResponse/update-location",
+            {
+              userId: userId,
+              latitude: lat,
+              longitude: lng,
+            }
+          );
+
+          if (updateResult.success) {
+            simLog(`עדכון ${step}: מיקום עודכן`, "info");
+
+            // Update marker position
+            userMarker.setLatLng([lat, lng]);
+
+            if (updateResult.data.hasArrived) {
+              simLog("הגעת למקלט! ✓", "success");
+              clearInterval(simulationInterval);
+
+              // Check final status
+              setTimeout(async () => {
+                simLog("שלב 3: בודק סטטוס סופי...");
+                const statusResult = await callApi(
+                  "GET",
+                  `https://localhost:7203/api/EmergencyResponse/check-emergency-status?userId=${userId}`
+                );
+
+                if (statusResult.success) {
+                  simLog(`סטטוס: ${statusResult.data.userStatus}`, "info");
+                }
+              }, 1000);
+            }
+          }
+
+          if (step >= totalSteps) {
+            clearInterval(simulationInterval);
+            simLog("הסימולציה הסתיימה", "info");
+          }
+        }, 2000);
+      }
+
+      function stopSimulation() {
+        clearInterval(simulationInterval);
+        simLog("הסימולציה נעצרה", "warning");
+      }
+
+      // Initialize on load
+      window.onload = function () {
+        initMap();
+        updateStats();
+      };
+    </script>
+  </body>
+</html>
