@@ -626,6 +626,7 @@ public class DBservicesShelter
     //--------------------------------------------------------------------------------------------------
     // This method gets all active shelters
     //--------------------------------------------------------------------------------------------------
+
     public List<Shelter> GetActiveShelters()
     {
         List<Shelter> shelters = new List<Shelter>();
@@ -644,19 +645,19 @@ public class DBservicesShelter
                     shelters.Add(new Shelter
                     {
                         ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                        ProviderId = Convert.ToInt32(dr["provider_id"]),
-                        ShelterType = dr["shelter_type"].ToString(),
-                        Name = dr["name"].ToString(),
-                        Latitude = (float)Convert.ToDouble(dr["latitude"]),
-                        Longitude = (float)Convert.ToDouble(dr["longitude"]),
-                        Address = dr["address"].ToString(),
-                        Capacity = Convert.ToInt32(dr["capacity"]),
-                        IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
-                        PetsFriendly = Convert.ToBoolean(dr["pets_friendly"]),
-                        IsActive = Convert.ToBoolean(dr["is_active"]),
-                        AdditionalInformation = dr["additional_information"]?.ToString(),
-                        CreatedAt = Convert.ToDateTime(dr["created_at"]),
-                        LastUpdated = Convert.ToDateTime(dr["last_updated"])
+                        ProviderId = dr["provider_id"] != DBNull.Value ? Convert.ToInt32(dr["provider_id"]) : 0,
+                        ShelterType = dr["shelter_type"] != DBNull.Value ? dr["shelter_type"].ToString() : "",
+                        Name = dr["name"] != DBNull.Value ? dr["name"].ToString() : "",
+                        Latitude = dr["latitude"] != DBNull.Value ? (float)Convert.ToDouble(dr["latitude"]) : 0f,
+                        Longitude = dr["longitude"] != DBNull.Value ? (float)Convert.ToDouble(dr["longitude"]) : 0f,
+                        Address = dr["address"] != DBNull.Value ? dr["address"].ToString() : "",
+                        Capacity = dr["capacity"] != DBNull.Value ? Convert.ToInt32(dr["capacity"]) : 0,
+                        IsAccessible = dr["is_accessible"] != DBNull.Value ? Convert.ToBoolean(dr["is_accessible"]) : false,
+                        PetsFriendly = dr["pets_friendly"] != DBNull.Value ? Convert.ToBoolean(dr["pets_friendly"]) : false,
+                        IsActive = dr["is_active"] != DBNull.Value ? Convert.ToBoolean(dr["is_active"]) : true,
+                        AdditionalInformation = dr["additional_information"] != DBNull.Value ? dr["additional_information"].ToString() : "",
+                        CreatedAt = dr["created_at"] != DBNull.Value ? Convert.ToDateTime(dr["created_at"]) : DateTime.Now,
+                        LastUpdated = dr["last_updated"] != DBNull.Value ? Convert.ToDateTime(dr["last_updated"]) : DateTime.Now
                     });
                 }
                 con.Close();
@@ -670,7 +671,6 @@ public class DBservicesShelter
 
         return shelters;
     }
-
 
     //--------------------------------------------------------------------------------------------------
     // Get shelters within radius using stored procedure
