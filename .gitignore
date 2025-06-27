@@ -508,4 +508,11 @@ appsettings.*.json
 msbuild.log
 msbuild.err
 msbuild.wrn
+
+# Firebase keys
+App_Data/keys/
+*.json
+!appsettings.json
+!package.json
+
 >>>>>>> 10952a377d231966cefc6f8fb916ee8ea924bc7a

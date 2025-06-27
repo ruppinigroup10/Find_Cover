@@ -7,8 +7,18 @@ namespace FC_Server.Services
 {
     public class FcmNotificationService
     {
-        private readonly string _serviceAccountPath = "C:\\Users\\HP\\Documents\\GitHub\\Find_Cover\\FC_Server\\App_Data\\keys\\find-cover-34ca3bbecc34.json";
-        private readonly string _projectId = "find-cover";
+        private readonly string _serviceAccountPath;
+        private readonly string _projectId;
+
+        public FcmNotificationService(IConfiguration configuration)
+        {
+            // works on both Mac and Windows
+            _serviceAccountPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                configuration["Firebase:ServiceAccountPath"]
+            );
+            _projectId = configuration["Firebase:ProjectId"];
+        }
 
         public async Task SendNotificationAsync(string title, string body, List<string> topicsOrTokens)
         {

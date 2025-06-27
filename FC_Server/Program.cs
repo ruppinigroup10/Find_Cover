@@ -35,6 +35,7 @@ builder.Services.AddScoped<DBservicesLocation>(provider =>
     var connectionString = configuration.GetConnectionString("myProjDB");
     return new DBservicesLocation(connectionString);
 });
+builder.Services.AddSingleton<FcmNotificationService>();
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
