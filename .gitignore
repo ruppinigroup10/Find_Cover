@@ -511,6 +511,7 @@ msbuild.wrn
 
 # Firebase keys
 App_Data/keys/
+appsettings*.json
 *.json
 !package.json
 !package-lock.json
