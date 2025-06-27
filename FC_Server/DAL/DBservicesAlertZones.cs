@@ -10,7 +10,6 @@ namespace FC_Server.DAL
 {
     public class DBservicesAlertZones
     {
-        // שימוש באותה מתודת חיבור כמו בפרויקט שלך
         public SqlConnection connect(String conString)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()

@@ -1,15 +1,32 @@
 ﻿namespace FC_Server.Models
 {
     /// <summary>
-    /// External API model - represents alerts from tzevaadom.co.il API
+    /// Extended Alert model to support database operations
     /// </summary>
     public class Alert
     {
+        // Keep existing properties:
         public string notificationId { get; set; }
         public long time { get; set; }
         public int threat { get; set; }
         public bool isDrill { get; set; }
         public List<string> cities { get; set; }
+
+        // Add these new properties for database compatibility:
+        public int AlertId { get; set; }
+        public string AlertType { get; set; }
+        public double CenterLatitude { get; set; }
+        public double CenterLongitude { get; set; }
+        public double RadiusKm { get; set; }
+        public DateTime AlertTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public bool IsActive { get; set; }
+        public string Data { get; set; }
+        public string CreatedBy { get; set; }
+        public string AffectedAreas { get; set; }
+
+        // Computed property for compatibility
+        public DateTime StartTime => AlertTime;
     }
 
     /// <summary>

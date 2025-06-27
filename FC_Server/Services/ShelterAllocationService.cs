@@ -159,6 +159,35 @@ namespace FC_Server.Services
         }
 
         /// <summary>
+        /// הקצאת מרחב מוגן למשתמש
+        /// </summary>
+        public async Task<AllocationResult> AllocateShelterForUser(
+    User user,
+    double userLat,
+    double userLon,
+    double centerLat,
+    double centerLon)
+        {
+            // Call your existing method
+            var result = await AllocateShelterForUserAsync(user, userLat, userLon, centerLat, centerLon);
+
+            // Convert ShelterAllocationResult to AllocationResult
+            return new AllocationResult
+            {
+                Success = result.Success,
+                Message = result.Message,
+                AllocatedShelterId = result.AllocatedShelterId,
+                ShelterName = result.ShelterName,
+                Distance = result.Distance,
+                EstimatedArrivalTime = result.EstimatedArrivalTime,
+                RoutePolyline = result.RoutePolyline,
+                RouteInstructions = result.RouteInstructions,
+                ShelterDetails = result.ShelterDetails,
+                RecommendedAction = result.RecommendedAction
+            };
+        }
+
+        /// <summary>
         /// בדיקת הקצאה פעילה למשתמש
         /// </summary>
         public async Task<UserAllocation> GetActiveAllocationForUser(int userId)
@@ -340,50 +369,97 @@ namespace FC_Server.Services
             return dbs.GetCurrentOccupancy(shelterId);
         }
 
+
+
         private async Task<Dictionary<int, double>> CalculateWalkingDistances(
             User user, double userLat, double userLon, List<Shelter> shelters)
         {
             var distances = new Dictionary<int, double>();
 
+            // null/empty check
+            if (user == null)
+            {
+                _logger.LogError("User is null in CalculateWalkingDistances");
+                // Return aerial distances as fallback
+                foreach (var shelter in shelters)
+                {
+                    distances[shelter.ShelterId] = CalculateDistance(userLat, userLon, shelter.Latitude, shelter.Longitude);
+                }
+                return distances;
+            }
+
             // המרת למבנה הנתונים של ServerSimulation
             var personDto = new PersonDto
             {
                 Id = user.UserId,
-                Age = CalculateAge(user.CreatedAt),
+                Age = user.CreatedAt != null ? CalculateAge(user.CreatedAt) : 30, // Default age if CreatedAt is null
                 Latitude = userLat,
                 Longitude = userLon
             };
 
-            var shelterDtos = shelters.Select(s => new ShelterDto
+            var shelterDtos = shelters
+            .Where(s => s != null) // Filter out any null shelters
+            .Select(s => new ShelterDto
             {
                 Id = s.ShelterId,
-                Name = s.Name,
+                Name = s.Name ?? "Unknown Shelter",
                 Latitude = s.Latitude,
                 Longitude = s.Longitude,
                 Capacity = s.Capacity
             }).ToList();
 
-            // קריאה לשירות Google Maps
-            var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(
-                new List<PersonDto> { personDto },
-                shelterDtos);
 
-            // המרת התוצאות
-            if (walkingDistances.ContainsKey(user.UserId.ToString()))
+            // Add check before calling Google Maps
+            if (!shelterDtos.Any())
             {
-                var userDistances = walkingDistances[user.UserId.ToString()];
-                foreach (var shelter in shelters)
+                _logger.LogWarning("No shelter DTOs created for distance calculation");
+                return distances;
+            }
+
+            try
+            {
+                // קריאה לשירות Google Maps
+                var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(
+                    new List<PersonDto> { personDto },
+                    shelterDtos);
+
+                // המרת התוצאות
+                if (walkingDistances != null && walkingDistances.ContainsKey(user.UserId.ToString()))
                 {
-                    if (userDistances.ContainsKey(shelter.ShelterId.ToString()))
+                    var userDistances = walkingDistances[user.UserId.ToString()];
+                    foreach (var shelter in shelters)
                     {
-                        distances[shelter.ShelterId] = userDistances[shelter.ShelterId.ToString()];
+                        if (userDistances.ContainsKey(shelter.ShelterId.ToString()))
+                        {
+                            distances[shelter.ShelterId] = userDistances[shelter.ShelterId.ToString()];
+                        }
+                        else
+                        {
+                            // אם אין מרחק הליכה, חשב מרחק אווירי
+                            distances[shelter.ShelterId] = CalculateDistance(
+                                userLat, userLon, shelter.Latitude, shelter.Longitude);
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    // If Google Maps fails, calculate aerial distances for all shelters
+                    _logger.LogWarning("Google Maps service returned no distances, using aerial calculation");
+                    foreach (var shelter in shelters)
                     {
-                        // אם אין מרחק הליכה, חשב מרחק אווירי
                         distances[shelter.ShelterId] = CalculateDistance(
                             userLat, userLon, shelter.Latitude, shelter.Longitude);
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling Google Maps service, falling back to aerial distances");
+                // Fallback to aerial distances
+                foreach (var shelter in shelters)
+                {
+                    distances[shelter.ShelterId] = CalculateDistance(
+                        userLat, userLon, shelter.Latitude, shelter.Longitude);
                 }
             }
 

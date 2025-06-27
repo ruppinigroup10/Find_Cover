@@ -107,12 +107,12 @@ namespace FC_Server.Controllers
                     return BadRequest(new { success = false, message = "משתמש לא נמצא" });
                 }
 
-                var allocationResult = await _allocationService.AllocateShelterForUserAsync(
-                    user,
-                    request.Latitude,
-                    request.Longitude,
-                    activeAlert.CenterLatitude,
-                    activeAlert.CenterLongitude);
+                var allocationResult = await _allocationService.AllocateShelterForUser(
+    user,
+    request.Latitude,
+    request.Longitude,
+    activeAlert.CenterLatitude,
+    activeAlert.CenterLongitude);
 
                 if (!allocationResult.Success)
                 {

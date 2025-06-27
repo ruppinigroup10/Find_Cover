@@ -785,20 +785,21 @@ public class DBservicesShelter
                 Shelter shelter = new Shelter
                 {
                     ShelterId = Convert.ToInt32(dr["shelter_id"]),
-                    ProviderId = Convert.ToInt32(dr["provider_id"]),
-                    ShelterType = dr["shelter_type"].ToString(),
-                    Name = dr["name"].ToString(),
-                    Latitude = Convert.ToSingle(dr["latitude"]),
-                    Longitude = Convert.ToSingle(dr["longitude"]),
-                    Address = dr["address"].ToString(),
-                    Capacity = Convert.ToInt32(dr["capacity"]),
-                    IsAccessible = Convert.ToBoolean(dr["is_accessible"]),
+                    ProviderId = dr["provider_id"] != DBNull.Value ? Convert.ToInt32(dr["provider_id"]) : 0,
+                    ShelterType = dr["shelter_type"] != DBNull.Value ? dr["shelter_type"].ToString() : "",
+                    Name = dr["name"] != DBNull.Value ? dr["name"].ToString() : "",
+                    Latitude = dr["latitude"] != DBNull.Value ? Convert.ToSingle(dr["latitude"]) : 0f,
+                    Longitude = dr["longitude"] != DBNull.Value ? Convert.ToSingle(dr["longitude"]) : 0f,
+                    Address = dr["address"] != DBNull.Value ? dr["address"].ToString() : "",
+                    Capacity = dr["capacity"] != DBNull.Value ? Convert.ToInt32(dr["capacity"]) : 0,
+                    IsAccessible = dr["is_accessible"] != DBNull.Value ? Convert.ToBoolean(dr["is_accessible"]) : false,
                     PetsFriendly = dr["pets_friendly"] != DBNull.Value ? Convert.ToBoolean(dr["pets_friendly"]) : false,
-                    IsActive = Convert.ToBoolean(dr["is_active"]),
-                    CreatedAt = Convert.ToDateTime(dr["created_at"]),
-                    LastUpdated = Convert.ToDateTime(dr["last_updated"]),
+                    IsActive = dr["is_active"] != DBNull.Value ? Convert.ToBoolean(dr["is_active"]) : true,
+                    CreatedAt = dr["created_at"] != DBNull.Value ? Convert.ToDateTime(dr["created_at"]) : DateTime.Now,
+                    LastUpdated = dr["last_updated"] != DBNull.Value ? Convert.ToDateTime(dr["last_updated"]) : DateTime.Now,
                     AdditionalInformation = dr["additional_information"] != DBNull.Value ? dr["additional_information"].ToString() : ""
                 };
+
 
                 sheltersList.Add(shelter);
             }

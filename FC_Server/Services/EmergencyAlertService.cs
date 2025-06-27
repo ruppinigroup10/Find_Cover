@@ -25,51 +25,23 @@ namespace FC_Server.Services
         /// <summary>
         /// בדיקה אם יש התראה פעילה במיקום מסוים
         /// </summary>
-        public async Task<ActiveEmergencyAlert> GetActiveAlertForLocation(double lat, double lon)
+        public async Task<Alert> GetActiveAlertForLocation(double lat, double lon)
         {
             try
             {
-                // קבלת כל ההתראות הפעילות מה-DB הקיים
-                var activeAlerts = await _dbAlert.GetActiveAlertsAsync();
+                // Call the new method that passes parameters correctly
+                var alert = await _dbAlert.GetActiveAlertForLocation(lat, lon);
 
-                // מצא התראה רלוונטית למיקום
-                foreach (var alert in activeAlerts)
+                if (alert != null)
                 {
-                    // בדוק אם יש נתוני מיקום (אולי צריך להוסיף לטבלה)
-                    if (alert.CenterLatitude != 0 && alert.CenterLongitude != 0 && alert.RadiusKm > 0)
-                    {
-                        var distance = CalculateDistance(lat, lon, alert.CenterLatitude, alert.CenterLongitude);
-                        if (distance <= alert.RadiusKm)
-                        {
-                            return new ActiveEmergencyAlert
-                            {
-                                AlertId = alert.alert_id,
-                                AlertType = alert.alert_type,
-                                CenterLatitude = alert.CenterLatitude,
-                                CenterLongitude = alert.CenterLongitude,
-                                RadiusKm = alert.RadiusKm,
-                                StartTime = alert.created_at,
-                                IsActive = alert.is_active
-                            };
-                        }
-                    }
-                    else
-                    {
-                        // אם אין נתוני מיקום, נניח שההתראה רלוונטית לכולם
-                        return new ActiveEmergencyAlert
-                        {
-                            AlertId = alert.alert_id,
-                            AlertType = alert.alert_type,
-                            CenterLatitude = 31.2518, // ברירת מחדל - באר שבע
-                            CenterLongitude = 34.7913,
-                            RadiusKm = 10, // רדיוס ברירת מחדל
-                            StartTime = alert.created_at,
-                            IsActive = alert.is_active
-                        };
-                    }
+                    _logger.LogInformation($"Found active alert: {alert.AlertType} (ID: {alert.AlertId}) at location ({lat}, {lon})");
+                }
+                else
+                {
+                    _logger.LogInformation($"No active alerts found for location ({lat}, {lon})");
                 }
 
-                return null;
+                return alert;
             }
             catch (Exception ex)
             {

@@ -240,6 +240,63 @@ public class DBservicesAlert
         await Task.Run(() => EndAlert(alertId));
     }
 
+
+    //--------------------------------------------------------------------------------------------------
+    // This method retrieves active alerts for a specific location
+    //--------------------------------------------------------------------------------------------------
+    public async Task<Alert> GetActiveAlertForLocation(double latitude, double longitude)
+    {
+        SqlConnection con = null;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+
+            Dictionary<string, object> paramDic = new Dictionary<string, object>();
+            paramDic.Add("@Latitude", latitude);
+            paramDic.Add("@Longitude", longitude);
+
+            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveAlerts", con, paramDic);
+
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    // Return Alert model (not AlertRecord) for compatibility with EmergencyAlertService
+                    return new Alert
+                    {
+                        // Map the stored procedure results to Alert properties
+                        // Note: Alert class needs to be extended with these properties
+                        AlertId = Convert.ToInt32(dr["AlertId"]),
+                        AlertType = dr["AlertType"]?.ToString() ?? "",
+                        CenterLatitude = dr["CenterLatitude"] != DBNull.Value ? Convert.ToDouble(dr["CenterLatitude"]) : 0,
+                        CenterLongitude = dr["CenterLongitude"] != DBNull.Value ? Convert.ToDouble(dr["CenterLongitude"]) : 0,
+                        RadiusKm = dr["RadiusKm"] != DBNull.Value ? Convert.ToDouble(dr["RadiusKm"]) : 0,
+                        AlertTime = dr["StartTime"] != DBNull.Value ? Convert.ToDateTime(dr["StartTime"]) : DateTime.Now,
+                        EndTime = dr["EndTime"] != DBNull.Value ? Convert.ToDateTime(dr["EndTime"]) : DateTime.Now.AddHours(1),
+                        IsActive = dr["IsActive"] != DBNull.Value ? Convert.ToBoolean(dr["IsActive"]) : false,
+                        Data = dr["Data"]?.ToString(),
+                        CreatedBy = dr["CreatedBy"]?.ToString() ?? "System",
+                        AffectedAreas = dr["AffectedAreas"]?.ToString()
+                    };
+                }
+                return null; // No active alert found
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Get active alert for location failed: " + ex.Message);
+        }
+        finally
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
     #endregion
 
     //--------------------------------------------------------------------------------------------------
@@ -258,6 +315,9 @@ public class DBservicesAlert
         return cmd;
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // Tzeva Adom - Fetching alerts from the Tzeva Adom API
+    //--------------------------------------------------------------------------------------------------
     public async Task<List<Alert>> GetAlertsFromApi()
     {
         using (HttpClient client = new HttpClient())
