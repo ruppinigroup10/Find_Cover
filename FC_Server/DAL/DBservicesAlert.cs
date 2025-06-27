@@ -3,6 +3,7 @@ using System.Data.SqlClient;
 using FC_Server.Models;
 using System.Data;
 using Microsoft.Extensions.Configuration;
+using System.Text;
 
 public class DBservicesAlert
 {
