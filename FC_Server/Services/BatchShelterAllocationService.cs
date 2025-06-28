@@ -21,6 +21,7 @@ namespace FC_Server.Services
         private readonly ILogger<BatchShelterAllocationService> _logger;
         private readonly ConcurrentQueue<AllocationRequest> _pendingRequests = new();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<AllocationResult>> _completionSources = new();
+        private readonly ManualResetEventSlim _processingSignal = new ManualResetEventSlim(false);
 
         // Batch processing settings
         private readonly TimeSpan _batchInterval = TimeSpan.FromSeconds(1); // Process every 1 second
@@ -49,8 +50,8 @@ namespace FC_Server.Services
         /// Public method called by the controller to request shelter allocation
         /// </summary>
         public async Task<AllocationResult> RequestShelterAllocation(
-            User user, double userLat, double userLon,
-            double alertLat, double alertLon, int alertId)
+    User user, double userLat, double userLon,
+    double alertLat, double alertLon, int alertId)
         {
             _logger.LogWarning($"========== RequestShelterAllocation called for user {user.UserId} ==========");
 
@@ -74,28 +75,111 @@ namespace FC_Server.Services
             _pendingRequests.Enqueue(request);
             _logger.LogInformation($"User {user.UserId} added to allocation queue. Queue size: {_pendingRequests.Count}");
 
-            // Check if we should trigger immediate processing
-            if (_pendingRequests.Count >= _minBatchSize)
-            {
-                _logger.LogInformation("Triggering immediate batch processing due to queue size");
-                // Signal the background service to process immediately
-                // (Implementation depends on your background service setup)
-            }
+            // IMPORTANT: Signal the background service to process immediately
+            // Add a manual reset event to trigger immediate processing
+            _processingSignal.Set();
 
-            // Set timeout for the request
-            var timeoutTask = Task.Delay(_maxWaitTime);
+            // Increase timeout to 10 seconds for debugging
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10));
             var completedTask = await Task.WhenAny(completionSource.Task, timeoutTask);
 
             if (completedTask == timeoutTask)
             {
-                _logger.LogWarning($"Timeout waiting for allocation for user {user.UserId}");
+                _logger.LogError($"TIMEOUT waiting for allocation for user {user.UserId} after 10 seconds");
                 _completionSources.TryRemove(user.UserId, out _);
 
-                // Fallback to individual allocation
-                return await FallbackIndividualAllocation(request);
+                // Instead of fallback, try direct allocation
+                return await DirectAllocation(request);
             }
 
             return await completionSource.Task;
+        }
+
+        /// <summary>
+        /// Direct allocation method that tries to find a shelter immediately
+        /// </summary>
+        private async Task<AllocationResult> DirectAllocation(AllocationRequest request)
+        {
+            try
+            {
+                _logger.LogWarning($"Using direct allocation for user {request.User.UserId}");
+
+                var dbShelter = new DBservicesShelter();
+                var allShelters = dbShelter.GetActiveShelters();
+
+                if (!allShelters.Any())
+                {
+                    return new AllocationResult
+                    {
+                        Success = false,
+                        Message = "No active shelters available"
+                    };
+                }
+
+                // Find nearest shelter with capacity
+                var nearestShelter = allShelters
+                    .Select(s => new
+                    {
+                        Shelter = s,
+                        Distance = CalculateDistance(request.Latitude, request.Longitude, s.Latitude, s.Longitude),
+                        CurrentOccupancy = dbShelter.GetCurrentOccupancy(s.ShelterId)
+                    })
+                    .Where(x => x.CurrentOccupancy < x.Shelter.Capacity && x.Distance <= MAX_DISTANCE_KM)
+                    .OrderBy(x => x.Distance)
+                    .FirstOrDefault();
+
+                if (nearestShelter == null)
+                {
+                    return new AllocationResult
+                    {
+                        Success = false,
+                        Message = "No available shelter within walking distance",
+                        RecommendedAction = "Seek alternative shelter"
+                    };
+                }
+
+                // Allocate directly
+                var allocated = dbShelter.AllocateUserToShelter(
+                    request.User.UserId,
+                    nearestShelter.Shelter.ShelterId,
+                    request.AlertId);
+
+                if (allocated)
+                {
+                    var route = await GetWalkingRoute(
+                        request.Latitude, request.Longitude,
+                        nearestShelter.Shelter.Latitude, nearestShelter.Shelter.Longitude);
+
+                    return new AllocationResult
+                    {
+                        Success = true,
+                        Message = "Allocated successfully (direct)",
+                        AllocatedShelterId = nearestShelter.Shelter.ShelterId,
+                        ShelterName = nearestShelter.Shelter.Name,
+                        Distance = nearestShelter.Distance,
+                        EstimatedArrivalTime = CalculateArrivalTime(nearestShelter.Distance),
+                        RoutePolyline = route?.OverviewPolyline,
+                        RouteInstructions = route?.TextInstructions,
+                        ShelterDetails = ConvertToShelterDetailsDto(nearestShelter.Shelter)
+                    };
+                }
+
+                return new AllocationResult
+                {
+                    Success = false,
+                    Message = "Failed to allocate shelter"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in direct allocation");
+                return new AllocationResult
+                {
+                    Success = false,
+                    Message = "Allocation error - please try again",
+                    RecommendedAction = "Retry or seek alternative shelter"
+                };
+            }
         }
 
         /// <summary>
@@ -112,24 +196,26 @@ namespace FC_Server.Services
 
                 _logger.LogWarning("========== BatchShelterAllocationService background loop starting ==========");
 
-
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     try
                     {
+                        // Wait for signal OR timeout
+                        var signaled = await Task.Run(() =>
+                            _processingSignal.Wait(_batchInterval, stoppingToken),
+                            stoppingToken);
 
-                        await Task.Delay(_batchInterval, stoppingToken);
+                        // Reset the signal
+                        _processingSignal.Reset();
 
                         if (_pendingRequests.Count > 0)
                         {
-                            _logger.LogWarning($"========== PROCESSING BATCH: {_pendingRequests.Count} requests ==========");
+                            _logger.LogWarning($"========== PROCESSING BATCH: {_pendingRequests.Count} requests (signaled: {signaled}) ==========");
+                            await ProcessBatch();
                         }
-
-                        await ProcessBatch();
                     }
                     catch (OperationCanceledException)
                     {
-                        // This is expected when the service is stopping
                         _logger.LogInformation("Batch processing loop canceled");
                         break;
                     }
@@ -142,7 +228,6 @@ namespace FC_Server.Services
             }
             catch (OperationCanceledException)
             {
-                // This is expected during shutdown
                 _logger.LogInformation("BatchShelterAllocationService ExecuteAsync was canceled");
             }
             catch (Exception ex)
@@ -706,6 +791,12 @@ namespace FC_Server.Services
             Task MarkUserAsArrived(int userId, int shelterId);
             Task ReleaseUserFromShelter(int userId);
             Task UpdateUserAllocationStatus(int userId, string status);
+        }
+
+        public override void Dispose()
+        {
+            _processingSignal?.Dispose();
+            base.Dispose();
         }
     }
 }

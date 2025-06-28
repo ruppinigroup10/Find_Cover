@@ -25,11 +25,11 @@ namespace FC_Server.Services
         /// <summary>
         /// בדיקה אם יש התראה פעילה במיקום מסוים
         /// </summary>
-        public async Task<Alert> GetActiveAlertForLocation(double lat, double lon)
+        public async Task<ActiveAlert> GetActiveAlertForLocation(double lat, double lon)
         {
             try
             {
-                // Call the new method that passes parameters correctly
+                // Call the method that returns ActiveAlert
                 var alert = await _dbAlert.GetActiveAlertForLocation(lat, lon);
 
                 if (alert != null)
@@ -53,31 +53,20 @@ namespace FC_Server.Services
         /// <summary>
         /// קבלת סטטוס התראה
         /// </summary>
-        public async Task<EmergencyAlertStatus> GetAlertStatus(int alertId)
+        public async Task<AlertStatus> GetAlertStatus(int alertId)
         {
             try
             {
-                var alert = _dbAlert.GetAlertById(alertId);
-                if (alert == null)
-                {
-                    return null;
-                }
-
-                return new EmergencyAlertStatus
-                {
-                    AlertId = alert.alert_id,
-                    IsActive = alert.is_active,
-                    StartTime = alert.created_at,
-                    EndTime = alert.end_time,
-                    AffectedUsers = await GetAffectedUsersCount(alertId)
-                };
+                var status = await _dbAlert.GetAlertStatus(alertId);
+                return status;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting alert status for alert {AlertId}", alertId);
-                throw;
+                return null;
             }
         }
+
 
         /// <summary>
         /// יצירת התראה חדשה

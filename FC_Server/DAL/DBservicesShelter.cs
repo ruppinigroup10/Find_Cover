@@ -819,5 +819,154 @@ public class DBservicesShelter
         }
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // Get Active User Allocation For Alert - Updated to use Stored Procedure
+    //--------------------------------------------------------------------------------------------------
+    public UserVisit GetActiveUserAllocationForAlert(int userId, int alertId)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+        UserVisit userVisit = null;
+
+        try
+        {
+            con = connect("myProjDB"); // This already opens the connection
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@userId", userId);
+        paramDic.Add("@alertId", alertId);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveUserAllocationForAlert", con, paramDic);
+
+        try
+        {
+            using (SqlDataReader dr = cmd.ExecuteReader())
+            {
+                if (dr.Read())
+                {
+                    userVisit = new UserVisit
+                    {
+                        visit_id = Convert.ToInt32(dr["visit_id"]),
+                        user_id = Convert.ToInt32(dr["user_id"]),
+                        shelter_id = Convert.ToInt32(dr["shelter_id"]),
+                        alert_id = dr["alert_id"] != DBNull.Value ? Convert.ToInt32(dr["alert_id"]) : 0,
+                        arrival_time = dr["arrival_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["arrival_time"]) : (DateTime?)null,
+                        departure_time = dr["departure_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["departure_time"]) : (DateTime?)null,
+                        status = dr["status"] != DBNull.Value ? dr["status"].ToString() : "EN_ROUTE",
+                        distance_to_shelter = dr["distance_to_shelter"] != DBNull.Value ?
+                            Convert.ToDouble(dr["distance_to_shelter"]) : (double?)null,
+                        confirmed_arrival = dr["confirmed_arrival"] != DBNull.Value ?
+                            Convert.ToBoolean(dr["confirmed_arrival"]) : false,
+                        walking_distance = dr["walking_distance"] != DBNull.Value ?
+                            Convert.ToDouble(dr["walking_distance"]) : (double?)null,
+                        route_polyline = dr["route_polyline"] != DBNull.Value ?
+                            dr["route_polyline"].ToString() : null
+                    };
+                }
+            }
+            return userVisit;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting active allocation for user {userId} and alert {alertId}: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Clear Old Allocations
+    //--------------------------------------------------------------------------------------------------
+    public void ClearOldAllocations(int userId)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB"); // This already opens the connection
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@userId", userId);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_ClearOldAllocations", con, paramDic);
+
+        try
+        {
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing old allocations for user {userId}: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Mark User As Arrived - for BatchShelterAllocationService
+    //--------------------------------------------------------------------------------------------------
+    public void MarkUserAsArrived(int userId, int shelterId)
+    {
+        SqlConnection con;
+        SqlCommand cmd;
+
+        try
+        {
+            con = connect("myProjDB");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Database connection error: " + ex.Message);
+        }
+
+        Dictionary<string, object> paramDic = new Dictionary<string, object>();
+        paramDic.Add("@userId", userId);
+        paramDic.Add("@shelterId", shelterId);
+
+        cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_MarkUserAsArrived", con, paramDic);
+
+        try
+        {
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error marking user {userId} as arrived at shelter {shelterId}: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            if (con != null && con.State == ConnectionState.Open)
+            {
+                con.Close();
+            }
+        }
+    }
+
     #endregion
 }

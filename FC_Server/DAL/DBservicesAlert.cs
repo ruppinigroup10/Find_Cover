@@ -253,57 +253,119 @@ public class DBservicesAlert
     //--------------------------------------------------------------------------------------------------
     // This method retrieves active alerts for a specific location
     //--------------------------------------------------------------------------------------------------
-    public async Task<Alert> GetActiveAlertForLocation(double latitude, double longitude)
+    public async Task<ActiveAlert> GetActiveAlertForLocation(double latitude, double longitude)
     {
-        SqlConnection con = null;
-        SqlCommand cmd;
-
-        try
+        return await Task.Run(() =>
         {
-            con = connect("myProjDB");
+            SqlConnection con = null;
+            SqlCommand cmd;
+            ActiveAlert activeAlert = null;
 
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@Latitude", latitude);
-            paramDic.Add("@Longitude", longitude);
-
-            cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveAlerts", con, paramDic);
-
-            using (SqlDataReader dr = cmd.ExecuteReader())
+            try
             {
-                if (dr.Read())
+                con = connect("myProjDB");
+
+                Dictionary<string, object> paramDic = new Dictionary<string, object>();
+                paramDic.Add("@userLatitude", latitude);
+                paramDic.Add("@userLongitude", longitude);
+
+                // Use the correct stored procedure
+                cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveAlertForLocation", con, paramDic);
+
+                using (SqlDataReader dr = cmd.ExecuteReader())
                 {
-                    // Return Alert model (not AlertRecord) for compatibility with EmergencyAlertService
-                    return new Alert
+                    if (dr.Read() && dr["alert_id"] != DBNull.Value)
                     {
-                        // Map the stored procedure results to Alert properties
-                        // Note: Alert class needs to be extended with these properties
-                        AlertId = Convert.ToInt32(dr["AlertId"]),
-                        AlertType = dr["AlertType"]?.ToString() ?? "",
-                        CenterLatitude = dr["CenterLatitude"] != DBNull.Value ? Convert.ToDouble(dr["CenterLatitude"]) : 0,
-                        CenterLongitude = dr["CenterLongitude"] != DBNull.Value ? Convert.ToDouble(dr["CenterLongitude"]) : 0,
-                        RadiusKm = dr["RadiusKm"] != DBNull.Value ? Convert.ToDouble(dr["RadiusKm"]) : 0,
-                        AlertTime = dr["StartTime"] != DBNull.Value ? Convert.ToDateTime(dr["StartTime"]) : DateTime.Now,
-                        EndTime = dr["EndTime"] != DBNull.Value ? Convert.ToDateTime(dr["EndTime"]) : DateTime.Now.AddHours(1),
-                        IsActive = dr["IsActive"] != DBNull.Value ? Convert.ToBoolean(dr["IsActive"]) : false,
-                        Data = dr["Data"]?.ToString(),
-                        CreatedBy = dr["CreatedBy"]?.ToString() ?? "System",
-                        AffectedAreas = dr["AffectedAreas"]?.ToString()
-                    };
+                        activeAlert = new ActiveAlert
+                        {
+                            AlertId = Convert.ToInt32(dr["alert_id"]),
+                            AlertTime = Convert.ToDateTime(dr["alert_time"]),
+                            EndTime = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : (DateTime?)null,
+                            AlertType = dr["alert_type"]?.ToString() ?? "rocket",
+                            Data = dr["data"]?.ToString(),
+                            IsActive = Convert.ToBoolean(dr["is_active"]),
+                            CenterLatitude = dr["center_latitude"] != DBNull.Value ? Convert.ToDouble(dr["center_latitude"]) : latitude,
+                            CenterLongitude = dr["center_longitude"] != DBNull.Value ? Convert.ToDouble(dr["center_longitude"]) : longitude,
+                            RadiusKm = dr["radius_km"] != DBNull.Value ? Convert.ToDouble(dr["radius_km"]) : 10.0,
+                            CreatedBy = dr["created_by"]?.ToString()
+                        };
+
+                        // Handle optional fields that might come from joined tables
+                        var fieldNames = Enumerable.Range(0, dr.FieldCount).Select(dr.GetName).ToList();
+
+                        if (fieldNames.Contains("area_name") && dr["area_name"] != DBNull.Value)
+                            activeAlert.AreaName = dr["area_name"].ToString();
+
+                        if (fieldNames.Contains("response_time_seconds") && dr["response_time_seconds"] != DBNull.Value)
+                            activeAlert.ResponseTimeSeconds = Convert.ToInt32(dr["response_time_seconds"]);
+                        else
+                            activeAlert.ResponseTimeSeconds = 60; // Default value
+                    }
                 }
-                return null; // No active alert found
+                return activeAlert;
             }
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Get active alert for location failed: " + ex.Message);
-        }
-        finally
-        {
-            if (con != null && con.State == System.Data.ConnectionState.Open)
+            catch (Exception ex)
             {
-                con.Close();
+                throw new Exception($"Get active alert for location failed: {ex.Message}");
             }
-        }
+            finally
+            {
+                if (con != null && con.State == ConnectionState.Open)
+                {
+                    con.Close();
+                }
+            }
+        });
+    }
+
+    //--------------------------------------------------------------------------------------------------
+    // Get Alert Status
+    //--------------------------------------------------------------------------------------------------
+    public async Task<AlertStatus> GetAlertStatus(int alertId)
+    {
+        return await Task.Run(() =>
+        {
+            SqlConnection con = null;
+            SqlCommand cmd;
+            AlertStatus status = null;
+
+            try
+            {
+                con = connect("myProjDB");
+
+                Dictionary<string, object> paramDic = new Dictionary<string, object>();
+                paramDic.Add("@alertId", alertId);
+
+                cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetAlertStatus", con, paramDic);
+
+                using (SqlDataReader dr = cmd.ExecuteReader())
+                {
+                    if (dr.Read())
+                    {
+                        status = new AlertStatus
+                        {
+                            AlertId = Convert.ToInt32(dr["alert_id"]),
+                            AlertTime = Convert.ToDateTime(dr["alert_time"]),
+                            EndTime = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : (DateTime?)null,
+                            AlertType = dr["alert_type"]?.ToString(),
+                            IsActive = Convert.ToBoolean(dr["IsActive"])
+                        };
+                    }
+                }
+                return status;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Get alert status failed: {ex.Message}");
+            }
+            finally
+            {
+                if (con != null && con.State == ConnectionState.Open)
+                {
+                    con.Close();
+                }
+            }
+        });
     }
 
     #endregion

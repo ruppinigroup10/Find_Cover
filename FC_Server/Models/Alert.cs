@@ -45,4 +45,35 @@
         public string created_by { get; set; }
         public string alert_source { get; set; }
     }
+
+    /// <summary>
+    /// Represents an active alert with additional properties for user allocation
+    /// </summary>
+    public class ActiveAlert
+    {
+        public int AlertId { get; set; }
+        public DateTime AlertTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public string AlertType { get; set; }
+        public string Data { get; set; }
+        public bool IsActive { get; set; }
+        public double CenterLatitude { get; set; }
+        public double CenterLongitude { get; set; }
+        public double RadiusKm { get; set; }
+        public string CreatedBy { get; set; }
+        public string AreaName { get; set; }
+        public int ResponseTimeSeconds { get; set; } = 60;
+    }
+
+    /// <summary>
+    /// Represents the status of an alert for user allocation
+    /// </summary>
+    public class AlertStatus
+    {
+        public int AlertId { get; set; }
+        public DateTime AlertTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public string AlertType { get; set; }
+        public bool IsActive { get; set; }
+    }
 }

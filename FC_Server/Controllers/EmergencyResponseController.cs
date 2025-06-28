@@ -61,13 +61,17 @@ namespace FC_Server.Controllers
                     });
                 }
 
+
+                //Check for existing allocation FOR THIS SPECIFIC ALERT
+                DBservicesShelter dbs = new DBservicesShelter();
+                var existingVisit = dbs.GetActiveUserAllocationForAlert(request.UserId, activeAlert.AlertId);
+                UserAllocation existingAllocation = null;
+
                 // בדיקה אם המשתמש כבר מוקצה למרחב מוגן
                 // var existingAllocation = await _allocationService.GetActiveAllocationForUser(request.UserId);
 
-                DBservicesShelter dbs = new DBservicesShelter();
-                var existingVisit = dbs.GetActiveUserAllocation(request.UserId);
-                UserAllocation existingAllocation = null;
-                if (existingVisit != null)
+
+                if (existingVisit != null && existingVisit.alert_id == activeAlert.AlertId)
                 {
                     var shelter = Shelter.getShelter(existingVisit.shelter_id);
                     existingAllocation = new UserAllocation
@@ -598,9 +602,20 @@ namespace FC_Server.Controllers
         {
             try
             {
+                // Release user from shelter
                 await _batchAllocationService.ReleaseUserFromShelter(userId);
+
+                // Stop tracking
                 await _locationTrackingService.StopTrackingUser(userId);
+
                 //await SaveAllocationStatistics(userId, allocation);
+
+                // Update database to mark visit as completed
+                DBservicesShelter dbs = new DBservicesShelter();
+                dbs.UpdateVisitStatus(userId, allocation.ShelterId, "COMPLETED");
+
+                // Clear any old allocations
+                dbs.ClearOldAllocations(userId);
 
                 _logger.LogInformation($"Alert ended - released user {userId} from shelter {allocation.ShelterId}");
             }
