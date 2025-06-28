@@ -10,7 +10,7 @@
         private DateTime created_at;
         private bool is_active;
         private bool is_provider;
-        private DateTime birthday;
+        private DateTime? birthday;
 
 
         public int UserId { get => user_id; set => user_id = value; }
@@ -21,7 +21,7 @@
         public DateTime CreatedAt { get => created_at; set => created_at = value; }
         public bool IsActive { get => is_active; set => is_active = value; }
         public bool IsProvider { get => is_provider; set => is_provider = value; }
-        public DateTime Birthday { get => birthday; set => birthday = value; }
+        public DateTime? Birthday { get => birthday; set => birthday = value; }
 
         // Constructor without parameters
         public User()
@@ -34,7 +34,7 @@
             this.created_at = DateTime.Now;
             this.is_active = false;
             this.is_provider = false;
-            this.birthday = new DateTime();
+            this.birthday = null;
         }
 
         // Constructor with parameters

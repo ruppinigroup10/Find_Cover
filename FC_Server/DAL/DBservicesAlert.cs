@@ -91,6 +91,9 @@ public class DBservicesAlert
     //--------------------------------------------------------------------------------------------------
     // This method gets an Alert object by ID
     //--------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// Fixed GetAlertById method that matches the FC_ALERT table structure
+    /// </summary>
     public AlertRecord? GetAlertById(int alertId)
     {
         SqlConnection con;
@@ -120,15 +123,21 @@ public class DBservicesAlert
                     alert = new AlertRecord
                     {
                         alert_id = Convert.ToInt32(dr["alert_id"]),
-                        alert_type = dr["alert_type"].ToString() ?? "",
-                        CenterLatitude = dr["center_latitude"] != DBNull.Value ? Convert.ToDouble(dr["center_latitude"]) : 0,
-                        CenterLongitude = dr["center_longitude"] != DBNull.Value ? Convert.ToDouble(dr["center_longitude"]) : 0,
-                        RadiusKm = dr["radius_km"] != DBNull.Value ? Convert.ToDouble(dr["radius_km"]) : 0,
-                        created_at = Convert.ToDateTime(dr["created_at"]),
-                        end_time = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : null,
-                        is_active = Convert.ToBoolean(dr["is_active"]),
+                        alert_type = dr["alert_type"]?.ToString() ?? "",
+                        CenterLatitude = dr["center_latitude"] != DBNull.Value ?
+                            Convert.ToDouble(dr["center_latitude"]) : 0,
+                        CenterLongitude = dr["center_longitude"] != DBNull.Value ?
+                            Convert.ToDouble(dr["center_longitude"]) : 0,
+                        RadiusKm = dr["radius_km"] != DBNull.Value ?
+                            Convert.ToDouble(dr["radius_km"]) : 0,
+                        created_at = dr["alert_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["alert_time"]) : DateTime.Now,
+                        end_time = dr["end_time"] != DBNull.Value ?
+                            Convert.ToDateTime(dr["end_time"]) : (DateTime?)null,
+                        is_active = dr["is_active"] != DBNull.Value ?
+                            Convert.ToBoolean(dr["is_active"]) : false,
                         created_by = dr["created_by"]?.ToString() ?? "System",
-                        alert_source = dr["alert_source"]?.ToString() ?? "Database"
+                        alert_source = "Database" // Default value since this column doesn't exist in your table
                     };
                 }
             }

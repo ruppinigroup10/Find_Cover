@@ -16,7 +16,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            var newUser = FC_Server.Models.User.Register(user.Username, user.PasswordHash, user.Email, user.PhoneNumber, user.Birthday);
+            var newUser = FC_Server.Models.User.Register(user.Username, user.PasswordHash, user.Email, user.PhoneNumber, user.Birthday ?? DateTime.Now);
 
             if (newUser != null)
             {
@@ -276,7 +276,7 @@ public class UserController : ControllerBase
             {
                 message = "Known location data transfer successful",
                 knownLocation = new
-                { 
+                {
                     location_id = knownLocation.LocationId,
                     user_id = knownLocation.UserId,
                     latitude = knownLocation.Latitude,
@@ -436,6 +436,6 @@ public class UserController : ControllerBase
 
             return BadRequest(new { message = "Failed to retrieve visit history" });
         }
-    } 
+    }
 }
 

@@ -83,11 +83,10 @@ namespace FC_Server.Controllers
                     }
 
                     // עדיין בדרך - החזר נתיב מעודכן
-                    var updatedRoute = await _allocationService.GetUpdatedRoute(
-                        request.Latitude,
-                        request.Longitude,
-                        existingAllocation.ShelterDetails.Latitude,
-                        existingAllocation.ShelterDetails.Longitude);
+                    var updatedRoute = await _allocationService.RecalculateRoute(
+                            request.UserId,
+                            request.Latitude,
+                            request.Longitude);
 
                     return Ok(new ShelterRouteResponse
                     {

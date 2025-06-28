@@ -18,12 +18,13 @@ namespace FC_Server.Services
         private readonly ILogger<ShelterAllocationService> _logger;
         private readonly object _allocationLock = new object();
 
-        // קבועים לאלגוריתם
+        // קבועים לאלגוריתם - SAME AS IN SIMULATION
         private const double MAX_TRAVEL_TIME_MINUTES = 1.0;
         private const double WALKING_SPEED_KM_PER_MINUTE = 0.6;
         private const double MAX_DISTANCE_KM = MAX_TRAVEL_TIME_MINUTES * WALKING_SPEED_KM_PER_MINUTE;
         private const double CUBE_SIZE_KM = 0.2; // 200 מטר
         private const double CUBE_SIZE_LAT = CUBE_SIZE_KM / 111.0;
+        private const double CUBE_SIZE_LON_APPROX = CUBE_SIZE_KM / 85.0; // Approximation for Beer Sheva latitude
 
         public ShelterAllocationService(IGoogleMapsService googleMapsService, ILogger<ShelterAllocationService> logger)
         {
@@ -33,6 +34,7 @@ namespace FC_Server.Services
 
         /// <summary>
         /// הקצאת מרחב מוגן למשתמש בודד
+        /// USING THE SAME ALGORITHM AS SIMULATION
         /// </summary>
         public async Task<ShelterAllocationResult> AllocateShelterForUserAsync(
             User user,
@@ -43,12 +45,36 @@ namespace FC_Server.Services
         {
             try
             {
+                // First, perform all synchronous operations within the lock
+                AssignmentOption bestOption = null;
+                List<AssignmentOption> alternativeOptions = new List<AssignmentOption>();
+
                 lock (_allocationLock)
                 {
-                    // קבלת כל המרחבים המוגנים הפעילים באזור
-                    var shelters = GetActiveSheltersInArea(userLat, userLon, MAX_DISTANCE_KM);
+                    _logger.LogInformation($"Starting shelter allocation for user {user.UserId} at ({userLat}, {userLon})");
 
-                    if (!shelters.Any())
+                    // STEP 1: GET ALL ACTIVE SHELTERS (same as simulation)
+                    var allShelters = Shelter.getActiveShelters();
+                    if (!allShelters.Any())
+                    {
+                        return new ShelterAllocationResult
+                        {
+                            Success = false,
+                            Message = "לא נמצאו מרחבים מוגנים פעילים",
+                            RecommendedAction = "נסה שוב מאוחר יותר"
+                        };
+                    }
+
+                    // STEP 2: BUILD CUBE INDEX FOR SHELTERS (same as simulation)
+                    var cubeToShelters = BuildCubeToShelterIndex(allShelters, centerLat, centerLon);
+
+                    // STEP 3: GET SHELTERS IN SURROUNDING CUBES (same as simulation)
+                    var nearbyShelters = GetSheltersInSurroundingCubes(
+                        userLat, userLon, allShelters, cubeToShelters, centerLat, centerLon);
+
+                    _logger.LogInformation($"Found {nearbyShelters.Count} shelters in nearby cubes");
+
+                    if (!nearbyShelters.Any())
                     {
                         return new ShelterAllocationResult
                         {
@@ -58,38 +84,48 @@ namespace FC_Server.Services
                         };
                     }
 
-                    // בדיקת תפוסה עדכנית
-                    var availableShelters = shelters
-                        .Where(s => GetCurrentOccupancy(s.ShelterId) < s.Capacity)
-                        .ToList();
+                    // STEP 4: CREATE PRIORITY QUEUE OF OPTIONS (same as simulation)
+                    var pq = new PriorityQueue<AssignmentOption, double>();
 
-                    if (!availableShelters.Any())
+                    foreach (var shelter in nearbyShelters)
                     {
-                        // מציאת המרחב הקרוב ביותר עם תור המתנה
-                        var nearestShelter = shelters
-                            .OrderBy(s => CalculateDistance(userLat, userLon, s.Latitude, s.Longitude))
-                            .First();
-
-                        return new ShelterAllocationResult
+                        // Check current capacity
+                        var currentOccupancy = GetCurrentOccupancy(shelter.ShelterId);
+                        if (currentOccupancy >= shelter.Capacity)
                         {
-                            Success = false,
-                            Message = "כל המרחבים המוגנים באזור מלאים",
-                            NearestShelterId = nearestShelter.ShelterId,
-                            EstimatedWaitTime = CalculateEstimatedWaitTime(nearestShelter.ShelterId),
-                            RecommendedAction = "המתן בתור או חפש מחסה חלופי"
-                        };
+                            _logger.LogInformation($"Shelter {shelter.ShelterId} is full ({currentOccupancy}/{shelter.Capacity})");
+                            continue;
+                        }
+
+                        // Calculate distance
+                        double distance = CalculateDistance(
+                            userLat, userLon,
+                            shelter.Latitude, shelter.Longitude);
+
+                        // Only consider shelters within maximum distance
+                        if (distance <= MAX_DISTANCE_KM)
+                        {
+                            var option = new AssignmentOption
+                            {
+                                PersonId = user.UserId,
+                                ShelterId = shelter.ShelterId,
+                                Distance = distance,
+                                IsReachable = true,
+                                VulnerabilityScore = CalculateVulnerabilityScore(user.Birthday)
+                            };
+
+                            // Calculate priority (same as simulation)
+                            double priority = distance;
+
+                            // Adjust priority for vulnerable people
+                            priority -= option.VulnerabilityScore * 0.01;
+
+                            pq.Enqueue(option, priority);
+                            _logger.LogInformation($"Added shelter {shelter.ShelterId} to options (distance: {distance * 1000:F0}m, priority: {priority:F4})");
+                        }
                     }
 
-                    // חישוב מרחקי הליכה אמיתיים עם Google Maps
-                    var walkingDistances = Task.Run(async () =>
-                        await CalculateWalkingDistances(user, userLat, userLon, availableShelters)
-                    ).Result;
-
-                    // מציאת המרחב האופטימלי
-                    var optimalShelter = FindOptimalShelter(
-                        user, userLat, userLon, availableShelters, walkingDistances);
-
-                    if (optimalShelter == null)
+                    if (pq.Count == 0)
                     {
                         return new ShelterAllocationResult
                         {
@@ -99,52 +135,86 @@ namespace FC_Server.Services
                         };
                     }
 
-                    // ביצוע ההקצאה
-                    DBservicesShelter dbShelter = new DBservicesShelter();
-                    var allocationSuccess = dbShelter.AllocateUserToShelter(
-                        user.UserId, optimalShelter.ShelterId, 1); // alert_id = 1 לעכשיו
-
-                    if (allocationSuccess)
+                    // STEP 5: PROCESS OPTIONS TO FIND BEST AVAILABLE
+                    while (pq.Count > 0)
                     {
-                        // קבלת נתיב הליכה
-                        var route = Task.Run(async () =>
-                            await GetWalkingRoute(userLat, userLon,
-                                optimalShelter.Latitude, optimalShelter.Longitude)
-                        ).Result;
+                        var option = pq.Dequeue();
 
-                        return new ShelterAllocationResult
+                        // Double-check capacity at allocation time
+                        var currentOccupancy = GetCurrentOccupancy(option.ShelterId);
+                        var shelter = nearbyShelters.First(s => s.ShelterId == option.ShelterId);
+
+                        if (currentOccupancy < shelter.Capacity)
                         {
-                            Success = true,
-                            Message = "הוקצה מרחב מוגן בהצלחה",
-                            AllocatedShelterId = optimalShelter.ShelterId,
-                            ShelterName = optimalShelter.Name,
-                            Distance = walkingDistances[optimalShelter.ShelterId],
-                            EstimatedArrivalTime = CalculateArrivalTime(walkingDistances[optimalShelter.ShelterId]),
-                            RoutePolyline = route?.OverviewPolyline,
-                            RouteInstructions = route?.TextInstructions,
-                            ShelterDetails = new ShelterDetailsDto
+                            // Try to allocate
+                            DBservicesShelter dbShelter = new DBservicesShelter();
+                            var allocationSuccess = dbShelter.AllocateUserToShelter(
+                                user.UserId, option.ShelterId, 1); // alert_id = 1 for now
+
+                            if (allocationSuccess)
                             {
-                                ShelterId = optimalShelter.ShelterId,
-                                Name = optimalShelter.Name,
-                                Address = optimalShelter.Address,
-                                Latitude = optimalShelter.Latitude,
-                                Longitude = optimalShelter.Longitude,
-                                Capacity = optimalShelter.Capacity,
-                                IsAccessible = optimalShelter.IsAccessible,
-                                PetsFriendly = optimalShelter.PetsFriendly
+                                bestOption = option;
+                                _logger.LogInformation($"Successfully allocated user {user.UserId} to shelter {option.ShelterId}");
+                                break;
                             }
-                        };
-                    }
-                    else
-                    {
-                        return new ShelterAllocationResult
+                            else
+                            {
+                                _logger.LogWarning($"Failed to allocate user {user.UserId} to shelter {option.ShelterId}, trying next option");
+                            }
+                        }
+                        else
                         {
-                            Success = false,
-                            Message = "המרחב המוגן התמלא ברגע האחרון",
-                            RecommendedAction = "נסה שוב"
-                        };
+                            _logger.LogInformation($"Shelter {option.ShelterId} became full, trying next option");
+                        }
+
+                        // Keep some alternatives in case we need them
+                        if (alternativeOptions.Count < 3)
+                        {
+                            alternativeOptions.Add(option);
+                        }
                     }
+                } // End of lock
+
+                // Now handle the async operations outside the lock
+                if (bestOption != null)
+                {
+                    var shelter = Shelter.getShelter(bestOption.ShelterId);
+
+                    // Get walking route (async operation)
+                    var route = await GetWalkingRoute(userLat, userLon,
+                        shelter.Latitude, shelter.Longitude);
+
+                    return new ShelterAllocationResult
+                    {
+                        Success = true,
+                        Message = "הוקצה מרחב מוגן בהצלחה",
+                        AllocatedShelterId = bestOption.ShelterId,
+                        ShelterName = shelter.Name,
+                        Distance = bestOption.Distance,
+                        EstimatedArrivalTime = CalculateArrivalTime(bestOption.Distance),
+                        RoutePolyline = route?.OverviewPolyline,
+                        RouteInstructions = route?.TextInstructions,
+                        ShelterDetails = new ShelterDetailsDto
+                        {
+                            ShelterId = shelter.ShelterId,
+                            Name = shelter.Name,
+                            Address = shelter.Address,
+                            Latitude = shelter.Latitude,
+                            Longitude = shelter.Longitude,
+                            Capacity = shelter.Capacity,
+                            IsAccessible = shelter.IsAccessible,
+                            PetsFriendly = shelter.PetsFriendly
+                        }
+                    };
                 }
+
+                // All options exhausted
+                return new ShelterAllocationResult
+                {
+                    Success = false,
+                    Message = "כל המרחבים המוגנים הקרובים מלאים",
+                    RecommendedAction = "נסה שוב או חפש מחסה חלופי"
+                };
             }
             catch (Exception ex)
             {
@@ -162,13 +232,13 @@ namespace FC_Server.Services
         /// הקצאת מרחב מוגן למשתמש
         /// </summary>
         public async Task<AllocationResult> AllocateShelterForUser(
-    User user,
-    double userLat,
-    double userLon,
-    double centerLat,
-    double centerLon)
+            User user,
+            double userLat,
+            double userLon,
+            double centerLat,
+            double centerLon)
         {
-            // Call your existing method
+            // Call your updated method
             var result = await AllocateShelterForUserAsync(user, userLat, userLon, centerLat, centerLon);
 
             // Convert ShelterAllocationResult to AllocationResult
@@ -195,8 +265,6 @@ namespace FC_Server.Services
             try
             {
                 DBservicesShelter dbs = new DBservicesShelter();
-                // כאן צריך לממש שאילתה לקבלת הקצאה פעילה מ-shelter_visit
-                // לדוגמה:
                 var allocation = dbs.GetActiveUserAllocation(userId);
                 if (allocation != null)
                 {
@@ -263,7 +331,8 @@ namespace FC_Server.Services
                     Distance = route?.Distance ?? 0,
                     RoutePolyline = route?.OverviewPolyline,
                     AllInstructions = route?.TextInstructions,
-                    CurrentInstruction = route?.TextInstructions?.FirstOrDefault()
+                    CurrentInstruction = route?.TextInstructions?.FirstOrDefault(),
+                    EstimatedArrivalTime = DateTime.Now.AddMinutes(route?.Distance ?? 0 / WALKING_SPEED_KM_PER_MINUTE)
                 };
             }
             catch (Exception ex)
@@ -274,7 +343,7 @@ namespace FC_Server.Services
         }
 
         /// <summary>
-        /// קבלת נתיב מעודכן
+        /// קבלת נתיב מעודכן (wrapper for EmergencyResponseController)
         /// </summary>
         public async Task<RouteInfoDto> GetUpdatedRoute(
             double currentLat, double currentLon,
@@ -282,37 +351,15 @@ namespace FC_Server.Services
         {
             try
             {
-                // Call Google Maps API directly to get full route information
-                var request = new DirectionsRequest
-                {
-                    Origin = new LocationPoint(currentLat, currentLon, "user"),
-                    Destination = new LocationPoint(destLat, destLon, "shelter"),
-                    Mode = TravelMode.Walking
-                };
-
-                var response = await _googleMapsService.GetDirectionsAsync(request);
-
-                if (response.Success && response.Routes?.Any() == true)
-                {
-                    var route = response.Routes.First();
-                    var leg = route.Legs?.FirstOrDefault();
-
-                    return new RouteInfoDto
-                    {
-                        Distance = (leg?.Distance?.Value ?? 0) / 1000.0, // Convert meters to km
-                        RoutePolyline = route.OverviewPolyline,
-                        AllInstructions = leg?.Steps?.Select(s => s.HtmlInstructions).ToList(),
-                        CurrentInstruction = leg?.Steps?.FirstOrDefault()?.HtmlInstructions,
-                        EstimatedArrivalTime = DateTime.Now.AddSeconds(leg?.Duration?.Value ?? 0)
-                    };
-                }
+                var route = await GetWalkingRoute(currentLat, currentLon, destLat, destLon);
 
                 return new RouteInfoDto
                 {
-                    Distance = 0,
-                    RoutePolyline = string.Empty,
-                    AllInstructions = new List<string>(),
-                    CurrentInstruction = "Unable to calculate route"
+                    Distance = route?.Distance ?? 0,
+                    RoutePolyline = route?.OverviewPolyline,
+                    AllInstructions = route?.TextInstructions,
+                    CurrentInstruction = route?.TextInstructions?.FirstOrDefault(),
+                    EstimatedArrivalTime = DateTime.Now.AddMinutes(route?.Distance ?? 0 / WALKING_SPEED_KM_PER_MINUTE)
                 };
             }
             catch (Exception ex)
@@ -354,7 +401,132 @@ namespace FC_Server.Services
             }
         }
 
+        #region Cube-based Optimization Methods (SAME AS SIMULATION)
+
+        /// <summary>
+        /// Get the cube key for a given coordinate
+        /// </summary>
+        private string GetCubeKey(double lat, double lon, double centerLat, double centerLon)
+        {
+            int latIndex = (int)((lat - centerLat) / CUBE_SIZE_LAT);
+            int lonIndex = (int)((lon - centerLon) / CUBE_SIZE_LON_APPROX);
+            return $"{latIndex},{lonIndex}";
+        }
+
+        /// <summary>
+        /// Get all 9 surrounding cubes (including the center cube)
+        /// </summary>
+        private List<string> GetSurroundingCubes(double lat, double lon, double centerLat, double centerLon)
+        {
+            var cubes = new List<string>();
+            int centerLatIndex = (int)((lat - centerLat) / CUBE_SIZE_LAT);
+            int centerLonIndex = (int)((lon - centerLon) / CUBE_SIZE_LON_APPROX);
+
+            for (int dLat = -1; dLat <= 1; dLat++)
+            {
+                for (int dLon = -1; dLon <= 1; dLon++)
+                {
+                    cubes.Add($"{centerLatIndex + dLat},{centerLonIndex + dLon}");
+                }
+            }
+
+            return cubes;
+        }
+
+        /// <summary>
+        /// Build an index mapping cubes to shelters
+        /// </summary>
+        private Dictionary<string, List<int>> BuildCubeToShelterIndex(List<Shelter> shelters, double centerLat, double centerLon)
+        {
+            var cubeToShelters = new Dictionary<string, List<int>>();
+
+            foreach (var shelter in shelters)
+            {
+                string cubeKey = GetCubeKey(shelter.Latitude, shelter.Longitude, centerLat, centerLon);
+
+                if (!cubeToShelters.ContainsKey(cubeKey))
+                {
+                    cubeToShelters[cubeKey] = new List<int>();
+                }
+
+                cubeToShelters[cubeKey].Add(shelter.ShelterId);
+            }
+
+            _logger.LogInformation($"Built cube index with {cubeToShelters.Count} cubes containing shelters");
+            return cubeToShelters;
+        }
+
+        /// <summary>
+        /// Get all shelters in the surrounding cubes for a person
+        /// </summary>
+        private List<Shelter> GetSheltersInSurroundingCubes(
+            double personLat,
+            double personLon,
+            List<Shelter> allShelters,
+            Dictionary<string, List<int>> cubeToShelters,
+            double centerLat,
+            double centerLon)
+        {
+            var surroundingCubes = GetSurroundingCubes(personLat, personLon, centerLat, centerLon);
+            var shelterIds = new HashSet<int>();
+
+            foreach (var cubeKey in surroundingCubes)
+            {
+                if (cubeToShelters.ContainsKey(cubeKey))
+                {
+                    foreach (var shelterId in cubeToShelters[cubeKey])
+                    {
+                        shelterIds.Add(shelterId);
+                    }
+                }
+            }
+
+            return allShelters.Where(s => shelterIds.Contains(s.ShelterId)).ToList();
+        }
+
+        #endregion
+
         #region Helper Methods
+
+        /// <summary>
+        /// Assignment option class (same as simulation)
+        /// </summary>
+        private class AssignmentOption
+        {
+            public int PersonId { get; set; }
+            public int ShelterId { get; set; }
+            public double Distance { get; set; }
+            public bool IsReachable { get; set; }
+            public int VulnerabilityScore { get; set; }
+        }
+
+        /// <summary>
+        /// Calculate vulnerability score based on user age (from birthday)
+        /// </summary>
+        private int CalculateVulnerabilityScore(DateTime? birthday)
+        {
+            if (!birthday.HasValue)
+            {
+                return 6; // Default adult score if no birthday
+            }
+
+            int age = DateTime.Now.Year - birthday.Value.Year;
+            if (DateTime.Now.DayOfYear < birthday.Value.DayOfYear)
+                age--; // Adjust if birthday hasn't occurred this year
+
+            if (age >= 70)
+                return 10; // Elderly (70+): highest priority
+            else if (age <= 12)
+                return 8; // Children (0-12): second highest priority
+            else
+                return 6; // Adults (13-69): normal priority
+        }
+
+        private DateTime CalculateArrivalTime(double distanceKm)
+        {
+            double walkingTimeMinutes = distanceKm / WALKING_SPEED_KM_PER_MINUTE;
+            return DateTime.Now.AddMinutes(walkingTimeMinutes);
+        }
 
         private List<Shelter> GetActiveSheltersInArea(double lat, double lon, double radiusKm)
         {
@@ -369,7 +541,93 @@ namespace FC_Server.Services
             return dbs.GetCurrentOccupancy(shelterId);
         }
 
+        private double GetOccupancyPercentage(int shelterId)
+        {
+            var shelter = Shelter.getShelter(shelterId);
+            if (shelter == null || shelter.Capacity == 0) return 100;
 
+            var currentOccupancy = GetCurrentOccupancy(shelterId);
+            return (double)currentOccupancy / shelter.Capacity * 100;
+        }
+
+        private bool UserNeedsAccessibility(User user)
+        {
+            // This would need to be implemented based on user profile
+            // For now, return false
+            return false;
+        }
+
+        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371;
+            double dLat = (lat2 - lat1) * Math.PI / 180;
+            double dLon = (lon2 - lon1) * Math.PI / 180;
+            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                      Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
+                      Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
+
+        private async Task<RouteInfo> GetWalkingRoute(
+            double originLat, double originLon,
+            double destLat, double destLon)
+        {
+            try
+            {
+                var request = new DirectionsRequest
+                {
+                    Origin = new LocationPoint(originLat, originLon, "user"),
+                    Destination = new LocationPoint(destLat, destLon, "shelter"),
+                    Mode = TravelMode.Walking
+                };
+
+                var response = await _googleMapsService.GetDirectionsAsync(request);
+
+                if (response.Success && response.Routes?.Any() == true)
+                {
+                    var route = response.Routes.First();
+                    var leg = route.Legs?.FirstOrDefault();
+
+                    return new RouteInfo
+                    {
+                        OverviewPolyline = route.OverviewPolyline,
+                        TextInstructions = leg?.Steps?
+                            .Select(s => s.HtmlInstructions)
+                            .ToList(),
+                        Distance = (leg?.Distance?.Value ?? 0) / 1000.0, // Convert meters to km
+                        //Duration = leg?.Duration?.Value ?? 0
+                    };
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting walking route");
+                return null;
+            }
+        }
+
+        private int CalculateAge(DateTime? birthday)
+        {
+            if (!birthday.HasValue)
+            {
+                return 30; // Default age if no birthday
+            }
+
+            int age = DateTime.Now.Year - birthday.Value.Year;
+            if (DateTime.Now.DayOfYear < birthday.Value.DayOfYear)
+                age--; // Adjust if birthday hasn't occurred this year
+
+            return age;
+        }
+
+        private TimeSpan CalculateEstimatedWaitTime(int shelterId)
+        {
+            // This would need real implementation based on shelter turnover rate
+            return TimeSpan.FromMinutes(5);
+        }
 
         private async Task<Dictionary<int, double>> CalculateWalkingDistances(
             User user, double userLat, double userLon, List<Shelter> shelters)
@@ -392,63 +650,38 @@ namespace FC_Server.Services
             var personDto = new PersonDto
             {
                 Id = user.UserId,
-                Age = user.CreatedAt != null ? CalculateAge(user.CreatedAt) : 30, // Default age if CreatedAt is null
+                Age = CalculateAge(user.Birthday), // Use helper method for age calculation
                 Latitude = userLat,
                 Longitude = userLon
             };
 
-            var shelterDtos = shelters
-            .Where(s => s != null) // Filter out any null shelters
-            .Select(s => new ShelterDto
+            var shelterDtos = shelters.Select(s => new ShelterDto
             {
                 Id = s.ShelterId,
-                Name = s.Name ?? "Unknown Shelter",
+                Name = s.Name,
                 Latitude = s.Latitude,
                 Longitude = s.Longitude,
                 Capacity = s.Capacity
             }).ToList();
 
-
-            // Add check before calling Google Maps
-            if (!shelterDtos.Any())
-            {
-                _logger.LogWarning("No shelter DTOs created for distance calculation");
-                return distances;
-            }
-
             try
             {
-                // קריאה לשירות Google Maps
+                // קריאה ל-Google Maps לחישוב מרחקי הליכה
                 var walkingDistances = await _googleMapsService.CalculateShelterDistancesAsync(
                     new List<PersonDto> { personDto },
-                    shelterDtos);
+                    shelterDtos
+                );
 
-                // המרת התוצאות
-                if (walkingDistances != null && walkingDistances.ContainsKey(user.UserId.ToString()))
+                // המרת התוצאות למבנה הנתונים המבוקש
+                if (walkingDistances.ContainsKey(personDto.Id.ToString()))
                 {
-                    var userDistances = walkingDistances[user.UserId.ToString()];
-                    foreach (var shelter in shelters)
+                    var userDistances = walkingDistances[personDto.Id.ToString()];
+                    foreach (var kvp in userDistances)
                     {
-                        if (userDistances.ContainsKey(shelter.ShelterId.ToString()))
+                        if (int.TryParse(kvp.Key, out int shelterId))
                         {
-                            distances[shelter.ShelterId] = userDistances[shelter.ShelterId.ToString()];
+                            distances[shelterId] = kvp.Value;
                         }
-                        else
-                        {
-                            // אם אין מרחק הליכה, חשב מרחק אווירי
-                            distances[shelter.ShelterId] = CalculateDistance(
-                                userLat, userLon, shelter.Latitude, shelter.Longitude);
-                        }
-                    }
-                }
-                else
-                {
-                    // If Google Maps fails, calculate aerial distances for all shelters
-                    _logger.LogWarning("Google Maps service returned no distances, using aerial calculation");
-                    foreach (var shelter in shelters)
-                    {
-                        distances[shelter.ShelterId] = CalculateDistance(
-                            userLat, userLon, shelter.Latitude, shelter.Longitude);
                     }
                 }
             }
@@ -489,85 +722,6 @@ namespace FC_Server.Services
                 .ThenByDescending(s => s.IsAccessible && UserNeedsAccessibility(user))
                 .ThenBy(s => GetOccupancyPercentage(s.ShelterId))
                 .FirstOrDefault();
-        }
-
-        private async Task<RouteInfo> GetWalkingRoute(
-            double originLat, double originLon,
-            double destLat, double destLon)
-        {
-            var request = new DirectionsRequest
-            {
-                Origin = new LocationPoint(originLat, originLon, "user"),
-                Destination = new LocationPoint(destLat, destLon, "shelter"),
-                Mode = TravelMode.Walking
-            };
-
-            var response = await _googleMapsService.GetDirectionsAsync(request);
-
-            if (response.Success && response.Routes?.Any() == true)
-            {
-                var route = response.Routes.First();
-                var leg = route.Legs?.FirstOrDefault();
-
-                return new RouteInfo
-                {
-                    OverviewPolyline = route.OverviewPolyline,
-                    TextInstructions = leg?.Steps?
-                        .Select(s => s.HtmlInstructions)
-                        .ToList(),
-                    Distance = (leg?.Distance?.Value ?? 0) / 1000.0 // Convert meters to km
-                };
-            }
-
-            return null;
-        }
-
-        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
-        {
-            const double R = 6371; // רדיוס כדור הארץ בק"מ
-            double dLat = (lat2 - lat1) * Math.PI / 180;
-            double dLon = (lon2 - lon1) * Math.PI / 180;
-            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                      Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
-                      Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return R * c;
-        }
-
-        private int CalculateAge(DateTime birthDate)
-        {
-            var today = DateTime.Today;
-            var age = today.Year - birthDate.Year;
-            if (birthDate.Date > today.AddYears(-age)) age--;
-            return age;
-        }
-
-        private TimeSpan CalculateEstimatedWaitTime(int shelterId)
-        {
-            // לוגיקה לחישוב זמן המתנה משוער
-            return TimeSpan.FromMinutes(5);
-        }
-
-        private DateTime CalculateArrivalTime(double distanceKm)
-        {
-            var walkingTimeMinutes = distanceKm / WALKING_SPEED_KM_PER_MINUTE;
-            return DateTime.Now.AddMinutes(walkingTimeMinutes);
-        }
-
-        private bool UserNeedsAccessibility(User user)
-        {
-            // Get user preferences to check if accessibility is needed
-            var preferences = UserPreferences.GetUserPreferences(user.UserId);
-            return preferences?.AccessibilityNeeded ?? false;
-        }
-
-        private double GetOccupancyPercentage(int shelterId)
-        {
-            var shelter = Shelter.getShelter(shelterId);
-            if (shelter == null || shelter.Capacity == 0) return 100;
-
-            var currentOccupancy = GetCurrentOccupancy(shelterId);
-            return (double)currentOccupancy / shelter.Capacity * 100;
         }
 
         #endregion
