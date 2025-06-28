@@ -363,7 +363,7 @@ public class DBservicesAlert
             string alertType = alert.threat switch
             {
                 0 => "Rocket",
-                1 => "Infiltration",
+                1 => "Simulated",
                 _ => "Unknown"
             };
 
