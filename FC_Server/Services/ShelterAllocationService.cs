@@ -55,6 +55,28 @@ namespace FC_Server.Services
 
                     // STEP 1: GET ALL ACTIVE SHELTERS (same as simulation)
                     var allShelters = Shelter.getActiveShelters();
+
+                    /////////////////////////
+                    // Start debugging logs//
+                    /////////////////////////
+
+                    _logger.LogInformation($"Got {allShelters.Count} shelters from database");
+                    // Log first 5 shelters
+                    foreach (var s in allShelters.Take(5))
+                    {
+                        _logger.LogInformation($"Shelter: ID={s.ShelterId}, Name='{s.Name}', Lat={s.Latitude}, Lon={s.Longitude}, Capacity={s.Capacity}");
+                    }
+
+                    // Check if "holaaa" is always first
+                    var holaaa = allShelters.FirstOrDefault(s => s.Name.Contains("holaaa"));
+                    if (holaaa != null)
+                    {
+                        _logger.LogInformation($"Found 'holaaa' shelter at position {allShelters.IndexOf(holaaa)} in the list");
+                    }
+                    ///////////////////////
+                    // End debugging logs//
+                    ///////////////////////
+
                     if (!allShelters.Any())
                     {
                         return new ShelterAllocationResult
@@ -73,6 +95,13 @@ namespace FC_Server.Services
                         userLat, userLon, allShelters, cubeToShelters, centerLat, centerLon);
 
                     _logger.LogInformation($"Found {nearbyShelters.Count} shelters in nearby cubes");
+
+                    // ========== START DEBUG ==========
+                    foreach (var s in nearbyShelters.Take(5))
+                    {
+                        _logger.LogInformation($"Nearby shelter: ID={s.ShelterId}, Name='{s.Name}'");
+                    }
+                    // ========== END DEBUG ============
 
                     if (!nearbyShelters.Any())
                     {
@@ -121,7 +150,7 @@ namespace FC_Server.Services
                             priority -= option.VulnerabilityScore * 0.01;
 
                             pq.Enqueue(option, priority);
-                            _logger.LogInformation($"Added shelter {shelter.ShelterId} to options (distance: {distance * 1000:F0}m, priority: {priority:F4})");
+                            _logger.LogInformation($"Added shelter {shelter.ShelterId} '{shelter.Name}' to options (distance: {distance * 1000:F0}m, priority: {priority:F4})");
                         }
                     }
 

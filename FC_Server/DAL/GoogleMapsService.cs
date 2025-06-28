@@ -160,6 +160,8 @@ namespace FC_Server.DAL
         /// </summary>
         public async Task<DirectionsResponse> GetDirectionsAsync(DirectionsRequest request)
         {
+            _logger.LogInformation($"Getting directions from ({request.Origin.Latitude}, {request.Origin.Longitude}) to ({request.Destination.Latitude}, {request.Destination.Longitude})");
+
             try
             {
                 var origin = $"{request.Origin.Latitude},{request.Origin.Longitude}";
@@ -189,6 +191,7 @@ namespace FC_Server.DAL
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Google Maps request timed out after {_httpClient.Timeout.TotalSeconds} seconds");
                 _logger.LogError(ex, "Error calling Google Directions API");
                 return new DirectionsResponse
                 {

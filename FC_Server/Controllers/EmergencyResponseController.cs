@@ -25,11 +25,13 @@ namespace FC_Server.Controllers
         private readonly BatchShelterAllocationService _batchAllocationService;
 
         public EmergencyResponseController(
+            BatchShelterAllocationService batchAllocationService,
             ShelterAllocationService allocationService,
             EmergencyAlertService emergencyAlertService,
             UserLocationTrackingService locationTrackingService,
             ILogger<EmergencyResponseController> logger)
         {
+            _batchAllocationService = batchAllocationService;
             _allocationService = allocationService;
             _emergencyAlertService = emergencyAlertService;
             _locationTrackingService = locationTrackingService;
@@ -108,8 +110,11 @@ namespace FC_Server.Controllers
                 }
 
                 var allocationResult = await _batchAllocationService.RequestShelterAllocation(
-                            user, request.Latitude, request.Longitude,
-                            activeAlert.CenterLatitude, activeAlert.CenterLongitude,
+                            user,
+                            request.Latitude,
+                            request.Longitude,
+                            activeAlert.CenterLatitude,
+                            activeAlert.CenterLongitude,
                             activeAlert.AlertId);
 
                 if (!allocationResult.Success)
