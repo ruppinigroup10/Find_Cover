@@ -298,6 +298,17 @@ namespace FC_Server.Controllers
                     });
                 }
 
+                // Null check for AlertId
+                if (userAllocation.AlertId == 0)
+                {
+                    return Ok(new EmergencyStatusResponse
+                    {
+                        IsAlertActive = false,
+                        UserStatus = "NO_ALERT",
+                        Message = "No active alert"
+                    });
+                }
+
                 // בדיקה אם האזעקה הסתיימה
                 var alertStatus = await _emergencyAlertService.GetAlertStatus(userAllocation.AlertId);
 

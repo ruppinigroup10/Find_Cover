@@ -205,16 +205,18 @@ namespace FC_Server.DAL
             List<ShelterDto> shelters)
         {
             var distances = new Dictionary<string, Dictionary<string, double>>();
+            string url = "";
 
             try
             {
+
                 // בניית רשימת origins
                 var origins = string.Join("|", people.Select(p => $"{p.Latitude},{p.Longitude}"));
 
                 // בניית רשימת destinations
                 var destinations = string.Join("|", shelters.Select(s => $"{s.Latitude},{s.Longitude}"));
 
-                var url = $"{DISTANCE_MATRIX_URL}?" +
+                url = $"{DISTANCE_MATRIX_URL}?" +
                          $"origins={origins}&" +
                          $"destinations={destinations}&" +
                          $"mode=walking&" +
@@ -227,6 +229,7 @@ namespace FC_Server.DAL
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogError($"Google Distance Matrix API error: {response.StatusCode} - {content}");
+                    _logger.LogError($"Request URL: {url}"); // Now url is available here
                     return distances;
                 }
 

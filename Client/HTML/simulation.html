@@ -9,6 +9,7 @@
       href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
     />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/polyline-encoded@0.0.9/Polyline.encoded.js"></script>
     <style>
       * {
         margin: 0;
@@ -240,6 +241,11 @@
         font-size: 12px;
         color: #666;
         margin-top: 5px;
+      }
+
+      /* Custom shelter icon rotation fix */
+      .custom-shelter-icon {
+        transform-origin: center;
       }
     </style>
   </head>
@@ -573,6 +579,17 @@
         logContainer.scrollTop = logContainer.scrollHeight;
       }
 
+      // Create custom shelter icon
+      function createShelterIcon() {
+        return L.divIcon({
+          html: '<div style="background-color: #d32f2f; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32],
+          className: "custom-shelter-icon",
+        });
+      }
+
       // Test functions
       async function testGetShelterRoute() {
         const testId = "test1";
@@ -609,22 +626,62 @@
           const shelter = result.data.shelterDetails;
           const shelterMarker = L.marker(
             [shelter.latitude, shelter.longitude],
-            {
-              icon: L.icon({
-                iconUrl:
-                  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiNkMzJmMmYiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNS0xLjEyIDIuNS0yLjUgMi41eiIvPjwvc3ZnPg==",
-                iconSize: [32, 32],
-              }),
-            }
+            { icon: createShelterIcon() }
           )
             .addTo(map)
             .bindPopup(shelter.name);
           markers.push(shelterMarker);
 
-          map.fitBounds([
-            [body.latitude, body.longitude],
-            [shelter.latitude, shelter.longitude],
-          ]);
+          // Add route line if available
+          if (result.data.routeInfo && result.data.routeInfo.routePolyline) {
+            try {
+              // Decode Google's encoded polyline
+              const decodedPath = L.Polyline.fromEncoded(
+                result.data.routeInfo.routePolyline
+              ).getLatLngs();
+
+              // Draw the route with Google Maps-style blue dotted line
+              const routeLine = L.polyline(decodedPath, {
+                color: "#4285F4", // Google Maps blue
+                weight: 5,
+                opacity: 0.8,
+                dashArray: "0, 10", // Creates dots
+                lineCap: "round",
+                lineJoin: "round",
+              }).addTo(map);
+
+              markers.push(routeLine);
+
+              // Fit map to show entire route
+              map.fitBounds(routeLine.getBounds().pad(0.1));
+            } catch (e) {
+              console.error("Error decoding polyline:", e);
+              // Fallback to simple line if decode fails
+              const routeLine = L.polyline(
+                [
+                  [body.latitude, body.longitude],
+                  [shelter.latitude, shelter.longitude],
+                ],
+                {
+                  color: "#4285F4",
+                  weight: 4,
+                  opacity: 0.7,
+                  dashArray: "10, 10",
+                }
+              ).addTo(map);
+              markers.push(routeLine);
+
+              map.fitBounds([
+                [body.latitude, body.longitude],
+                [shelter.latitude, shelter.longitude],
+              ]);
+            }
+          } else {
+            map.fitBounds([
+              [body.latitude, body.longitude],
+              [shelter.latitude, shelter.longitude],
+            ]);
+          }
         }
       }
 
@@ -768,16 +825,68 @@
         const userMarker = L.marker([lat, lng])
           .addTo(map)
           .bindPopup("מיקום נוכחי");
+
         const shelterMarker = L.marker([shelterLat, shelterLng], {
-          icon: L.icon({
-            iconUrl:
-              "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiNkMzJmMmYiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNS0xLjEyIDIuNS0yLjUgMi41eiIvPjwvc3ZnPg==",
-            iconSize: [32, 32],
-          }),
+          icon: createShelterIcon(),
         })
           .addTo(map)
           .bindPopup(routeResult.data.shelterDetails.name);
         markers.push(userMarker, shelterMarker);
+
+        // Add route if available
+        let routePath = null;
+        if (
+          routeResult.data.routeInfo &&
+          routeResult.data.routeInfo.routePolyline
+        ) {
+          try {
+            const decodedPath = L.Polyline.fromEncoded(
+              routeResult.data.routeInfo.routePolyline
+            ).getLatLngs();
+
+            const routeLine = L.polyline(decodedPath, {
+              color: "#4285F4",
+              weight: 5,
+              opacity: 0.8,
+              dashArray: "0, 10",
+              lineCap: "round",
+              lineJoin: "round",
+            }).addTo(map);
+
+            markers.push(routeLine);
+            routePath = decodedPath;
+
+            // Fit map to show entire route
+            map.fitBounds(routeLine.getBounds().pad(0.1));
+          } catch (e) {
+            console.error("Error decoding route:", e);
+            // Fallback to simple line
+            const routeLine = L.polyline(
+              [
+                [lat, lng],
+                [shelterLat, shelterLng],
+              ],
+              {
+                color: "#4285F4",
+                weight: 4,
+                opacity: 0.7,
+                dashArray: "10, 10",
+              }
+            ).addTo(map);
+            markers.push(routeLine);
+
+            map.fitBounds([
+              [lat, lng],
+              [shelterLat, shelterLng],
+            ]);
+          }
+        } else {
+          // No route data - just fit bounds to markers
+          map.fitBounds([
+            [lat, lng],
+            [shelterLat, shelterLng],
+          ]);
+        }
 
         // Step 2: Simulate movement
         simLog("שלב 2: מתחיל תנועה למקלט...");
@@ -787,10 +896,22 @@
         simulationInterval = setInterval(async () => {
           step++;
 
-          // Calculate new position (moving towards shelter)
-          const progress = step / totalSteps;
-          lat = lat + (shelterLat - lat) * 0.1;
-          lng = lng + (shelterLng - lng) * 0.1;
+          // Calculate new position
+          if (routePath && routePath.length > 1) {
+            // Move along the actual route if available
+            const routeIndex = Math.min(
+              Math.floor((step / totalSteps) * routePath.length),
+              routePath.length - 1
+            );
+            const point = routePath[routeIndex];
+            lat = point.lat;
+            lng = point.lng;
+          } else {
+            // Move towards shelter in straight line
+            const progress = step / totalSteps;
+            lat = lat + (shelterLat - lat) * 0.1;
+            lng = lng + (shelterLng - lng) * 0.1;
+          }
 
           // Update location
           const updateResult = await callApi(
