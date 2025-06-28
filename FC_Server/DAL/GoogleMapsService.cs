@@ -47,6 +47,16 @@ namespace FC_Server.DAL
             _logger = logger;
             _apiKey = configuration["GoogleMaps:ApiKey"];
 
+            // FORCE SET THE TIMEOUT - This should override any configuration
+            if (_httpClient.Timeout < TimeSpan.FromSeconds(30))
+            {
+                _logger.LogWarning($"HttpClient timeout was {_httpClient.Timeout.TotalMilliseconds}ms, overriding to 30 seconds");
+                _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            }
+
+            _logger.LogInformation($"GoogleMapsService initialized with timeout: {_httpClient.Timeout.TotalSeconds} seconds");
+
+
             if (string.IsNullOrEmpty(_apiKey))
             {
                 throw new InvalidOperationException("Google Maps API key is not configured");
@@ -161,6 +171,10 @@ namespace FC_Server.DAL
         public async Task<DirectionsResponse> GetDirectionsAsync(DirectionsRequest request)
         {
             _logger.LogInformation($"Getting directions from ({request.Origin.Latitude}, {request.Origin.Longitude}) to ({request.Destination.Latitude}, {request.Destination.Longitude})");
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            _logger.LogInformation($"Getting directions from ({request.Origin.Latitude}, {request.Origin.Longitude}) to ({request.Destination.Latitude}, {request.Destination.Longitude})");
+            _logger.LogInformation($"HttpClient timeout is: {_httpClient.Timeout.TotalMilliseconds}ms");
 
             try
             {
@@ -174,7 +188,12 @@ namespace FC_Server.DAL
                          $"language={request.Language ?? "he"}&" +
                          $"key={_apiKey}";
 
+                _logger.LogInformation($"Calling Google Maps API...");
                 var response = await _httpClient.GetAsync(url);
+
+                stopwatch.Stop();
+                _logger.LogInformation($"Google Maps API responded in {stopwatch.ElapsedMilliseconds}ms");
+
                 var content = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)

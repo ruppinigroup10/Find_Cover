@@ -18,7 +18,7 @@ namespace FC_Server.Controllers
     [Route("api/[controller]")]
     public class EmergencyResponseController : ControllerBase
     {
-        private readonly ShelterAllocationService _allocationService;
+        //private readonly ShelterAllocationService _allocationService;
         private readonly EmergencyAlertService _emergencyAlertService;
         private readonly UserLocationTrackingService _locationTrackingService;
         private readonly ILogger<EmergencyResponseController> _logger;
@@ -26,13 +26,13 @@ namespace FC_Server.Controllers
 
         public EmergencyResponseController(
             BatchShelterAllocationService batchAllocationService,
-            ShelterAllocationService allocationService,
+            //ShelterAllocationService allocationService,
             EmergencyAlertService emergencyAlertService,
             UserLocationTrackingService locationTrackingService,
             ILogger<EmergencyResponseController> logger)
         {
             _batchAllocationService = batchAllocationService;
-            _allocationService = allocationService;
+            //_allocationService = allocationService;
             _emergencyAlertService = emergencyAlertService;
             _locationTrackingService = locationTrackingService;
             _logger = logger;
@@ -62,7 +62,31 @@ namespace FC_Server.Controllers
                 }
 
                 // בדיקה אם המשתמש כבר מוקצה למרחב מוגן
-                var existingAllocation = await _allocationService.GetActiveAllocationForUser(request.UserId);
+                // var existingAllocation = await _allocationService.GetActiveAllocationForUser(request.UserId);
+
+                DBservicesShelter dbs = new DBservicesShelter();
+                var existingVisit = dbs.GetActiveUserAllocation(request.UserId);
+                UserAllocation existingAllocation = null;
+                if (existingVisit != null)
+                {
+                    var shelter = Shelter.getShelter(existingVisit.shelter_id);
+                    existingAllocation = new UserAllocation
+                    {
+                        UserId = request.UserId,
+                        ShelterId = existingVisit.shelter_id,
+                        AlertId = existingVisit.alert_id,
+                        AllocationTime = existingVisit.arrival_time ?? DateTime.Now,
+                        Status = existingVisit.status,
+                        ShelterDetails = new ShelterDetailsDto
+                        {
+                            ShelterId = shelter.ShelterId,
+                            Name = shelter.Name,
+                            Address = shelter.Address,
+                            Latitude = shelter.Latitude,
+                            Longitude = shelter.Longitude
+                        }
+                    };
+                }
 
                 if (existingAllocation != null)
                 {
@@ -86,7 +110,7 @@ namespace FC_Server.Controllers
                     }
 
                     // עדיין בדרך - החזר נתיב מעודכן
-                    var updatedRoute = await _allocationService.RecalculateRoute(
+                    var updatedRoute = await _batchAllocationService.RecalculateRoute(
                             request.UserId,
                             request.Latitude,
                             request.Longitude);
@@ -110,12 +134,12 @@ namespace FC_Server.Controllers
                 }
 
                 var allocationResult = await _batchAllocationService.RequestShelterAllocation(
-                            user,
-                            request.Latitude,
-                            request.Longitude,
-                            activeAlert.CenterLatitude,
-                            activeAlert.CenterLongitude,
-                            activeAlert.AlertId);
+                    user,
+                    request.Latitude,
+                    request.Longitude,
+                    activeAlert.CenterLatitude,
+                    activeAlert.CenterLongitude,
+                    activeAlert.AlertId);
 
                 if (!allocationResult.Success)
                 {
@@ -200,7 +224,7 @@ namespace FC_Server.Controllers
                 if (trackingResult.HasArrivedAtShelter)
                 {
                     // סמן את המשתמש כנמצא במרחב
-                    await _allocationService.MarkUserAsArrived(
+                    await _batchAllocationService.MarkUserAsArrived(
                         request.UserId,
                         trackingResult.ShelterId);
 
@@ -217,7 +241,7 @@ namespace FC_Server.Controllers
                 if (trackingResult.HasDeviatedFromRoute)
                 {
                     // חישוב נתיב מחדש
-                    var newRoute = await _allocationService.RecalculateRoute(
+                    var newRoute = await _batchAllocationService.RecalculateRoute(
                         request.UserId,
                         request.Latitude,
                         request.Longitude);
@@ -290,7 +314,7 @@ namespace FC_Server.Controllers
         {
             try
             {
-                var userAllocation = await _allocationService.GetActiveAllocationForUser(userId);
+                var userAllocation = await _batchAllocationService.GetActiveAllocationForUser(userId);
 
                 if (userAllocation == null)
                 {
@@ -574,7 +598,7 @@ namespace FC_Server.Controllers
         {
             try
             {
-                await _allocationService.ReleaseUserFromShelter(userId);
+                await _batchAllocationService.ReleaseUserFromShelter(userId);
                 await _locationTrackingService.StopTrackingUser(userId);
                 //await SaveAllocationStatistics(userId, allocation);
 
@@ -590,7 +614,7 @@ namespace FC_Server.Controllers
         {
             try
             {
-                await _allocationService.UpdateUserAllocationStatus(userId, "LEFT_SHELTER");
+                await _batchAllocationService.UpdateUserAllocationStatus(userId, "LEFT_SHELTER");
                 _logger.LogInformation($"User {userId} left shelter {allocation.ShelterId} during active alert");
             }
             catch (Exception ex)

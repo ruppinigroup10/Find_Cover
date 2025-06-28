@@ -9,6 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient<IGoogleMapsService, GoogleMapsService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    // Ensure no handler-level timeout interference
+    MaxConnectionsPerServer = 10
 });
 
 
@@ -22,7 +26,7 @@ string connectionString = builder.Configuration.GetConnectionString("myProjDB");
 builder.Services.AddHostedService<AlertBackgroundService>(); // with this we will listen to the tzeva adom api all the time
 builder.Services.AddHostedService<LocationCleanupService>(); // with this we will delete old user locations
 
-builder.Services.AddScoped<FC_Server.Services.ShelterAllocationService>();
+//builder.Services.AddScoped<FC_Server.Services.ShelterAllocationService>();
 builder.Services.AddScoped<FC_Server.Services.EmergencyAlertService>();
 builder.Services.AddScoped<FC_Server.Services.UserLocationTrackingService>();
 
@@ -44,6 +48,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+//logging to see what's happening:
+app.Use(async (context, next) =>
+{
+    app.Logger.LogInformation($"Processing request: {context.Request.Path}");
+    await next();
+});
 
 // Configure the HTTP request pipeline.
 if (true)

@@ -23,9 +23,9 @@ namespace FC_Server.Services
         private readonly ConcurrentDictionary<int, TaskCompletionSource<AllocationResult>> _completionSources = new();
 
         // Batch processing settings
-        private readonly TimeSpan _batchInterval = TimeSpan.FromSeconds(2); // Process every 2 seconds
-        private readonly TimeSpan _maxWaitTime = TimeSpan.FromSeconds(5); // Max wait time for a request
-        private readonly int _minBatchSize = 5; // Minimum requests to trigger immediate processing
+        private readonly TimeSpan _batchInterval = TimeSpan.FromSeconds(1); // Process every 1 second
+        private readonly TimeSpan _maxWaitTime = TimeSpan.FromSeconds(3); // Max wait 3 seconds
+        private readonly int _minBatchSize = 1; // Process immediately with 1 user
         private readonly int _maxBatchSize = 100; // Maximum requests to process at once
 
         // Constants from simulation
@@ -42,6 +42,7 @@ namespace FC_Server.Services
         {
             _googleMapsService = googleMapsService;
             _logger = logger;
+            _logger.LogWarning("========== BatchShelterAllocationService CREATED ==========");
         }
 
         /// <summary>
@@ -51,6 +52,8 @@ namespace FC_Server.Services
             User user, double userLat, double userLon,
             double alertLat, double alertLon, int alertId)
         {
+            _logger.LogWarning($"========== RequestShelterAllocation called for user {user.UserId} ==========");
+
             // Create request object
             var request = new AllocationRequest
             {
@@ -100,17 +103,52 @@ namespace FC_Server.Services
         /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                try
+                _logger.LogWarning("========== BatchShelterAllocationService.ExecuteAsync called ==========");
+
+                // Wait a bit for all services to be ready
+                await Task.Delay(5000, stoppingToken);
+
+                _logger.LogWarning("========== BatchShelterAllocationService background loop starting ==========");
+
+
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    await Task.Delay(_batchInterval, stoppingToken);
-                    await ProcessBatch();
+                    try
+                    {
+
+                        await Task.Delay(_batchInterval, stoppingToken);
+
+                        if (_pendingRequests.Count > 0)
+                        {
+                            _logger.LogWarning($"========== PROCESSING BATCH: {_pendingRequests.Count} requests ==========");
+                        }
+
+                        await ProcessBatch();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // This is expected when the service is stopping
+                        _logger.LogInformation("Batch processing loop canceled");
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error in batch processing loop");
+                        // Continue the loop even if there's an error
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in batch processing");
-                }
+            }
+            catch (OperationCanceledException)
+            {
+                // This is expected during shutdown
+                _logger.LogInformation("BatchShelterAllocationService ExecuteAsync was canceled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fatal error in BatchShelterAllocationService ExecuteAsync");
+                throw;
             }
         }
 
@@ -250,6 +288,25 @@ namespace FC_Server.Services
             List<AllocationRequest> requests, List<Shelter> shelters)
         {
             _logger.LogInformation($"Running optimal assignment for {requests.Count} people and {shelters.Count} shelters");
+
+            // ========== START DEBUG  ==========
+            _logger.LogWarning($"=========== BATCH ALLOCATION DEBUG ===========");
+            _logger.LogWarning($"Processing {requests.Count} requests");
+            _logger.LogWarning($"Available shelters: {shelters.Count}");
+
+            // Log first few shelters
+            foreach (var shelter in shelters.Take(5))
+            {
+                _logger.LogWarning($"Shelter {shelter.ShelterId}: '{shelter.Name}' - Capacity: {shelter.Capacity}");
+            }
+
+            // Log user locations
+            foreach (var req in requests)
+            {
+                _logger.LogWarning($"User {req.User.UserId} at ({req.Latitude}, {req.Longitude})");
+            }
+            _logger.LogWarning($"===========================================");
+            // ========== END DEBUG ==========
 
             // Use center of alert for cube calculations
             var centerLat = requests.First().AlertLatitude;
@@ -524,6 +581,110 @@ namespace FC_Server.Services
             };
         }
 
+        public async Task<RouteInfoDto> RecalculateRoute(int userId, double currentLat, double currentLon)
+        {
+            try
+            {
+                // Get user's current shelter assignment
+                var dbs = new DBservicesShelter();
+                var visit = dbs.GetActiveUserAllocation(userId);
+                if (visit == null) return null;
+
+                var shelter = Shelter.getShelter(visit.shelter_id);
+                var route = await GetWalkingRoute(
+                    currentLat, currentLon,
+                    shelter.Latitude, shelter.Longitude);
+
+                return new RouteInfoDto
+                {
+                    Distance = route?.Distance ?? 0,
+                    RoutePolyline = route?.OverviewPolyline,
+                    AllInstructions = route?.TextInstructions,
+                    CurrentInstruction = route?.TextInstructions?.FirstOrDefault(),
+                    EstimatedArrivalTime = DateTime.Now.AddMinutes(route?.Distance ?? 0 / WALKING_SPEED_KM_PER_MINUTE)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error recalculating route");
+                return null;
+            }
+        }
+
+        public async Task MarkUserAsArrived(int userId, int shelterId)
+        {
+            try
+            {
+                DBservicesShelter dbs = new DBservicesShelter();
+                dbs.UpdateVisitStatus(userId, shelterId, "ARRIVED");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking user as arrived");
+            }
+        }
+
+        public async Task<UserAllocation> GetActiveAllocationForUser(int userId)
+        {
+            try
+            {
+                DBservicesShelter dbs = new DBservicesShelter();
+                var allocation = dbs.GetActiveUserAllocation(userId);
+                if (allocation != null)
+                {
+                    var shelter = Shelter.getShelter(allocation.shelter_id);
+                    return new UserAllocation
+                    {
+                        UserId = userId,
+                        ShelterId = allocation.shelter_id,
+                        AlertId = allocation.alert_id,
+                        AllocationTime = allocation.arrival_time ?? DateTime.Now,
+                        Status = allocation.status,
+                        ShelterDetails = new ShelterDetailsDto
+                        {
+                            ShelterId = shelter.ShelterId,
+                            Name = shelter.Name,
+                            Address = shelter.Address,
+                            Latitude = shelter.Latitude,
+                            Longitude = shelter.Longitude
+                        }
+                    };
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting active allocation for user {UserId}", userId);
+                return null;
+            }
+        }
+
+        public async Task ReleaseUserFromShelter(int userId)
+        {
+            try
+            {
+                DBservicesShelter dbs = new DBservicesShelter();
+                dbs.ReleaseUserFromShelter(userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error releasing user from shelter");
+            }
+        }
+
+        public async Task UpdateUserAllocationStatus(int userId, string status)
+        {
+            try
+            {
+                DBservicesShelter dbs = new DBservicesShelter();
+                dbs.UpdateAllocationStatus(userId, status);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating allocation status");
+            }
+        }
+
         #endregion
 
         #region Helper Classes
@@ -536,7 +697,15 @@ namespace FC_Server.Services
             public int VulnerabilityScore { get; set; }
         }
 
-
         #endregion
+
+        public interface IShelterService
+        {
+            Task<UserAllocation> GetActiveAllocationForUser(int userId);
+            Task<RouteInfoDto> RecalculateRoute(int userId, double currentLat, double currentLon);
+            Task MarkUserAsArrived(int userId, int shelterId);
+            Task ReleaseUserFromShelter(int userId);
+            Task UpdateUserAllocationStatus(int userId, string status);
+        }
     }
 }
