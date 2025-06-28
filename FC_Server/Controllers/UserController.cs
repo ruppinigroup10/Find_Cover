@@ -16,7 +16,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            var newUser = FC_Server.Models.User.Register(user.Username, user.PasswordHash, user.Email, user.PhoneNumber);
+            var newUser = FC_Server.Models.User.Register(user.Username, user.PasswordHash, user.Email, user.PhoneNumber, user.Birthday);
 
             if (newUser != null)
             {

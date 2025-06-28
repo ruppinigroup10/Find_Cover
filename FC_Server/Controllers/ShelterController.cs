@@ -194,41 +194,5 @@ namespace FC_Server.Controllers
                 return BadRequest(new { message = "Deletion failed" });
             }
         }
-
-        //--------------------------------------------------------------------------------------------------
-        // Default controllers
-        //--------------------------------------------------------------------------------------------------
-
-        // GET: api/<ShelterController>
-        [HttpGet]
-        public IEnumerable<string> Get()
-        {
-            return new string[] { "value1", "value2" };
-        }
-
-        // GET api/<ShelterController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
-        }
-
-        // POST api/<ShelterController>
-        [HttpPost]
-        public void Post([FromBody] string value)
-        {
-        }
-
-        // PUT api/<ShelterController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
-        {
-        }
-
-        // DELETE api/<ShelterController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
-        }
     }
 }
