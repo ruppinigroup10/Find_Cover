@@ -3,7 +3,7 @@
     public class VisitHistory
     {
         public int VisitId { get; set; }
-        public DateTime ArrivalTime { get; set; }
+        public DateTime? ArrivalTime { get; set; }
         public string ShelterName { get; set; }
         public string ShelterAddress { get; set; }
         public string AdditionalInformation { get; set; }

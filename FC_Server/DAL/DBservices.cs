@@ -888,7 +888,7 @@ public class DBservices
                     VisitHistory visit = new VisitHistory
                     {
                         VisitId = Convert.ToInt32(dr["visit_id"]),
-                        ArrivalTime = Convert.ToDateTime(dr["arrival_time"]),
+                        ArrivalTime = dr["arrival_time"] != DBNull.Value ? Convert.ToDateTime(dr["arrival_time"]) : (DateTime?)null,
                         ShelterName = dr["shelter_name"].ToString() ?? "",
                         ShelterAddress = dr["shelter_address"].ToString() ?? "",
                         AdditionalInformation = dr["additional_information"].ToString() ?? ""
