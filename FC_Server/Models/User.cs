@@ -10,6 +10,7 @@
         private DateTime created_at;
         private bool is_active;
         private bool is_provider;
+        private DateTime birthday;
 
 
         public int UserId { get => user_id; set => user_id = value; }
@@ -20,6 +21,7 @@
         public DateTime CreatedAt { get => created_at; set => created_at = value; }
         public bool IsActive { get => is_active; set => is_active = value; }
         public bool IsProvider { get => is_provider; set => is_provider = value; }
+        public DateTime Birthday { get => birthday; set => birthday = value; }
 
         // Constructor without parameters
         public User()
@@ -32,6 +34,7 @@
             this.created_at = DateTime.Now;
             this.is_active = false;
             this.is_provider = false;
+            this.birthday = new DateTime();
         }
 
         // Constructor with parameters
@@ -47,10 +50,23 @@
             this.is_provider = isProvider;
         }
 
-        public static User? Register(string username, string password_hash, string email, string phone_number)
+        public User(int userId, string username, string passwordHash, string email, string phoneNumber, bool isActive, bool isProvider, DateTime birthday)
+        {
+            this.user_id = userId;
+            this.username = username;
+            this.password_hash = passwordHash;
+            this.email = email;
+            this.phone_number = phoneNumber;
+            this.created_at = DateTime.Now;
+            this.is_active = isActive;
+            this.is_provider = isProvider;
+            this.birthday = birthday;
+        }
+
+        public static User? Register(string username, string password_hash, string email, string phone_number, DateTime birthday)
         {
             DBservices dbs = new DBservices();
-            return dbs.RegisterUser(username, password_hash, email, phone_number);
+            return dbs.RegisterUser(username, password_hash, email, phone_number, birthday);
         }
 
         public static User? UpdateUser(int user_id, string username, string password_hash, string email, string phone_number)

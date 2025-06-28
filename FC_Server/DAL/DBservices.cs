@@ -51,7 +51,7 @@ public class DBservices
     //--------------------------------------------------------------------------------------------------
     // This method registers a user
     //--------------------------------------------------------------------------------------------------
-    public User? RegisterUser(string username, string password_hash, string email, string phone_number)
+    public User? RegisterUser(string username, string password_hash, string email, string phone_number, DateTime birthday)
     {
         SqlConnection con;
         SqlCommand cmd;
@@ -71,6 +71,7 @@ public class DBservices
         paramDic.Add("@password_hash", password_hash);
         paramDic.Add("@email", email);
         paramDic.Add("@phone_number", phone_number);
+        paramDic.Add("@birthday", birthday);
 
         cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_RegisterUser", con, paramDic);
 
@@ -87,7 +88,8 @@ public class DBservices
                         Email = dr["email"].ToString() ?? "",
                         PhoneNumber = dr["phone_number"].ToString() ?? "",
                         IsActive = Convert.ToBoolean(dr["is_active"]),
-                        IsProvider = Convert.ToBoolean(dr["is_provider"])
+                        IsProvider = Convert.ToBoolean(dr["is_provider"]),
+                        Birthday = Convert.ToDateTime(dr["birthday"])
                     };
                 }
             }
