@@ -24,8 +24,8 @@ namespace FC_Server.Controllers
 
             Alert fakeAlert = new Alert
             {
-                AlertTime = DateTime.UtcNow,
-                AlertType = "Simulated",
+                time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                threat = 1,
                 cities = new List<string> { "באר שבע - דרום", "באר שבע - מזרח", "באר שבע - מערב", "באר שבע - צפון" },
                 IsActive = true
             };
