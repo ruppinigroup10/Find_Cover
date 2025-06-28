@@ -22,6 +22,7 @@ namespace FC_Server.Controllers
         private readonly EmergencyAlertService _emergencyAlertService;
         private readonly UserLocationTrackingService _locationTrackingService;
         private readonly ILogger<EmergencyResponseController> _logger;
+        private readonly BatchShelterAllocationService _batchAllocationService;
 
         public EmergencyResponseController(
             ShelterAllocationService allocationService,
@@ -106,12 +107,10 @@ namespace FC_Server.Controllers
                     return BadRequest(new { success = false, message = "משתמש לא נמצא" });
                 }
 
-                var allocationResult = await _allocationService.AllocateShelterForUser(
-    user,
-    request.Latitude,
-    request.Longitude,
-    activeAlert.CenterLatitude,
-    activeAlert.CenterLongitude);
+                var allocationResult = await _batchAllocationService.RequestShelterAllocation(
+                            user, request.Latitude, request.Longitude,
+                            activeAlert.CenterLatitude, activeAlert.CenterLongitude,
+                            activeAlert.AlertId);
 
                 if (!allocationResult.Success)
                 {

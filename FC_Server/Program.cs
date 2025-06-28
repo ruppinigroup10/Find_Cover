@@ -36,7 +36,8 @@ builder.Services.AddScoped<DBservicesLocation>(provider =>
     return new DBservicesLocation(connectionString);
 });
 builder.Services.AddSingleton<FcmNotificationService>();
-
+builder.Services.AddSingleton<BatchShelterAllocationService>();
+builder.Services.AddHostedService<BatchShelterAllocationService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
