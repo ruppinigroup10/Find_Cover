@@ -23,6 +23,7 @@ public class FirebaseNotificationSender
             .FromFile(_serviceAccountPath)
             .CreateScoped(scopes);
 
+
         string accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
 
         using (var client = new HttpClient())
