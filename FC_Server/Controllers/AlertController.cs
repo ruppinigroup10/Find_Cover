@@ -17,7 +17,7 @@ namespace FC_Server.Controllers
         }
 
         [HttpPost]
-        [Route("api/alert/simulate")]
+        [Route("simulate")]
         public IActionResult SimulateFakeAlert()
         {
             DBservicesAlert db = new DBservicesAlert();
