@@ -18,7 +18,7 @@ namespace FC_Server.Controllers
 
         [HttpPost]
         [Route("simulate")]
-        public IActionResult SimulateFakeAlert()
+        public async Task<IActionResult> SimulateFakeAlert([FromServices] IConfiguration configuration)
         {
             DBservicesAlert db = new DBservicesAlert();
 
@@ -32,8 +32,41 @@ namespace FC_Server.Controllers
 
             db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
-            return Ok("Simulated alert sent successfully.");
+            // שליפת נתוני Firebase מה-configuration
+            var serviceAccountPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                configuration["Firebase:ServiceAccountPath"]
+            );
+            var projectId = configuration["Firebase:ProjectId"];
+
+            var fcmSender = new FirebaseNotificationSender(serviceAccountPath, projectId);
+            await fcmSender.SendNotificationAsync(
+                "אזעקה חדשה",
+                "יש התראה באזור באר שבע"
+            );
+
+            return Ok("Simulated alert sent and notification pushed.");
         }
+
+        /*  [HttpPost]
+          [Route("simulate")]
+          public IActionResult SimulateFakeAlert()
+          {
+              DBservicesAlert db = new DBservicesAlert();
+
+              Alert fakeAlert = new Alert
+              {
+                  time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                  threat = 1,
+                  cities = new List<string> { "באר שבע - דרום", "באר שבע - מזרח", "באר שבע - מערב", "באר שבע - צפון" },
+                  IsActive = true
+              };
+
+              db.SaveAlertsToDb(new List<Alert> { fakeAlert });
+
+
+              return Ok("Simulated alert sent successfully.");
+          }*/
 
 
     }
