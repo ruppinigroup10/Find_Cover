@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>יצירת פוליגונים לאזורי התרעה - עמק חפר</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f0f0f0;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .delete-btn {
+        background-color: #f44336;
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+      .delete-btn:hover {
+        background-color: #da190b;
+      }
+      input[type="text"] {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        width: 300px;
+      }
+      select {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      #map {
+        height: 600px;
+        width: 100%;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      .info-box {
+        background-color: #e3f2fd;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      .zone-colors {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin: 15px 0;
+        flex-wrap: wrap;
+      }
+      .zone-color {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+      }
+      .color-box {
+        width: 20px;
+        height: 20px;
+        border: 1px solid #333;
+        border-radius: 3px;
+      }
+      .polygons-list {
+        background-color: #f9f9f9;
+        padding: 15px;
+        border-radius: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .polygon-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .status-bar {
+        background-color: #fff3e0;
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 20px;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        margin-top: 10px;
+      }
+      .export-section {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+      .marker-label {
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 1px solid #333;
+        border-radius: 3px;
+        padding: 2px 5px;
+        font-weight: bold;
+      }
+      .shortcuts-info {
+        background-color: #fff3e0;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+      .shortcuts-info ul {
+        margin: 10px 0;
+        padding-right: 20px;
+      }
+    </style>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🗺️ יצירת פוליגונים לאזורי התרעה - עמק חפר</h1>
+
+      <div class="info-box">
+        <h3>הוראות שימוש:</h3>
+        <ol>
+          <li>לחץ על המפה כדי להוסיף נקודות לפוליגון</li>
+          <li>הזן שם לאזור ולחץ "שמור פוליגון"</li>
+          <li>חזור על התהליך עבור כל אזור</li>
+          <li>ייצא את הנתונים בפורמט הרצוי</li>
+        </ol>
+      </div>
+
+      <div class="shortcuts-info">
+        <strong>💡 טיפים:</strong>
+        <ul>
+          <li>השתמש בזום כדי לדייק בנקודות</li>
+          <li>הוסף לפחות 3 נקודות לכל פוליגון</li>
+          <li>עקוב אחרי כבישים ראשיים לגבולות ברורים</li>
+          <li>לחץ על פוליגון שמור כדי לראות את שמו</li>
+        </ul>
+      </div>
+
+      <div class="zone-colors">
+        <div class="zone-color">
+          <div class="color-box" style="background-color: #4a90e2"></div>
+          <span>עמק חפר צפון</span>
+        </div>
+        <div class="zone-color">
+          <div class="color-box" style="background-color: #e74c3c"></div>
+          <span>עמק חפר מערב</span>
+        </div>
+        <div class="zone-color">
+          <div class="color-box" style="background-color: #27ae60"></div>
+          <span>עמק חפר מזרח</span>
+        </div>
+        <div class="zone-color">
+          <div class="color-box" style="background-color: #f39c12"></div>
+          <span>עמק חפר דרום</span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input
+          type="text"
+          id="polygonName"
+          placeholder="שם האזור (למשל: עמק חפר צפון)"
+        />
+        <button id="savePolygon">💾 שמור פוליגון</button>
+        <button id="clearCurrent">🗑️ נקה נקודות</button>
+        <button id="undoLastPoint">↩️ בטל נקודה אחרונה</button>
+      </div>
+
+      <div class="status-bar" id="statusBar">
+        לחץ על המפה כדי להתחיל ליצור פוליגון
+      </div>
+
+      <div id="map"></div>
+
+      <div class="polygons-list">
+        <h3>📍 פוליגונים שנוצרו:</h3>
+        <div id="polygonsList"></div>
+      </div>
+
+      <div class="export-section">
+        <h3>📤 ייצוא נתונים:</h3>
+        <div class="controls">
+          <select id="exportFormat">
+            <option value="sql">SQL Insert Statements</option>
+            <option value="json">JSON</option>
+            <option value="csharp">C# Objects</option>
+            <option value="geojson">GeoJSON</option>
+          </select>
+          <button id="exportData">⬇️ הורד קובץ</button>
+          <button id="copyData">📋 העתק לקליפבורד</button>
+          <button id="showOutput">👁️ הצג תוצאה</button>
+        </div>
+        <div id="outputSection" style="display: none">
+          <textarea id="outputText" readonly></textarea>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Global variables
+      let map;
+      let currentMarkers = [];
+      let currentPolyline;
+      let polygons = [];
+      let savedPolygons = [];
+
+      // Zone colors
+      const zoneColors = {
+        "עמק חפר צפון": "#4A90E2",
+        "עמק חפר מערב": "#E74C3C",
+        "עמק חפר מזרח": "#27AE60",
+        "עמק חפר דרום": "#F39C12",
+      };
+
+      // Initialize map - Emek Hefer coordinates
+      map = L.map("map").setView([32.343735, 34.910549], 12);
+
+      // Add tile layer
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      // Add some helpful landmarks in Emek Hefer
+      const landmarks = [
+        { name: "המרכז האקדמי רופין", lat: 32.363, lng: 34.925 },
+        { name: "כפר ויתקין", lat: 32.379, lng: 34.861 },
+        { name: "קיבוץ עין החורש", lat: 32.369, lng: 34.89 },
+        { name: "בית ינאי", lat: 32.38, lng: 34.835 },
+        { name: "אביחיל", lat: 32.341, lng: 34.873 },
+        { name: "חדרה (צפון)", lat: 32.434, lng: 34.919 },
+        { name: "נתניה (דרום)", lat: 32.321, lng: 34.853 },
+        { name: "גבעת חיים", lat: 32.393, lng: 34.901 },
+        { name: "מכמורת", lat: 32.401, lng: 34.867 },
+      ];
+
+      landmarks.forEach((landmark) => {
+        L.marker([landmark.lat, landmark.lng], {
+          icon: L.divIcon({
+            className: "landmark-marker",
+            html: `<div style="background-color: white; padding: 2px 5px; border: 1px solid black; border-radius: 3px; font-size: 11px;">${landmark.name}</div>`,
+            iconAnchor: [40, 12],
+          }),
+        }).addTo(map);
+      });
+
+      // Initialize current polyline
+      currentPolyline = L.polyline([], {
+        color: "#FF0000",
+        weight: 3,
+        opacity: 0.7,
+        dashArray: "5, 10",
+      }).addTo(map);
+
+      // Map click handler
+      map.on("click", function (e) {
+        addPoint(e.latlng);
+      });
+
+      // Add point to current polygon
+      function addPoint(latlng) {
+        const point = {
+          lat: latlng.lat,
+          lng: latlng.lng,
+        };
+
+        // Add marker
+        const marker = L.marker([point.lat, point.lng], {
+          icon: L.divIcon({
+            className: "custom-div-icon",
+            html: `<div style="background-color: #FF0000; color: white; border-radius: 50%; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: bold; border: 2px solid white;">${
+              currentMarkers.length + 1
+            }</div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          }),
+        }).addTo(map);
+
+        marker.bindTooltip(`${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`, {
+          permanent: false,
+          direction: "top",
+        });
+
+        currentMarkers.push({ marker, point });
+        updatePolyline();
+        updateStatus();
+      }
+
+      // Update current polyline
+      function updatePolyline() {
+        const latlngs = currentMarkers.map((m) => [m.point.lat, m.point.lng]);
+        if (latlngs.length > 1) {
+          // Add closing line
+          currentPolyline.setLatLngs([...latlngs, latlngs[0]]);
+        } else {
+          currentPolyline.setLatLngs(latlngs);
+        }
+      }
+
+      // Update status bar
+      function updateStatus() {
+        const count = currentMarkers.length;
+        const statusBar = document.getElementById("statusBar");
+
+        if (count === 0) {
+          statusBar.textContent = "לחץ על המפה כדי להתחיל ליצור פוליגון";
+        } else if (count < 3) {
+          statusBar.textContent = `נוספו ${count} נקודות - נדרשות לפחות ${
+            3 - count
+          } נקודות נוספות`;
+        } else {
+          statusBar.textContent = `נוספו ${count} נקודות - ניתן לשמור את הפוליגון`;
+        }
+      }
+
+      // Save polygon
+      document.getElementById("savePolygon").addEventListener("click", () => {
+        if (currentMarkers.length < 3) {
+          alert("נדרשות לפחות 3 נקודות ליצירת פוליגון");
+          return;
+        }
+
+        const name = document.getElementById("polygonName").value.trim();
+        if (!name) {
+          alert("אנא הזן שם לאזור");
+          return;
+        }
+
+        // Get color based on name
+        const color =
+          zoneColors[name] || `hsl(${polygons.length * 60}, 70%, 50%)`;
+
+        // Create polygon
+        const points = currentMarkers.map((m) => m.point);
+        const polygon = L.polygon(
+          points.map((p) => [p.lat, p.lng]),
+          {
+            color: color,
+            weight: 2,
+            opacity: 0.8,
+            fillColor: color,
+            fillOpacity: 0.3,
+          }
+        ).addTo(map);
+
+        polygon.bindPopup(
+          `<strong>${name}</strong><br>נקודות: ${points.length}`
+        );
+
+        // Save polygon data
+        polygons.push({
+          name: name,
+          points: points,
+          polygon: polygon,
+        });
+
+        // Clear current
+        clearCurrent();
+        document.getElementById("polygonName").value = "";
+        updatePolygonsList();
+      });
+
+      // Clear current polygon
+      function clearCurrent() {
+        currentMarkers.forEach((m) => map.removeLayer(m.marker));
+        currentMarkers = [];
+        currentPolyline.setLatLngs([]);
+        updateStatus();
+      }
+
+      // Undo last point
+      document.getElementById("undoLastPoint").addEventListener("click", () => {
+        if (currentMarkers.length > 0) {
+          const last = currentMarkers.pop();
+          map.removeLayer(last.marker);
+          updatePolyline();
+          updateStatus();
+        }
+      });
+
+      // Clear current button
+      document
+        .getElementById("clearCurrent")
+        .addEventListener("click", clearCurrent);
+
+      // Update polygons list
+      function updatePolygonsList() {
+        const list = document.getElementById("polygonsList");
+        list.innerHTML = "";
+
+        polygons.forEach((polygon, index) => {
+          const div = document.createElement("div");
+          div.className = "polygon-item";
+          div.innerHTML = `
+                    <span>
+                        <strong>${polygon.name}</strong> 
+                        (${polygon.points.length} נקודות)
+                    </span>
+                    <button class="delete-btn" onclick="deletePolygon(${index})">מחק</button>
+                `;
+          list.appendChild(div);
+        });
+      }
+
+      // Delete polygon
+      window.deletePolygon = function (index) {
+        const polygon = polygons[index];
+        map.removeLayer(polygon.polygon);
+        polygons.splice(index, 1);
+        updatePolygonsList();
+      };
+
+      // Generate output
+      function generateOutput(format) {
+        let output = "";
+
+        switch (format) {
+          case "json":
+            const jsonData = polygons.map((p) => ({
+              name: p.name,
+              coordinates: p.points,
+            }));
+            output = JSON.stringify(jsonData, null, 2);
+            break;
+
+          case "sql":
+            output = polygons
+              .map((polygon, index) => {
+                const coordsJson = JSON.stringify(polygon.points);
+                return `INSERT INTO AlertZones (Id, ZoneName, PolygonCoordinates) VALUES (${
+                  index + 1
+                }, '${polygon.name}', '${coordsJson}');`;
+              })
+              .join("\n\n");
+            break;
+
+          case "csharp":
+            output = "var alertZones = new List<AlertZone>\n{\n";
+            output += polygons
+              .map((polygon, index) => {
+                const pointsStr = polygon.points
+                  .map(
+                    (p) =>
+                      `new Coordinate { Latitude = ${p.lat.toFixed(
+                        6
+                      )}f, Longitude = ${p.lng.toFixed(6)}f }`
+                  )
+                  .join(",\n            ");
+                return `    new AlertZone
+    {
+        Id = ${index + 1},
+        ZoneName = "${polygon.name}",
+        Coordinates = new List<Coordinate>
+        {
+            ${pointsStr}
+        }
+    }`;
+              })
+              .join(",\n");
+            output += "\n};";
+            break;
+
+          case "geojson":
+            const features = polygons.map((polygon) => ({
+              type: "Feature",
+              properties: {
+                name: polygon.name,
+                pointCount: polygon.points.length,
+              },
+              geometry: {
+                type: "Polygon",
+                coordinates: [polygon.points.map((p) => [p.lng, p.lat])],
+              },
+            }));
+            output = JSON.stringify(
+              {
+                type: "FeatureCollection",
+                features: features,
+              },
+              null,
+              2
+            );
+            break;
+        }
+
+        return output;
+      }
+
+      // Export data
+      document.getElementById("exportData").addEventListener("click", () => {
+        if (polygons.length === 0) {
+          alert("אין פוליגונים לייצוא");
+          return;
+        }
+
+        const format = document.getElementById("exportFormat").value;
+        const output = generateOutput(format);
+
+        const blob = new Blob([output], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `emek_hefer_alert_zones.${
+          format === "csharp" ? "cs" : format
+        }`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Copy to clipboard
+      document.getElementById("copyData").addEventListener("click", () => {
+        if (polygons.length === 0) {
+          alert("אין פוליגונים להעתקה");
+          return;
+        }
+
+        const format = document.getElementById("exportFormat").value;
+        const output = generateOutput(format);
+
+        navigator.clipboard
+          .writeText(output)
+          .then(() => {
+            alert("הנתונים הועתקו ללוח!");
+          })
+          .catch(() => {
+            const textarea = document.getElementById("outputText");
+            textarea.value = output;
+            textarea.select();
+            document.execCommand("copy");
+            alert("הנתונים הועתקו ללוח!");
+          });
+      });
+
+      // Show output
+      document.getElementById("showOutput").addEventListener("click", () => {
+        const outputSection = document.getElementById("outputSection");
+        const isHidden = outputSection.style.display === "none";
+
+        if (isHidden && polygons.length > 0) {
+          const format = document.getElementById("exportFormat").value;
+          document.getElementById("outputText").value = generateOutput(format);
+          outputSection.style.display = "block";
+        } else {
+          outputSection.style.display = "none";
+        }
+      });
+
+      // Update export format
+      document.getElementById("exportFormat").addEventListener("change", () => {
+        const outputSection = document.getElementById("outputSection");
+        if (outputSection.style.display === "block" && polygons.length > 0) {
+          const format = document.getElementById("exportFormat").value;
+          document.getElementById("outputText").value = generateOutput(format);
+        }
+      });
+    </script>
+  </body>
+</html>
