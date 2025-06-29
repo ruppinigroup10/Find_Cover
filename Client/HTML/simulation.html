@@ -603,7 +603,7 @@
 
         const result = await callApi(
           "POST",
-          "https://localhost:7203/api/EmergencyResponse/get-shelter-route",
+          "https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/get-shelter-route",
           body
         );
         displayResponse("response1", testId, result);
@@ -697,7 +697,7 @@
 
         const result = await callApi(
           "POST",
-          "https://localhost:7203/api/EmergencyResponse/update-location",
+          "https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/update-location",
           body
         );
         displayResponse("response2", testId, result);
@@ -710,7 +710,7 @@
         const userId = document.getElementById("userId3").value;
         const result = await callApi(
           "GET",
-          `https://localhost:7203/api/EmergencyResponse/check-emergency-status?userId=${userId}`
+          `https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/check-emergency-status?userId=${userId}`
         );
         displayResponse("response3", testId, result);
       }
@@ -725,7 +725,7 @@
 
         const result = await callApi(
           "GET",
-          `https://localhost:7203/api/EmergencyResponse/area-shelters-status?latitude=${lat}&longitude=${lng}&radiusKm=${radius}`
+          `https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/area-shelters-status?latitude=${lat}&longitude=${lng}&radiusKm=${radius}`
         );
         displayResponse("response4", testId, result);
 
@@ -801,7 +801,7 @@
         simLog("שלב 1: מבקש נתיב למקלט...");
         const routeResult = await callApi(
           "POST",
-          "https://localhost:7203/api/EmergencyResponse/get-shelter-route",
+          "https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/get-shelter-route",
           {
             userId: userId,
             latitude: lat,
@@ -916,7 +916,7 @@
           // Update location
           const updateResult = await callApi(
             "POST",
-            "https://localhost:7203/api/EmergencyResponse/update-location",
+            "https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/update-location",
             {
               userId: userId,
               latitude: lat,
@@ -939,7 +939,7 @@
                 simLog("שלב 3: בודק סטטוס סופי...");
                 const statusResult = await callApi(
                   "GET",
-                  `https://localhost:7203/api/EmergencyResponse/check-emergency-status?userId=${userId}`
+                  `https://proj.ruppin.ac.il/igroup10/test2/tar1/api/EmergencyResponse/check-emergency-status?userId=${userId}`
                 );
 
                 if (statusResult.success) {
