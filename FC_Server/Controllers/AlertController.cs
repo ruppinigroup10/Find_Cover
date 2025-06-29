@@ -40,7 +40,15 @@ namespace FC_Server.Controllers
 
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
-                await _fcmSender.SendNotificationAsync();
+                await _fcmSender.SendNotificationAsync(
+    data: new Dictionary<string, string>
+    {
+        { "type", "trigger_location" },
+        { "code", "FIND_SHELTER" }
+    },
+    topic: "alerts"
+);
+
 
                 return Ok("Simulated alert sent and notification pushed.");
             }
