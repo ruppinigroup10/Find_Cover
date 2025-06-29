@@ -23,24 +23,204 @@ namespace FC_Server.Controllers
         private readonly UserLocationTrackingService _locationTrackingService;
         private readonly ILogger<EmergencyResponseController> _logger;
         private readonly BatchShelterAllocationService _batchAllocationService;
+        private readonly FirebaseNotificationSender _notificationSender;
 
         public EmergencyResponseController(
             BatchShelterAllocationService batchAllocationService,
             //ShelterAllocationService allocationService,
             EmergencyAlertService emergencyAlertService,
             UserLocationTrackingService locationTrackingService,
-            ILogger<EmergencyResponseController> logger)
+            ILogger<EmergencyResponseController> logger,
+            FirebaseNotificationSender notificationSender)
         {
             _batchAllocationService = batchAllocationService;
             //_allocationService = allocationService;
             _emergencyAlertService = emergencyAlertService;
             _locationTrackingService = locationTrackingService;
             _logger = logger;
+            _notificationSender = notificationSender;
+
         }
 
         /// <summary>
         /// קבלת נתיב למרחב מוגן בזמן אזעקה
         /// </summary>
+        [HttpPost("get-shelter-route")]
+        public async Task<IActionResult> GetShelterRoute([FromBody] UserLocationRequest request)
+        {
+            try
+            {
+                // בדיקה אם יש אזעקה פעילה באזור
+                var activeAlert = await _emergencyAlertService.GetActiveAlertForLocation(
+                    request.Latitude,
+                    request.Longitude);
+
+                if (activeAlert == null)
+                {
+                    return Ok(new ShelterRouteResponse
+                    {
+                        Success = false,
+                        Message = "אין התראה פעילה באזור שלך",
+                        RequiresAction = false
+                    });
+                }
+
+                // Check for existing allocation FOR THIS SPECIFIC ALERT
+                DBservicesShelter dbs = new DBservicesShelter();
+                var existingVisit = dbs.GetActiveUserAllocationForAlert(request.UserId, activeAlert.AlertId);
+                UserAllocation existingAllocation = null;
+
+                // בדיקה אם המשתמש כבר מוקצה למרחב מוגן
+                if (existingVisit != null && existingVisit.alert_id == activeAlert.AlertId)
+                {
+                    var shelter = Shelter.getShelter(existingVisit.shelter_id);
+                    existingAllocation = new UserAllocation
+                    {
+                        UserId = request.UserId,
+                        ShelterId = existingVisit.shelter_id,
+                        AlertId = existingVisit.alert_id,
+                        AllocationTime = existingVisit.arrival_time ?? DateTime.Now,
+                        Status = existingVisit.status,
+                        ShelterDetails = new ShelterDetailsDto
+                        {
+                            ShelterId = shelter.ShelterId,
+                            Name = shelter.Name,
+                            Address = shelter.Address,
+                            Latitude = shelter.Latitude,
+                            Longitude = shelter.Longitude
+                        }
+                    };
+                }
+
+                if (existingAllocation != null)
+                {
+                    // המשתמש כבר מוקצה - בדוק אם הגיע או בדרך
+                    var locationStatus = await CheckUserLocationStatus(
+                        request.UserId,
+                        request.Latitude,
+                        request.Longitude,
+                        existingAllocation);
+
+                    if (locationStatus.HasArrivedAtShelter)
+                    {
+                        return Ok(new ShelterRouteResponse
+                        {
+                            Success = true,
+                            Message = "הגעת למרחב המוגן",
+                            HasArrived = true,
+                            ShelterDetails = existingAllocation.ShelterDetails,
+                            RequiresAction = false
+                        });
+                    }
+
+                    // עדיין בדרך - החזר נתיב מעודכן
+                    var updatedRoute = await _batchAllocationService.RecalculateRoute(
+                            request.UserId,
+                            request.Latitude,
+                            request.Longitude);
+
+                    return Ok(new ShelterRouteResponse
+                    {
+                        Success = true,
+                        Message = "המשך לנווט למרחב המוגן",
+                        ShelterDetails = existingAllocation.ShelterDetails,
+                        RouteInfo = updatedRoute,
+                        RequiresAction = true,
+                        ActionType = "NAVIGATE"
+                    });
+                }
+
+                // משתמש חדש - הקצה מרחב מוגן
+                var user = FC_Server.Models.User.getUser(request.UserId);
+                if (user == null)
+                {
+                    return BadRequest(new { success = false, message = "משתמש לא נמצא" });
+                }
+
+                var allocationResult = await _batchAllocationService.RequestShelterAllocation(
+                    user,
+                    request.Latitude,
+                    request.Longitude,
+                    activeAlert.CenterLatitude,
+                    activeAlert.CenterLongitude,
+                    activeAlert.AlertId);
+
+                if (!allocationResult.Success)
+                {
+                    return Ok(new ShelterRouteResponse
+                    {
+                        Success = false,
+                        Message = allocationResult.Message,
+                        RequiresAction = true,
+                        ActionType = "FIND_ALTERNATIVE",
+                        RecommendedAction = allocationResult.RecommendedAction
+                    });
+                }
+
+                // הקצאה הצליחה - התחל מעקב אחר המשתמש
+                await _locationTrackingService.StartTrackingUser(
+                    request.UserId,
+                    allocationResult.AllocatedShelterId.Value,
+                    request.Latitude,
+                    request.Longitude);
+/*
+                // ======== כאן נוסף: שליחת התראת FCM למשתמש ========
+                try
+                {
+                    await _notificationSender.SendNotificationAsync(
+                        shelterId: allocationResult.AllocatedShelterId.Value.ToString(),
+                        latitude: allocationResult.ShelterDetails.Latitude,
+                        longitude: allocationResult.ShelterDetails.Longitude
+                    );
+
+                    _logger.LogInformation("FCM notification sent successfully to user {UserId}", request.UserId);
+                }
+                catch (Exception fcmEx)
+                {
+                    _logger.LogError(fcmEx, "Failed to send FCM notification to user {UserId}", request.UserId);
+                }
+                // ========================================================
+*/
+                return Ok(new ShelterRouteResponse
+                {
+                    Success = true,
+                    Message = "הוקצה מרחב מוגן - התחל לנווט",
+                    ShelterDetails = new ShelterDetailsDto
+                    {
+                        ShelterId = allocationResult.AllocatedShelterId.Value,
+                        Name = allocationResult.ShelterName,
+                        Address = allocationResult.ShelterDetails.Address,
+                        Latitude = allocationResult.ShelterDetails.Latitude,
+                        Longitude = allocationResult.ShelterDetails.Longitude,
+                        Distance = allocationResult.Distance
+                    },
+                    RouteInfo = new RouteInfoDto
+                    {
+                        Distance = allocationResult.Distance.Value,
+                        EstimatedArrivalTime = allocationResult.EstimatedArrivalTime,
+                        RoutePolyline = allocationResult.RoutePolyline,
+                        CurrentInstruction = allocationResult.RouteInstructions?.FirstOrDefault(),
+                        AllInstructions = allocationResult.RouteInstructions
+                    },
+                    RequiresAction = true,
+                    ActionType = "NAVIGATE"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting shelter route for user {UserId}", request.UserId);
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "אירעה שגיאה במציאת מרחב מוגן"
+                });
+            }
+        }
+
+
+
+        /*קסניה*/
+        /*
         [HttpPost("get-shelter-route")]
         public async Task<IActionResult> GetShelterRoute([FromBody] UserLocationRequest request)
         {
@@ -199,6 +379,7 @@ namespace FC_Server.Controllers
                 });
             }
         }
+         */
 
         /// <summary>
         /// עדכון מיקום משתמש - נקרא באופן תקופתי מהלקוח
@@ -531,6 +712,7 @@ namespace FC_Server.Controllers
                     stackTrace = ex.StackTrace
                 });
             }
+
         }
 
         /// <summary>
@@ -685,6 +867,7 @@ namespace FC_Server.Controllers
         }
 
         #endregion
-    }
+    
 
+    } 
 }
