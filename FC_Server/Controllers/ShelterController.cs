@@ -1,8 +1,8 @@
 ﻿using FC_Server.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
+using FC_Server.DAL;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace FC_Server.Controllers
 {
@@ -10,21 +10,80 @@ namespace FC_Server.Controllers
     [ApiController]
     public class ShelterController : ControllerBase
     {
+
+        private readonly IGoogleMapsService _googleMapsService;
+
+        // Add constructor to inject GoogleMapsService
+        public ShelterController(IGoogleMapsService googleMapsService)
+        {
+            _googleMapsService = googleMapsService;
+        }
+
+        // POST api/<ShelterController>/AddShelter
+        // [HttpPost("AddShelter")]
+        // public IActionResult AddShelter([FromBody] FC_Server.Models.Shelter shelter)
+        // {
+        //     try
+        //     {
+        //         var newShelter = FC_Server.Models.Shelter.AddShelter("", shelter.Name, 0, 0,
+        //                         shelter.Address, shelter.Capacity, shelter.IsAccessible, shelter.PetsFriendly,
+        //                         shelter.AdditionalInformation, shelter.ProviderId);
+
+        //         if (newShelter != null)
+        //         {
+        //             return Ok(new
+        //             {
+        //                 message = "Added successfuly",
+        //                 shelter = newShelter
+        //             });
+        //         }
+        //         return BadRequest(new { message = "Add failed" });
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         if (ex.Message.Contains("User added this shelter already"))
+        //         {
+        //             return BadRequest(new { message = "User added this shelter already" });
+        //         }
+        //         if (ex.Message.Contains("User not exist"))
+        //         {
+        //             return BadRequest(new { message = "User not exist" });
+        //         }
+        //         throw new Exception("Addition failed");
+        //     }
+        // }
+
+
         // POST api/<ShelterController>/AddShelter
         [HttpPost("AddShelter")]
-        public IActionResult AddShelter([FromBody] FC_Server.Models.Shelter shelter)
+        public async Task<IActionResult> AddShelter([FromBody] FC_Server.Models.Shelter shelter)
         {
             try
             {
-                var newShelter = FC_Server.Models.Shelter.AddShelter("", shelter.Name, 0, 0,
-                                shelter.Address, shelter.Capacity, shelter.IsAccessible, shelter.PetsFriendly,
-                                shelter.AdditionalInformation, shelter.ProviderId);
+                // Handle nullable coordinates - use 0 as default if null
+                float latitude = shelter.Latitude;
+                float longitude = shelter.Longitude;
+
+                // Note the await and passing googleMapsService
+                var newShelter = await FC_Server.Models.Shelter.AddShelter(
+                    "",
+                    shelter.Name,
+                    latitude,
+                    longitude,
+                    shelter.Address,
+                    shelter.Capacity,
+                    shelter.IsAccessible,
+                    shelter.PetsFriendly,
+                    shelter.AdditionalInformation,
+                    shelter.ProviderId,
+                    _googleMapsService
+                );
 
                 if (newShelter != null)
                 {
                     return Ok(new
                     {
-                        message = "Added successfuly",
+                        message = "Added successfully",
                         shelter = newShelter
                     });
                 }
@@ -42,6 +101,36 @@ namespace FC_Server.Controllers
                 }
                 throw new Exception("Addition failed");
             }
+        }
+
+        // Direct geocoding
+        [HttpGet("geocode")]
+        public async Task<IActionResult> GeocodeAddress([FromQuery] string address)
+        {
+            var coordinates = await _googleMapsService.GetCoordinatesFromAddressAsync(address);
+            if (coordinates.HasValue)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    latitude = coordinates.Value.latitude,
+                    longitude = coordinates.Value.longitude
+                });
+            }
+            return NotFound(new { success = false, message = "Could not geocode address" });
+        }
+
+
+        // Reverse geocoding endpoint
+        [HttpGet("reverse-geocode")]
+        public async Task<IActionResult> ReverseGeocode([FromQuery] float latitude, [FromQuery] float longitude)
+        {
+            var address = await _googleMapsService.GetAddressFromCoordinatesAsync(latitude, longitude);
+            if (!string.IsNullOrEmpty(address))
+            {
+                return Ok(new { success = true, address = address });
+            }
+            return NotFound(new { success = false, message = "Could not find address" });
         }
 
         // PUT api/<ShelterController>/UpdateShelter

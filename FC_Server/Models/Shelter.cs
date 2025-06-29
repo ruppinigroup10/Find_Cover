@@ -1,4 +1,7 @@
-﻿namespace FC_Server.Models
+﻿using FC_Server.DAL;
+
+
+namespace FC_Server.Models
 {
     public class Shelter
     {
@@ -73,17 +76,58 @@
             this.additional_information = additionalInformation;
         }
 
-        public static Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
-                                            string address, int capacity,
-                                            bool is_accessible, bool pets_friendly,
-                                            string additional_information, int provider_id)
+        // public static Shelter? AddShelter(string shelter_type, string name, float latitude, float longitude,
+        //                                     string address, int capacity,
+        //                                     bool is_accessible, bool pets_friendly,
+        //                                     string additional_information, int provider_id)
+        // {
+        //     shelter_type = "פרטי";
+        //     latitude = 31.2518f;
+        //     longitude = 34.7913f;
+        //     DBservicesShelter dbs = new DBservicesShelter();
+        //     return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity,
+        //                                     is_accessible, pets_friendly, additional_information, provider_id);
+        // }
+
+        public static async Task<Shelter?> AddShelter(string shelter_type, string name, float latitude, float longitude,
+            string address, int capacity, bool is_accessible, bool pets_friendly,
+            string additional_information, int provider_id, IGoogleMapsService googleMapsService)
         {
             shelter_type = "פרטי";
-            latitude = 31.2518f;
-            longitude = 34.7913f;
+
+            // Check if we're using default coordinates or if coordinates are missing
+            bool usingDefaultCoordinates = (latitude == 31.2518f && longitude == 34.7913f) ||
+                                           (latitude == 0 && longitude == 0);
+
+            // If using default coordinates and we have an address, geocode it
+            if (usingDefaultCoordinates && !string.IsNullOrEmpty(address))
+            {
+                var coordinates = await googleMapsService.GetCoordinatesFromAddressAsync(address);
+                if (coordinates.HasValue)
+                {
+                    latitude = coordinates.Value.latitude;
+                    longitude = coordinates.Value.longitude;
+                }
+                else
+                {
+                    // Keep default Beer Sheva coordinates if geocoding fails
+                    latitude = 31.2518f;
+                    longitude = 34.7913f;
+                }
+            }
+            // If we have coordinates but no address, get address from coordinates
+            else if (string.IsNullOrEmpty(address) && !usingDefaultCoordinates)
+            {
+                string geocodedAddress = await googleMapsService.GetAddressFromCoordinatesAsync(latitude, longitude);
+                if (!string.IsNullOrEmpty(geocodedAddress))
+                {
+                    address = geocodedAddress;
+                }
+            }
+
             DBservicesShelter dbs = new DBservicesShelter();
             return dbs.AddShelter(shelter_type, name, latitude, longitude, address, capacity,
-                                            is_accessible, pets_friendly, additional_information, provider_id);
+                is_accessible, pets_friendly, additional_information, provider_id);
         }
 
         public static Shelter? UpdateShelter(int shelter_id, string shelter_type, string name, float latitude, float longitude,

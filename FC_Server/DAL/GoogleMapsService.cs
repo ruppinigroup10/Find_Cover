@@ -24,6 +24,10 @@ namespace FC_Server.DAL
             List<PersonDto> people,
             List<ShelterDto> shelters,
             Dictionary<int, AssignmentDto> assignments);
+
+        //for geolocation
+        Task<(float latitude, float longitude)?> GetCoordinatesFromAddressAsync(string address);
+        Task<string> GetAddressFromCoordinatesAsync(float latitude, float longitude);
     }
 
     /// <summary>
@@ -37,6 +41,7 @@ namespace FC_Server.DAL
         private readonly string _apiKey;
         private const string DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json";
         private const string DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
+        private const string GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 
         public GoogleMapsService(
             HttpClient httpClient,
@@ -219,6 +224,105 @@ namespace FC_Server.DAL
                 };
             }
         }
+
+
+        /// <summary>
+        /// geocoding methods - start
+        /// </summary>
+        public async Task<(float latitude, float longitude)?> GetCoordinatesFromAddressAsync(string address)
+        {
+            try
+            {
+                // Add Israel to the address for better results if not already present
+                if (!address.Contains("ישראל") && !address.Contains("Israel"))
+                {
+                    address += ", ישראל";
+                }
+
+                var queryParams = new Dictionary<string, string>
+                {
+                    ["address"] = address,
+                    ["key"] = _apiKey,
+                    ["language"] = "he"
+                };
+
+                var url = BuildUrl(GEOCODE_URL, queryParams);
+
+                var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var jObject = JObject.Parse(json);
+
+                    if (jObject["status"]?.ToString() == "OK" && jObject["results"].HasValues)
+                    {
+                        var location = jObject["results"][0]["geometry"]["location"];
+                        float lat = float.Parse(location["lat"].ToString());
+                        float lng = float.Parse(location["lng"].ToString());
+
+                        _logger.LogInformation($"Successfully geocoded address: {address} to {lat}, {lng}");
+                        return (lat, lng);
+                    }
+                }
+
+                _logger.LogWarning($"Failed to geocode address: {address}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error geocoding address: {address}");
+            }
+
+            return null;
+        }
+
+        public async Task<string> GetAddressFromCoordinatesAsync(float latitude, float longitude)
+        {
+            try
+            {
+                var queryParams = new Dictionary<string, string>
+                {
+                    ["latlng"] = $"{latitude},{longitude}",
+                    ["key"] = _apiKey,
+                    ["language"] = "he"
+                };
+
+                var url = BuildUrl(GEOCODE_URL, queryParams);
+
+                var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var jObject = JObject.Parse(json);
+
+                    if (jObject["status"]?.ToString() == "OK" && jObject["results"].HasValues)
+                    {
+                        var address = jObject["results"][0]["formatted_address"].ToString();
+                        _logger.LogInformation($"Successfully reverse geocoded {latitude}, {longitude} to: {address}");
+                        return address;
+                    }
+                }
+
+                _logger.LogWarning($"Failed to reverse geocode coordinates: {latitude}, {longitude}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reverse geocoding: {latitude}, {longitude}");
+            }
+
+            return "";
+        }
+
+        private string BuildUrl(string baseUrl, Dictionary<string, string> queryParams)
+        {
+            var query = string.Join("&", queryParams.Select(kv =>
+                $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
+            return $"{baseUrl}?{query}";
+        }
+
+        /// <summary>
+        /// geocoding methods - end
+        /// </summary>
+
 
         #region Private Methods
 
