@@ -16,7 +16,7 @@ public class FirebaseNotificationSender
         _projectId = projectId;
     }
 
-    public async Task SendNotificationAsync(string title, string body, string topic = "alerts")
+    public async Task SendNotificationAsync(string title = "", string body = "", string topic = "alerts")
     {
         string[] scopes = { "https://www.googleapis.com/auth/firebase.messaging" };
         GoogleCredential credential = GoogleCredential
@@ -60,7 +60,7 @@ public class FirebaseNotificationSender
     }
 }
 
-
+/*--------------------------------------*/
 /*using Google.Apis.Auth.OAuth2;
 using System.Net.Http.Headers;
 using System.Text;

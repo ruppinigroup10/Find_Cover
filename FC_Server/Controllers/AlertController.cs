@@ -7,6 +7,15 @@ namespace FC_Server.Controllers
     [ApiController]
     public class AlertController : ControllerBase
     {
+        private readonly FirebaseNotificationSender _fcmSender;
+        private readonly DBservicesAlert _db;
+
+        public AlertController(FirebaseNotificationSender fcmSender, DBservicesAlert db)
+        {
+            _fcmSender = fcmSender;
+            _db = db;
+        }
+
         [HttpGet("fetch")]
         public async Task<IActionResult> FetchAndSaveAlerts()
         {
@@ -15,38 +24,32 @@ namespace FC_Server.Controllers
             db.SaveAlertsToDb(alerts);
             return Ok(new { message = $"{alerts.Count} alerts processed" });
         }
-
         [HttpPost]
         [Route("simulate")]
-        public async Task<IActionResult> SimulateFakeAlert([FromServices] IConfiguration configuration)
+        public async Task<IActionResult> SimulateFakeAlert()
         {
-            DBservicesAlert db = new DBservicesAlert();
-
-            Alert fakeAlert = new Alert
+            try
             {
-                time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                threat = 1,
-                cities = new List<string> { "באר שבע - דרום", "באר שבע - מזרח", "באר שבע - מערב", "באר שבע - צפון" },
-                IsActive = true
-            };
+                Alert fakeAlert = new Alert
+                {
+                    time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    threat = 1,
+                    cities = new List<string> { "באר שבע - דרום", "באר שבע - מזרח", "באר שבע - מערב", "באר שבע - צפון" },
+                    IsActive = true
+                };
 
-            db.SaveAlertsToDb(new List<Alert> { fakeAlert });
+                _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
-            // שליפת נתוני Firebase מה-configuration
-            var serviceAccountPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                configuration["Firebase:ServiceAccountPath"]
-            );
-            var projectId = configuration["Firebase:ProjectId"];
+                await _fcmSender.SendNotificationAsync();
 
-            var fcmSender = new FirebaseNotificationSender(serviceAccountPath, projectId);
-            await fcmSender.SendNotificationAsync(
-                "אזעקה חדשה",
-                "יש התראה באזור באר שבע"
-            );
-
-            return Ok("Simulated alert sent and notification pushed.");
+                return Ok("Simulated alert sent and notification pushed.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"שגיאה פנימית: {ex.Message}");
+            }
         }
+
 
         /*  [HttpPost]
           [Route("simulate")]

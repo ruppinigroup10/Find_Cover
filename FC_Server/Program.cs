@@ -36,12 +36,11 @@ builder.Services.AddScoped<DBservicesLocation>(provider =>
     return new DBservicesLocation(connectionString);
 });
 
-builder.Services.AddSingleton<FirebaseNotificationSender>();
 builder.Services.AddSingleton<BatchShelterAllocationService>();
 builder.Services.AddHostedService<BatchShelterAllocationService>();
 
 // הוספת התמיכה בקונפיגורציה של Firebase
-builder.Services.AddTransient<FirebaseNotificationSender>(sp =>
+builder.Services.AddSingleton<FirebaseNotificationSender>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
     var serviceAccountPath = Path.Combine(
@@ -51,6 +50,7 @@ builder.Services.AddTransient<FirebaseNotificationSender>(sp =>
     var projectId = config["Firebase:ProjectId"];
     return new FirebaseNotificationSender(serviceAccountPath, projectId);
 });
+
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
