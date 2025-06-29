@@ -24,6 +24,7 @@ namespace FC_Server.Controllers
             db.SaveAlertsToDb(alerts);
             return Ok(new { message = $"{alerts.Count} alerts processed" });
         }
+
         [HttpPost]
         [Route("simulate")]
         public async Task<IActionResult> SimulateFakeAlert()
@@ -41,13 +42,47 @@ namespace FC_Server.Controllers
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
                 await _fcmSender.SendNotificationAsync(
-    data: new Dictionary<string, string>
-    {
-        { "type", "trigger_location" },
-        { "code", "FIND_SHELTER" }
-    },
-    topic: "alerts"
-);
+                        data: new Dictionary<string, string>
+                        {
+                            { "type", "trigger_location" },
+                            { "code", "FIND_SHELTER" }
+                        },
+                        topic: "alerts"
+                    );
+
+
+                return Ok("Simulated alert sent and notification pushed.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"שגיאה פנימית: {ex.Message}");
+            }
+        }
+
+        [HttpPost]
+        [Route("simulateEmekHefer")]
+        public async Task<IActionResult> SimulateFakeAlertEmekHefer()
+        {
+            try
+            {
+                Alert fakeAlert = new Alert
+                {
+                    time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    threat = 1,
+                    cities = new List<string> { "עמק חפר" },
+                    IsActive = true
+                };
+
+                _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
+
+                await _fcmSender.SendNotificationAsync(
+                        data: new Dictionary<string, string>
+                        {
+                            { "type", "trigger_location" },
+                            { "code", "FIND_SHELTER" }
+                        },
+                        topic: "alerts"
+                    );
 
 
                 return Ok("Simulated alert sent and notification pushed.");
