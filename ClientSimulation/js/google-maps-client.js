@@ -4,16 +4,16 @@
  */
 
 //old version
-// class GoogleMapsClient {
-//   constructor(baseUrl = "https://localhost", port = 7777) {
-//     this.baseUrl = `${baseUrl}:${port}/api/GoogleMaps`;
-//   }
-
-//new version
 class GoogleMapsClient {
-  constructor(baseUrl = "https://localhost:7777/api/GoogleMaps") {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl = "https://localhost", port = 7777) {
+    this.baseUrl = `${baseUrl}:${port}/api/GoogleMaps`;
   }
+
+  // //new version
+  // class GoogleMapsClient {
+  //   constructor(baseUrl = "https://localhost:7777/api/GoogleMaps") {
+  //     this.baseUrl = baseUrl;
+  //   }
 
   /**
    * Calculate walking distances between multiple origins and destinations
@@ -325,14 +325,13 @@ async function runServerSimulationWithWalkingDistances() {
 
     console.log("Calling server to run simulation with walking distances...");
 
-    // Call the server endpoint that handles EVERYTHING including Google Maps
+    //Call the server endpoint that handles EVERYTHING including Google Maps
     //old version
-    // const response = await fetch(
-    //   `https://localhost:${PORT}/api/Simulation/run-with-walking-distances`,
-
-    //new version
     const response = await fetch(
-      `https://proj.ruppin.ac.il/igroup18/test2/tar1/api/Simulation/run-with-walking-distances`,
+      `https://localhost:${PORT}/api/Simulation/run-with-walking-distances`,
+      // //new version
+      // const response = await fetch(
+      //   `https://proj.ruppin.ac.il/igroup18/test2/tar1/api/Simulation/run-with-walking-distances`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -401,12 +400,12 @@ async function showWalkingDirections(
   shelterLng
 ) {
   //old version
-  //const googleMapsClient = new GoogleMapsClient("https://localhost", PORT);
+  const googleMapsClient = new GoogleMapsClient("https://localhost", PORT);
 
   //new version
-  const googleMapsClient = new GoogleMapsClient(
-    "https://proj.ruppin.ac.il/igroup18/test2/tar1/api/GoogleMaps"
-  );
+  // const googleMapsClient = new GoogleMapsClient(
+  //   "https://proj.ruppin.ac.il/igroup18/test2/tar1/api/GoogleMaps"
+  // );
 
   try {
     const directions = await googleMapsClient.getDirections(
