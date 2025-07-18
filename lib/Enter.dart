@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; /*1*/
 import 'Login.dart'; // ייבוא עמוד ההתחברות
 import 'Register.dart'; // ייבוא עמוד ההרשמה
 import 'base_before_login.dart'; // ייבוא Base_before_login
