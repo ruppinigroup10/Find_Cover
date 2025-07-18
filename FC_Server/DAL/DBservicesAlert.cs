@@ -434,7 +434,8 @@ public class DBservicesAlert
             Dictionary<string, object> paramDic = new Dictionary<string, object>();
             paramDic.Add("@alert_time", alertTime);
             paramDic.Add("@data", data);
-            paramDic.Add("@is_active", !alert.isDrill); // אם זה תרגיל – לא אקטיבי
+            //removed is_active parameter as it now automatically set
+            //paramDic.Add("@is_active", !alert.isDrill); // אם זה תרגיל – לא אקטיבי
             paramDic.Add("@alert_type", alertType);
 
             cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_AddAlert", con, paramDic);

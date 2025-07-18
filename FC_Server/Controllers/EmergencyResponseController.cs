@@ -247,7 +247,110 @@ namespace FC_Server.Controllers
             }
         }
 
+        /// <summary>
+        /// Debug endpoint to test FCM without actual allocation
+        /// Add this to your EmergencyResponseController
+        /// </summary>
+        [HttpPost("test-fcm-flow")]
+        public async Task<IActionResult> TestFCMFlow([FromBody] UserLocationRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("=== Starting FCM Flow Test ===");
 
+                // Step 1: Check for active alert
+                var activeAlert = await _emergencyAlertService.GetActiveAlertForLocation(
+                    request.Latitude,
+                    request.Longitude);
+
+                if (activeAlert == null)
+                {
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "No active alert found. First simulate an alert using POST /api/Alert/simulate",
+                        debugInfo = new
+                        {
+                            searchedLocation = new { lat = request.Latitude, lon = request.Longitude },
+                            tip = "Make sure the simulated alert covers this location"
+                        }
+                    });
+                }
+
+                _logger.LogInformation($"Found active alert: {activeAlert.AlertId}");
+
+                // Step 2: Simulate finding a shelter (without actual allocation)
+                var testShelter = new
+                {
+                    ShelterId = 999,
+                    Name = "מרחב מוגן לבדיקה",
+                    Address = "רחוב הבדיקה 1, באר שבע",
+                    Latitude = 31.2600,
+                    Longitude = 34.8000
+                };
+
+                // Step 3: Send test FCM
+                var data = new Dictionary<string, string>
+        {
+            { "type", "shelter_allocation" },
+            { "shelter_id", testShelter.ShelterId.ToString() },
+            { "latitude", testShelter.Latitude.ToString(CultureInfo.InvariantCulture) },
+            { "longitude", testShelter.Longitude.ToString(CultureInfo.InvariantCulture) },
+            { "address", testShelter.Address },
+            { "name", testShelter.Name }
+        };
+
+                try
+                {
+                    await _notificationSender.SendNotificationAsync(
+                        title: "נמצא עבורך מרחב מוגן",
+                        body: "לחץ לניווט",
+                        data: data,
+                        topic: $"user_{request.UserId}"
+                    );
+
+                    _logger.LogInformation($"FCM sent successfully to topic: user_{request.UserId}");
+
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "FCM test notification sent successfully",
+                        fcmDetails = new
+                        {
+                            topic = $"user_{request.UserId}",
+                            title = "נמצא עבורך מרחב מוגן",
+                            body = "לחץ לניווט",
+                            data = data
+                        },
+                        alertInfo = new
+                        {
+                            alertId = activeAlert.AlertId,
+                            alertType = activeAlert.AlertType,
+                            centerLat = activeAlert.CenterLatitude,
+                            centerLon = activeAlert.CenterLongitude
+                        },
+                        testShelter = testShelter
+                    });
+                }
+                catch (Exception fcmEx)
+                {
+                    _logger.LogError(fcmEx, "FCM test failed");
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "FCM sending failed",
+                        error = fcmEx.Message,
+                        alertFound = true,
+                        alertId = activeAlert.AlertId
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FCM flow test failed");
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
+        }
 
         /*קסניה*/
         /*
@@ -897,7 +1000,7 @@ namespace FC_Server.Controllers
         }
 
         #endregion
-    
 
-    } 
+
+    }
 }
