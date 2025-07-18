@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using FC_Server.Models;
 using FC_Server.Services;
 using FC_Server.DAL;
+using System.Globalization;
 
 namespace FC_Server.Controllers
 {
@@ -163,24 +164,53 @@ namespace FC_Server.Controllers
                     allocationResult.AllocatedShelterId.Value,
                     request.Latitude,
                     request.Longitude);
-/*
-                // ======== כאן נוסף: שליחת התראת FCM למשתמש ========
+
                 try
                 {
+                    var shelterDetails = allocationResult.ShelterDetails;
+
+                    var data = new Dictionary<string, string>
+    {
+        { "type", "shelter_allocation" },
+        { "shelter_id", allocationResult.AllocatedShelterId.ToString() },
+        { "latitude", shelterDetails.Latitude.ToString(CultureInfo.InvariantCulture) },
+        { "longitude", shelterDetails.Longitude.ToString(CultureInfo.InvariantCulture) },
+        { "address", shelterDetails.Address },
+        { "name", allocationResult.ShelterName }
+    };
+
                     await _notificationSender.SendNotificationAsync(
-                        shelterId: allocationResult.AllocatedShelterId.Value.ToString(),
-                        latitude: allocationResult.ShelterDetails.Latitude,
-                        longitude: allocationResult.ShelterDetails.Longitude
+                        title: "נמצא עבורך מרחב מוגן",
+                        body: "לחץ לניווט",
+                        data: data,
+                        topic: $"user_{request.UserId}"  // או device token אם יש לך
                     );
 
-                    _logger.LogInformation("FCM notification sent successfully to user {UserId}", request.UserId);
+                    _logger.LogInformation("FCM push sent successfully for user {UserId}", request.UserId);
                 }
-                catch (Exception fcmEx)
+                catch (Exception ex)
                 {
-                    _logger.LogError(fcmEx, "Failed to send FCM notification to user {UserId}", request.UserId);
+                    _logger.LogError(ex, "Failed to send FCM push to user {UserId}", request.UserId);
                 }
-                // ========================================================
-*/
+
+                /*
+                                // ======== כאן נוסף: שליחת התראת FCM למשתמש ========
+                                try
+                                {
+                                    await _notificationSender.SendNotificationAsync(
+                                        shelterId: allocationResult.AllocatedShelterId.Value.ToString(),
+                                        latitude: allocationResult.ShelterDetails.Latitude,
+                                        longitude: allocationResult.ShelterDetails.Longitude
+                                    );
+
+                                    _logger.LogInformation("FCM notification sent successfully to user {UserId}", request.UserId);
+                                }
+                                catch (Exception fcmEx)
+                                {
+                                    _logger.LogError(fcmEx, "Failed to send FCM notification to user {UserId}", request.UserId);
+                                }
+                                // ========================================================
+                */
                 return Ok(new ShelterRouteResponse
                 {
                     Success = true,

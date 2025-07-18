@@ -16,8 +16,11 @@ public class FirebaseNotificationSender
         _serviceAccountPath = serviceAccountPath;
         _projectId = projectId;
     }
-
-    public async Task SendNotificationAsync(Dictionary<string, string> data, string topic = "alerts")
+    public async Task SendNotificationAsync(
+     Dictionary<string, string> data,
+     string topic = "alerts",
+     string title = null,
+     string body = null)
     {
         string[] scopes = { "https://www.googleapis.com/auth/firebase.messaging" };
         GoogleCredential credential = GoogleCredential
@@ -26,33 +29,77 @@ public class FirebaseNotificationSender
 
         string accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
 
-        using (var client = new HttpClient())
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var message = new
         {
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", accessToken);
+            message = new Dictionary<string, object>
+        {
+            { "topic", topic },
+            { "data", data }
+        }
+        };
 
-            var message = new
+        // רק אם יש title/body – נוסיף שדה notification
+        if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(body))
+        {
+            ((Dictionary<string, object>)message.message).Add("notification", new
             {
-                message = new
-                {
-                    topic = topic,
-                    data = data
-                }
-            };
+                title = title,
+                body = body
+            });
+        }
 
-            var json = JsonSerializer.Serialize(message);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var json = JsonSerializer.Serialize(message);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var url = $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send";
-            var response = await client.PostAsync(url, content);
+        var url = $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send";
+        var response = await client.PostAsync(url, content);
 
+        if (!response.IsSuccessStatusCode)
+        {
             string responseBody = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception($"FCM send failed: {response.StatusCode}, {responseBody}");
-            }
+            throw new Exception($"FCM send failed: {response.StatusCode}, {responseBody}");
         }
     }
+    //    public async Task SendNotificationAsync(Dictionary<string, string> data, string topic = "alerts")
+    //    {
+    //        string[] scopes = { "https://www.googleapis.com/auth/firebase.messaging" };
+    //        GoogleCredential credential = GoogleCredential
+    //            .FromFile(_serviceAccountPath)
+    //            .CreateScoped(scopes);
+
+    //        string accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
+
+    //        using (var client = new HttpClient())
+    //        {
+    //            client.DefaultRequestHeaders.Authorization =
+    //                new AuthenticationHeaderValue("Bearer", accessToken);
+
+    //            var message = new
+    //            {
+    //                message = new
+    //                {
+    //                    topic = topic,
+    //                    data = data
+    //                }
+    //            };
+
+    //            var json = JsonSerializer.Serialize(message);
+    //            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+    //            var url = $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send";
+    //            var response = await client.PostAsync(url, content);
+
+    //            string responseBody = await response.Content.ReadAsStringAsync();
+    //            if (!response.IsSuccessStatusCode)
+    //            {
+    //                throw new Exception($"FCM send failed: {response.StatusCode}, {responseBody}");
+    //            }
+    //        }
+    //    }
 }
 
 /*--------------------------------------*/

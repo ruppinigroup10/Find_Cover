@@ -41,14 +41,17 @@ namespace FC_Server.Controllers
 
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
-                await _fcmSender.SendNotificationAsync(
-                        data: new Dictionary<string, string>
-                        {
-                            { "type", "trigger_location" },
-                            { "code", "FIND_SHELTER" }
-                        },
-                        topic: "alerts"
-                    );
+               await _fcmSender.SendNotificationAsync(
+    title: "Alert Notification",
+    body: "A simulated alert has been triggered.",
+    data: new Dictionary<string, string>
+    {
+        { "type", "trigger_location" },
+        { "code", "FIND_SHELTER" }
+    },
+    topic: "alerts"
+);
+
 
 
                 return Ok("Simulated alert sent and notification pushed.");
@@ -76,14 +79,23 @@ namespace FC_Server.Controllers
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
                 await _fcmSender.SendNotificationAsync(
-                        data: new Dictionary<string, string>
-                        {
-                            { "type", "trigger_location" },
-                            { "code", "FIND_SHELTER" }
-                        },
-                        topic: "alerts"
-                    );
-
+    data: new Dictionary<string, string>
+    {
+        { "type", "trigger_location" },
+        { "code", "FIND_SHELTER" }
+    },
+    topic: "alerts"
+);
+                //await _fcmSender.SendNotificationAsync(
+                //    title: "Alert Notification",
+                //    body: "A simulated alert has been triggered for Emek Hefer.",
+                //    data: new Dictionary<string, string>
+                //    {
+                //       { "type", "trigger_location" },
+                //       { "code", "FIND_SHELTER" }
+                //    },
+                //    topic: "alerts"
+                //);
 
                 return Ok("Simulated alert sent and notification pushed.");
             }
