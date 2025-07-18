@@ -63,6 +63,20 @@ public class FirebaseNotificationSender
             string responseBody = await response.Content.ReadAsStringAsync();
             throw new Exception($"FCM send failed: {response.StatusCode}, {responseBody}");
         }
+
+
+        // check if the response is successful
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[FCM ERROR] Status: {response.StatusCode}, Body: {responseBody}");
+            throw new Exception($"FCM send failed: {response.StatusCode}, {responseBody}");
+        }
+        else
+        {
+            string responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[FCM SUCCESS] Response: {responseBody}");
+        }
     }
     //    public async Task SendNotificationAsync(Dictionary<string, string> data, string topic = "alerts")
     //    {
