@@ -1,0 +1,2 @@
+C:/Users/HP/Desktop/FCFlutter/fc_flutter/android/app/.cxx/RelWithDebInfo/513wq5x6/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/HP/Desktop/FCFlutter/fc_flutter/android/app/.cxx/RelWithDebInfo/513wq5x6/armeabi-v7a/CMakeFiles/rebuild_cache.dir
