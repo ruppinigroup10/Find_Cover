@@ -22,31 +22,109 @@ namespace FC_Server.Services
             _dbAlert = new DBservicesAlert();
         }
 
+        ///old
+
         /// <summary>
+        /// בדיקה אם יש התראה פעילה במיקום מסוים
+        /// </summary>
+        // public async Task<ActiveAlert> GetActiveAlertForLocation(double lat, double lon)
+        // {
+        //     try
+        //     {
+        //         // Call the method that returns ActiveAlert
+        //         var alert = await _dbAlert.GetActiveAlertForLocation(lat, lon);
+
+        //         if (alert != null)
+        //         {
+        //             _logger.LogInformation($"Found active alert: {alert.AlertType} (ID: {alert.AlertId}) at location ({lat}, {lon})");
+        //         }
+        //         else
+        //         {
+        //             _logger.LogInformation($"No active alerts found for location ({lat}, {lon})");
+        //         }
+
+        //         return alert;
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Error getting active alert for location ({Lat}, {Lon})", lat, lon);
+        //         return null; // במקרה של שגיאה, נניח שאין התראה
+        //     }
+        // }
+
+
+        ///New 
+        /// 
+        // <summary>
         /// בדיקה אם יש התראה פעילה במיקום מסוים
         /// </summary>
         public async Task<ActiveAlert> GetActiveAlertForLocation(double lat, double lon)
         {
             try
             {
-                // Call the method that returns ActiveAlert
-                var alert = await _dbAlert.GetActiveAlertForLocation(lat, lon);
+                _logger.LogInformation($"Checking for active alerts at location ({lat}, {lon})");
 
-                if (alert != null)
+                // Get ALL active alerts with zone data
+                var allAlertsWithZones = await _dbAlert.GetAllActiveAlertsWithZones();
+
+                if (allAlertsWithZones == null || !allAlertsWithZones.Any())
                 {
-                    _logger.LogInformation($"Found active alert: {alert.AlertType} (ID: {alert.AlertId}) at location ({lat}, {lon})");
-                }
-                else
-                {
-                    _logger.LogInformation($"No active alerts found for location ({lat}, {lon})");
+                    _logger.LogInformation("No active alerts in the system");
+                    return null;
                 }
 
-                return alert;
+                // Check each alert to see if user is in any of its zones
+                foreach (var alertData in allAlertsWithZones)
+                {
+                    if (string.IsNullOrEmpty(alertData.PolygonCoordinates))
+                    {
+                        _logger.LogWarning($"Zone {alertData.ZoneName} has no polygon data");
+                        continue;
+                    }
+
+                    // Create AlertZone object to use its ContainsPoint method
+                    var zone = new AlertZone
+                    {
+                        ZoneName = alertData.ZoneName,
+                        PolygonCoordinates = alertData.PolygonCoordinates,
+                        ResponseTime = alertData.ResponseTimeSeconds
+                    };
+
+                    // Check if user is inside this zone's polygon
+                    if (zone.ContainsPoint(lat, lon))
+                    {
+                        _logger.LogInformation($"User IS INSIDE zone: {zone.ZoneName} for alert {alertData.AlertId}");
+
+                        // User is in this alert zone! Return the alert
+                        return new ActiveAlert
+                        {
+                            AlertId = alertData.AlertId,
+                            AlertTime = alertData.AlertTime,
+                            EndTime = alertData.EndTime,
+                            AlertType = alertData.AlertType,
+                            Data = alertData.Data,
+                            IsActive = true,
+                            AreaName = alertData.AreaName,
+                            ResponseTimeSeconds = zone.ResponseTime,
+                            CenterLatitude = alertData.CenterLatitude,
+                            CenterLongitude = alertData.CenterLongitude,
+                            RadiusKm = alertData.RadiusKm,
+                            CreatedBy = alertData.CreatedBy
+                        };
+                    }
+                    else
+                    {
+                        _logger.LogDebug($"User is NOT in zone: {zone.ZoneName}");
+                    }
+                }
+
+                _logger.LogInformation($"No active alerts found for location ({lat}, {lon}) after checking all polygons");
+                return null;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting active alert for location ({Lat}, {Lon})", lat, lon);
-                return null; // במקרה של שגיאה, נניח שאין התראה
+                return null;
             }
         }
 

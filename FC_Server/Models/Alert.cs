@@ -5,14 +5,14 @@
     /// </summary>
     public class Alert
     {
-        // Keep existing properties:
+        // for Tzeva Adom
         public string notificationId { get; set; }
         public long time { get; set; }
         public int threat { get; set; }
         public bool isDrill { get; set; }
         public List<string> cities { get; set; }
 
-        // Add these new properties for database compatibility:
+        // new properties for database
         public int AlertId { get; set; }
         public string AlertType { get; set; }
         public double CenterLatitude { get; set; }
@@ -75,5 +75,26 @@
         public DateTime? EndTime { get; set; }
         public string AlertType { get; set; }
         public bool IsActive { get; set; }
+    }
+
+    /// <summary>
+    /// Helper class to hold alert and zone data together for polygon checking
+    /// Used when checking if a user location is inside an alert zone polygon
+    /// </summary>
+    public class AlertWithZoneData
+    {
+        public int AlertId { get; set; }
+        public DateTime AlertTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public string AlertType { get; set; }
+        public string Data { get; set; }
+        public double CenterLatitude { get; set; }
+        public double CenterLongitude { get; set; }
+        public double RadiusKm { get; set; }
+        public string CreatedBy { get; set; }
+        public string AreaName { get; set; }
+        public int ResponseTimeSeconds { get; set; }
+        public string ZoneName { get; set; }
+        public string PolygonCoordinates { get; set; }
     }
 }

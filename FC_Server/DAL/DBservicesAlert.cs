@@ -404,6 +404,69 @@ public class DBservicesAlert
         }
     }
 
+    //--------------------------------------------------------------------------------------------------
+    // Get all active alerts with zone data
+    //--------------------------------------------------------------------------------------------------
+
+    public async Task<List<AlertWithZoneData>> GetAllActiveAlertsWithZones()
+    {
+        return await Task.Run(() =>
+        {
+            SqlConnection con = null;
+            SqlCommand cmd;
+            var results = new List<AlertWithZoneData>();
+
+            try
+            {
+                con = connect("myProjDB");
+
+                // Call the SP - it now returns all alerts, no need for location params
+                Dictionary<string, object> paramDic = new Dictionary<string, object>();
+                paramDic.Add("@userLatitude", 0); // Dummy values since SP doesn't use them
+                paramDic.Add("@userLongitude", 0);
+
+                cmd = CreateCommandWithStoredProcedureGeneral("FC_SP_GetActiveAlertForLocation", con, paramDic);
+
+                using (SqlDataReader dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+                        var alertData = new AlertWithZoneData
+                        {
+                            AlertId = Convert.ToInt32(dr["alert_id"]),
+                            AlertTime = Convert.ToDateTime(dr["alert_time"]),
+                            EndTime = dr["end_time"] != DBNull.Value ? Convert.ToDateTime(dr["end_time"]) : (DateTime?)null,
+                            AlertType = dr["alert_type"]?.ToString() ?? "rocket",
+                            Data = dr["data"]?.ToString(),
+                            CenterLatitude = dr["center_latitude"] != DBNull.Value ? Convert.ToDouble(dr["center_latitude"]) : 0,
+                            CenterLongitude = dr["center_longitude"] != DBNull.Value ? Convert.ToDouble(dr["center_longitude"]) : 0,
+                            RadiusKm = dr["radius_km"] != DBNull.Value ? Convert.ToDouble(dr["radius_km"]) : 0,
+                            CreatedBy = dr["created_by"]?.ToString() ?? "System",
+                            AreaName = dr["area_name"]?.ToString(),
+                            ResponseTimeSeconds = dr["response_time_seconds"] != DBNull.Value ? Convert.ToInt32(dr["response_time_seconds"]) : 90,
+                            ZoneName = dr["zone_name"]?.ToString(),
+                            PolygonCoordinates = dr["polygon_coordinates"]?.ToString()
+                        };
+
+                        results.Add(alertData);
+                    }
+                }
+                return results;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Get all active alerts with zones failed: {ex.Message}");
+            }
+            finally
+            {
+                if (con != null && con.State == ConnectionState.Open)
+                {
+                    con.Close();
+                }
+            }
+        });
+    }
+
     public void SaveAlertsToDb(List<Alert> alerts)
     {
         SqlConnection con;
