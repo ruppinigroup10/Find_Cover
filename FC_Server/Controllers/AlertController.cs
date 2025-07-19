@@ -42,8 +42,8 @@ namespace FC_Server.Controllers
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
                await _fcmSender.SendNotificationAsync(
-    title: "Alert Notification",
-    body: "A simulated alert has been triggered.",
+    title: "נמצא עבורך מרחב מוגן",
+    body: "לחץ לניווט",
     data: new Dictionary<string, string>
     {
         { "type", "trigger_location" },
@@ -79,6 +79,8 @@ namespace FC_Server.Controllers
                 _db.SaveAlertsToDb(new List<Alert> { fakeAlert });
 
                 await _fcmSender.SendNotificationAsync(
+     title: "נמצא עבורך מרחב מוגן",
+    body: "לחץ לניווט",
     data: new Dictionary<string, string>
     {
         { "type", "trigger_location" },
