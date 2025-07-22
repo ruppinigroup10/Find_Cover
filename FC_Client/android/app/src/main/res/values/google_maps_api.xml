@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+    TODO: Before you run your application, you need a Google Maps API key.
+
+    To get one, follow this link, follow the directions and press "Create" at the end:
+
+    https://console.developers.google.com/flows/enableapi?apiid=maps_android_backend&keyType=CLIENT_SIDE_ANDROID&r=SHA1:E1:ED:5A:9E:34:93:4B:7D:7D:7F:15:A9:2E:3E:86:4C:FB:0B:1F:7C%3Bcom.example.fc_flutter_new
+
+    You can also add your credentials to the file directly here, or in the manifest:
+    -->
+    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyC400d5hqO47q1OYkWQeFMhENFXng1V3bI</string>
+</resources>
