@@ -1655,7 +1655,7 @@ class ShelterSimulationVisualizer {
 
       // Call the server API
       const response = await fetch(
-        `https://localhost:${PORT}/api/Simulation/run`,
+        `https://proj.ruppin.ac.il/igroup18/test2/tar1/api/Simulation/run`,
         {
           method: "POST",
           headers: {

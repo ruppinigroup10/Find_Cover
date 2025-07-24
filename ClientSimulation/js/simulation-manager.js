@@ -87,7 +87,7 @@ async function runServerSimulation() {
     };
 
     const response = await fetch(
-      `https://localhost:${PORT}/api/Simulation/run`,
+      `https://proj.ruppin.ac.il/igroup18/test2/tar1/api/Simulation/run`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -547,7 +547,7 @@ async function runManualSimulationWithWalkingDistances() {
     };
 
     const response = await fetch(
-      `https://localhost:${PORT}/api/Simulation/run-with-walking-distances`,
+      `https://proj.ruppin.ac.il/igroup18/test2/tar1/api/Simulation/run-with-walking-distances`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
